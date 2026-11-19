@@ -25,9 +25,18 @@ events a term took, EVENT_RETENTION after that term, and terms older than
 FIRING_RETENTION with their events; never a term whose run is still open, never an
 event still waiting for an active rule's quiet time to end. Events waiting with a
 deleted rule go, and those a paused rule took in more than EVENT_RETENTION ago. The
-same cleanup removes `/mcp`'s call rows (`mcp_call`) older than MCP_CALL_RETENTION.
+same cleanup removes `/mcp`'s call rows (`mcp_call`) older than MCP_CALL_RETENTION,
+the files of storage tombstones older than their grace that nothing uses again
+(`core/storage_tombstones.py`, plan M9 decision 4), and the rows whose time has run
+out (`upkeep.py`: sessions, flows, grants, rate limits; and backups whose process
+died). The periods are the
+retention catalogue's (`core/retention.py`).
 
-The time comes from a `Clock` (`app.core.clock`); tests set theirs. A task of its own
+In maintenance (plan M9 decision 9: the process's cache, `paused`) a round does
+nothing: no term fires, no review step, no cleanup.
+
+The time comes from a `Clock` (`app.core.clock`); tests set theirs. Only the expiry
+upkeep judges at the wall time, as the modules that write those rows do. A task of its own
 reads the gauges from the database every METRICS_SECONDS (`automations/metrics.py`:
 due automations, the lag of the oldest due term, paused ones by reason, spaces the
 review has still to go through today). Up to two database connections at a time.
@@ -40,18 +49,25 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.db import Database
+from app.core.models_base import utcnow
+from app.core.retention import upkeep_after
+from app.core.storage import get_storage
+from app.core.storage_tombstones import remove_buried
 from app.modules.automations.firing import Fired, fire_next, set_aside
 from app.modules.automations.metrics import automation_metrics
 from app.modules.automations.upkeep_repository import UpkeepRepository
+from app.modules.maintenance.cache import in_maintenance
 from app.modules.mcp_tools.repository import delete_calls_before
+from app.modules.wiki.attachment_files import blob_in_use
 from app.modules.wiki.review_pass import Step, review_next
 from app.modules.wiki.review_repository import ReviewRepository
+from app.worker.upkeep import run_upkeep
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +76,9 @@ BATCH = 50
 REVIEW_STEPS = 20
 MAX_ERROR_WAIT_SECONDS = 30.0
 METRICS_SECONDS = 10.0
-FIRING_RETENTION = timedelta(days=90)  # terms in the log (with the events they took)
-EVENT_RETENTION = timedelta(days=7)  # events a term took, after that term
-MCP_CALL_RETENTION = timedelta(days=90)  # `/mcp`'s call rows
+FIRING_RETENTION = upkeep_after("automation_firing")  # terms (with the events they took)
+EVENT_RETENTION = upkeep_after("automation_event")  # events a term took, after that term
+MCP_CALL_RETENTION = upkeep_after("mcp_call")  # `/mcp`'s call rows
 CLEANUP_BATCH = 1000
 CLEANUP_EVERY_SECONDS = 60.0
 
@@ -74,9 +90,11 @@ class DueLoop:
         *,
         clock: Clock = SYSTEM_CLOCK,
         cleanup_batch: int = CLEANUP_BATCH,
+        paused: Callable[[], bool] = in_maintenance,
     ) -> None:
         self.database = database
         self.clock = clock
+        self.paused = paused
         self.cleanup_batch = cleanup_batch
         self._last_cleanup: float | None = None
         self.metrics = automation_metrics()  # only processes with a worker export these
@@ -109,7 +127,9 @@ class DueLoop:
     async def round(self) -> bool:
         """Fire due automations, then review steps, then the cleanup if due, each
         whatever the others did; whether more may be due. The first error is raised
-        once all three had their turn."""
+        once all three had their turn. Nothing in maintenance."""
+        if self.paused():
+            return False
         errors: list[Exception] = []
         fired = await _guarded(self.pass_once(), errors, 0)
         steps = await _guarded(self.review_once(), errors, 0)
@@ -194,7 +214,12 @@ class DueLoop:
         if self._last_cleanup is not None and now - self._last_cleanup < CLEANUP_EVERY_SECONDS:
             return None
         self._last_cleanup = now
-        return await self.cleanup()
+        removed = await self.cleanup()
+        await self.remove_buried_files()
+        await run_upkeep(  # expiry at the wall time (`upkeep.py`)
+            self.database, wall=utcnow(), now=self.clock.now(), limit=self.cleanup_batch
+        )
+        return removed
 
     async def cleanup(self) -> tuple[int, int, int]:
         """Remove what the log no longer needs, batch by batch (one transaction each):
@@ -217,6 +242,18 @@ class DueLoop:
             lambda s: delete_calls_before(s, now - MCP_CALL_RETENTION, limit)
         )
         return terms, events, calls
+
+    async def remove_buried_files(self) -> int:
+        """Remove the files of tombstones older than their grace that no attachment
+        uses again, batch by batch (one transaction each); how many files."""
+        storage, now, limit = get_storage(), self.clock.now(), self.cleanup_batch
+        files = 0
+        while True:
+            async with self.database.session_factory() as session, session.begin():
+                taken, removed = await remove_buried(session, storage, now, blob_in_use, limit)
+            files += removed
+            if taken < limit:
+                return files
 
     async def _batches(self, step: Callable[[AsyncSession], Awaitable[int]]) -> int:
         removed = 0

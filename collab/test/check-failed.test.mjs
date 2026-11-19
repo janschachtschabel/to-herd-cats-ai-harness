@@ -28,14 +28,14 @@ function failing(...kinds) {
 
 test("a page too heavy to check is too large for live editing", async () => {
   live = await liveFixture({ markdown: "Text", createCollabServer, checks: failing("open") });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await until(() => anna.closes.includes(4413));
   assert.equal(live.api.saves.length, 0);
 });
 
 test("a state too heavy to check is not stored, and everyone is told", async () => {
   live = await liveFixture({ markdown: "Text", createCollabServer, checks: failing("readBack") });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await synced(anna);
   const heard = [];
   anna.provider.on("stateless", ({ payload }) => heard.push(payload));

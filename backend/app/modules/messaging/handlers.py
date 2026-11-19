@@ -3,7 +3,8 @@
 delivery, metric labels)."""
 
 from app.modules.messaging import notifications, threads
-from app.modules.messaging.live_events import LIVE_TYPES, publish_live
+from app.modules.messaging.live_events import LIVE_TYPES
+from app.modules.messaging.live_publish import publish_live
 from app.modules.wiki.events import PAGE_EVENTS
 from app.worker.registry import handler
 

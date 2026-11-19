@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.outbox import Event, EventOutbox
 from app.core.principal import Principal
-from app.modules.messaging.live_events import of_event
+from app.modules.messaging.live_publish import of_event
 from app.modules.messaging.notification_models import Notification
 from app.modules.messaging.notifications import notify_on_message
 from app.modules.spaces.repository import SpaceRepository

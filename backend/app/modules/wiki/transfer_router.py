@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.core.downloads import content_disposition, file_chunks
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.auth.write_limits import UPLOAD
 from app.modules.wiki.export import PageExport
 from app.modules.wiki.transfer import ImportResult, PageImport
 
@@ -49,7 +50,9 @@ class ImportResultOut(BaseModel):
         )
 
 
-@space_transfer.post("/import", response_model=ImportResultOut, openapi_extra=_ZIP_BODY)
+@space_transfer.post(
+    "/import", response_model=ImportResultOut, openapi_extra=_ZIP_BODY, dependencies=UPLOAD
+)
 async def import_space(
     space_id: uuid.UUID, request: Request, actor: ActorDep, session: SessionDep
 ) -> ImportResultOut:

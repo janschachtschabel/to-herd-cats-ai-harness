@@ -1,9 +1,11 @@
 """Minimal generic repository. Module repositories extend it with real queries."""
 
 import uuid
+from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
-from sqlalchemy import CTE, Select, func, select
+from sqlalchemy import CTE, ColumnElement, Select, func, literal, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import Base
@@ -51,3 +53,23 @@ async def limit_time(session: AsyncSession, lock_ms: int, statement_ms: int) -> 
             func.set_config("statement_timeout", f"{max(1, statement_ms)}ms", True),
         )
     )
+
+
+@dataclass(frozen=True, slots=True)
+class DayKey:
+    """Where a page of a list ordered by (day, id) starts: from `day` on, and on `day`
+    itself only after `after_id` (None: the whole of `day`)."""
+
+    day: date
+    after_id: uuid.UUID | None = None
+
+
+def from_day(
+    day: ColumnElement[date], id_: ColumnElement[uuid.UUID], key: DayKey | None
+) -> ColumnElement[bool]:
+    """The rows at or after `key` in the order (day, id); every row without one."""
+    if key is None:
+        return literal(True)
+    if key.after_id is None:
+        return day >= key.day
+    return tuple_(day, id_) > tuple_(literal(key.day), literal(key.after_id))

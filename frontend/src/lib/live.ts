@@ -21,6 +21,9 @@ export const LIVE_EVENTS = [
   'card.changed',
   'skill_proposal.changed',
   'automation.changed',
+  'backup.changed',
+  'calendar.changed',
+  'event.invited',
   'resync',
 ] as const
 
@@ -44,6 +47,11 @@ export interface LiveEvent {
   /** An automation that changed or fired a term (`automation.changed`, with the space
    *  of its place; none for a DM). */
   automationId?: string | null
+  /** A calendar whose events changed (`calendar.changed`, with its space). */
+  calendarId?: string | null
+  /** An event one was invited to, or whose time or state changed for one
+   *  (`event.invited`, for that person alone). */
+  eventId?: string | null
 }
 
 /** `limited`: the server refused another stream for this session (429, too many tabs). */
@@ -88,8 +96,8 @@ function idOrNull(value: unknown): string | null {
  *  `ticket_id` and `space_id`; a sprint's is `{"space_id", "sprint_id"}`, and the
  *  space is all a client refreshes by; an agent run's progress adds `run_id` and
  *  `step`; a proposal's is `{"space_id", "proposal_id"}`, a skill proposal's adds
- *  `proposal_id`; an automation's is `{"automation_id", "space_id"}`); null if
- *  unreadable. */
+ *  `proposal_id`; an automation's is `{"automation_id", "space_id"}`; a calendar's
+ *  `{"space_id", "calendar_id"}`, an invitation's `{"event_id"}`); null if unreadable. */
 export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | null {
   try {
     const value: unknown = JSON.parse(data || '{}')
@@ -108,6 +116,12 @@ export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | n
     }
     if (type === 'automation.changed') {
       return { ...event, automationId: idOrNull(fields.automation_id) }
+    }
+    if (type === 'calendar.changed') {
+      return { ...event, calendarId: idOrNull(fields.calendar_id) }
+    }
+    if (type === 'event.invited') {
+      return { ...event, eventId: idOrNull(fields.event_id) }
     }
     if (type !== 'run.progress') return event
     const step = Number.isInteger(fields.step) ? (fields.step as number) : null

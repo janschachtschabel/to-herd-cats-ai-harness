@@ -1,13 +1,13 @@
 import { Link } from '@tanstack/react-router'
-import { LayoutDashboard, SquareKanban } from 'lucide-react'
+import { CalendarDays, LayoutDashboard, SquareKanban } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useTicketCount } from '@/features/tickets/queries'
 import { badgeCount } from '@/lib/format'
 import { navLinkActive, navLinkClass } from './navStyles'
 import { SectionHeading } from './SectionHeading'
 
-/** "Work" (spec 6.2): the tickets, with how many unfinished ones are mine, and my
- *  board across spaces (plan M4b). */
+/** "Work" (spec 6.2): the tickets, with how many unfinished ones are mine, my board
+ *  across spaces (plan M4b) and the calendar (plan M10). */
 export function WorkSection() {
   const { t } = useTranslation()
   const count = useTicketCount()
@@ -31,6 +31,12 @@ export function WorkSection() {
           <Link to="/my-board" className={navLinkClass} activeProps={navLinkActive}>
             <LayoutDashboard className="size-4 shrink-0" aria-hidden />
             <span className="flex-1">{t('nav.myBoard')}</span>
+          </Link>
+        </li>
+        <li>
+          <Link to="/calendar" className={navLinkClass} activeProps={navLinkActive}>
+            <CalendarDays className="size-4 shrink-0" aria-hidden />
+            <span className="flex-1">{t('nav.calendar')}</span>
           </Link>
         </li>
       </ul>

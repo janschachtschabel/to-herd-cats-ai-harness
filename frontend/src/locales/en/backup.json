@@ -1,0 +1,177 @@
+{
+  "nav": {
+    "backup": "Backup"
+  },
+  "maintenance": {
+    "title": "Maintenance",
+    "text": "The installation is in maintenance: a backup is being restored. Afterwards you sign in again.",
+    "checking": "This page checks every few seconds whether it is over."
+  },
+  "backup": {
+    "title": "Backup",
+    "description": "Backups of the whole installation: database and attachments in one archive. Only owners see this page.",
+    "start": "Back up now",
+    "starting": "Requesting …",
+    "runs": {
+      "title": "Backups",
+      "empty": "No backup yet.",
+      "started": "Started",
+      "trigger": "Trigger",
+      "state": "State",
+      "size": "Size",
+      "archive": "Archive",
+      "offsite": "Offsite",
+      "waiting": "waiting for the worker"
+    },
+    "triggers": {
+      "schedule": "schedule",
+      "cli": "command line",
+      "admin": "administration",
+      "pre_restore": "before a restore"
+    },
+    "states": {
+      "running": "running",
+      "ok": "done",
+      "failed": "failed",
+      "interrupted": "interrupted"
+    },
+    "offsite": {
+      "off": "off",
+      "ok": "copied",
+      "failed": "failed"
+    },
+    "archives": {
+      "title": "Archives",
+      "description": "The archives in the backup directory. Upload an archive of another installation here.",
+      "empty": "No archive yet.",
+      "name": "Name",
+      "created": "Created",
+      "size": "Size",
+      "origin": "Origin",
+      "uploaded": "uploaded",
+      "made": "backup",
+      "upload": "Upload archive",
+      "uploading": "Uploading …",
+      "uploaded_done": "{{name}} is uploaded and checked.",
+      "download": "Download",
+      "downloadLabel": "Download {{name}}",
+      "check": "Check",
+      "checkLabel": "Check {{name}}",
+      "file": "Archive (.tar)"
+    },
+    "check": {
+      "title": "Check of {{name}}",
+      "checking": "Reading and checking the archive …",
+      "what": "Item",
+      "archive": "Archive",
+      "installation": "This installation",
+      "appVersion": "Version",
+      "revision": "Database revision",
+      "server": "PostgreSQL",
+      "tools": "pg_dump / pg_restore",
+      "storage": "Storage",
+      "tables": "Tables",
+      "rows": "Rows",
+      "files": "Files",
+      "fileCount": "{{count}} ({{size}})",
+      "createdAt": "Created on {{at}}.",
+      "key": "Key (HERD_SECRET_KEY)",
+      "keys": {
+        "match": "fits",
+        "mismatch": "does not fit",
+        "missing": "missing",
+        "not_needed": "not needed (no encrypted values)"
+      },
+      "keyBlocked": "This installation's key does not fit the archive: its encrypted values would be unreadable. Restoring is blocked.",
+      "problems": "What prevents restoring",
+      "warnings": "Notes",
+      "fine": "The archive is unchanged and fits this installation.",
+      "blocked": "Restoring is blocked while the check reports problems.",
+      "replace": "Restore …"
+    },
+    "replace": {
+      "title": "Replace the installation",
+      "text": "Everything in this installation is replaced by the state of the archive {{name}}. The present state is backed up first. While restoring, the installation is in maintenance; afterwards everyone is signed out.",
+      "confirm": "Type the organisation's name to confirm: {{org}}",
+      "submit": "Replace",
+      "started": "Restoring: the present state is backed up first, then maintenance begins.",
+      "failed": "The last restore ({{name}}) failed: {{reason}}. The previous state is unchanged.",
+      "requested": "Restore of {{name}} requested on {{at}}."
+    },
+    "export": {
+      "title": "Single spaces",
+      "text": "A single space can be exported as a Markdown ZIP at any time: in the space under “Import/Export” → “Export space (ZIP)”. It does not replace a backup of the installation."
+    },
+    "codes": {
+      "archive": {
+        "checksum": "The archive was changed after the backup (checksum differs).",
+        "format_unknown": "Not a backup archive of this format.",
+        "member_missing": "A part of the archive is missing.",
+        "member_checksum": "A part of the archive was changed.",
+        "truncated": "The archive is incomplete (cut off).",
+        "dump_foreign": "The archive's database holds more than this software's schema (such as foreign functions or extensions).",
+        "unreadable": "The archive could not be read.",
+        "exists": "An archive of this name exists already.",
+        "member_twice": "A part would have gone into the archive twice.",
+        "member_size": "A part had another size than expected while it was written."
+      },
+      "restore": {
+        "archive_newer": "The archive comes from a newer version.",
+        "file_conflict": "A file of the archive is here already with other content.",
+        "storage_unavailable": "The file storage does not answer.",
+        "server_too_old": "The PostgreSQL server is older than the archive's.",
+        "tools_too_old": "pg_restore is older than the archive's pg_dump, or pg_restore/psql are older than 16.10 or 17.6.",
+        "secret_key_mismatch": "The key (HERD_SECRET_KEY) does not fit the archive.",
+        "secret_key_missing": "The archive has encrypted values and no key is set here.",
+        "env_missing": "The environment variable {{detail}} is not set here.",
+        "secrets_unreadable": "Stay unreadable: {{detail}}.",
+        "safety_backup_failed": "Backing up the present state failed ({{detail}}).",
+        "already_running": "Another restore or a migration is running.",
+        "confirm_mismatch": "The organisation's name does not match.",
+        "failed": "The restore failed.",
+        "finish_failed": "A step after the restore failed; the installation stays in maintenance.",
+        "not_schema_owner": "With separate database roles the app itself may not restore; that works only on the command line with the migration role (docs/SICHERUNG.md).",
+        "swap_broken": "The archive ended the swap's transaction itself; the old state may be gone. The installation stays in maintenance.",
+        "swap_unknown": "After the swap, the database's state could not be determined. The installation stays in maintenance.",
+        "swap_failed": "Swapping the database failed (an SQL error, missing rights or a lock held for more than 60 seconds); the old state is complete.",
+        "pg_restore_failed": "pg_restore could not read the archive's dump; the old state is complete.",
+        "tool_missing": "pg_restore or psql is missing on the server.",
+        "target_not_empty": "The target database is not empty.",
+        "backup_running": "A backup is running; try again afterwards.",
+        "confirm_missing": "The organisation's name is missing (--confirm).",
+        "superuser_refused": "The app connects to the database with a superuser role; the administration does not restore then. Run the app with a role without superuser rights, or restore on the command line (docs/SICHERUNG.md)."
+      },
+      "backup": {
+        "interrupted": "The process ended before it finished.",
+        "in_restored_archive": "Was running when the restored archive was made.",
+        "dump_failed": "pg_dump failed.",
+        "file_missing": "An attachment file is missing.",
+        "storage_unavailable": "The file storage does not answer.",
+        "io": "Writing into the backup directory failed.",
+        "verify_failed": "The archive was faulty when read back.",
+        "tools_too_old": "pg_dump is older than the server.",
+        "tool_missing": "pg_dump is missing.",
+        "schema_behind": "The database is not at this version's state.",
+        "schema_ahead": "The database is newer than this version.",
+        "no_schema": "The database has no schema.",
+        "failed": "The backup failed.",
+        "already_running": "A backup was running; try again afterwards."
+      }
+    }
+  },
+  "errors": {
+    "backup": {
+      "already_running": "A backup is running or waiting for the worker.",
+      "busy": "Another backup request is being handled. Try again in a moment.",
+      "restore_running": "A restore is running already.",
+      "confirm_mismatch": "The name does not match the organisation's name.",
+      "replace_refused": "The check reports problems: restoring is blocked.",
+      "archive_invalid": "The file is not a valid backup archive.",
+      "upload_too_large": "The archive is larger than this installation accepts (HERD_BACKUP_UPLOAD_MAX_BYTES).",
+      "not_found": "This archive does not exist (any more)."
+    },
+    "restore": {
+      "superuser_refused": "The app connects to the database with a superuser role; the administration does not restore then. Run the app with a role without superuser rights, or restore on the command line (docs/SICHERUNG.md)."
+    }
+  }
+}

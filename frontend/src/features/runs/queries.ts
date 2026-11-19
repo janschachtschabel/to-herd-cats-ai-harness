@@ -9,8 +9,8 @@ export type StopReason = Schemas['StopReason']
 
 /** The filters of a run list (they stand in the address). */
 export interface RunFilters {
-  state?: RunState
-  stop_reason?: StopReason
+  state?: RunState | undefined
+  stop_reason?: StopReason | undefined
 }
 
 /** Run lists share the runs' prefix, so whatever refreshes runs refreshes them too. */

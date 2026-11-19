@@ -43,7 +43,7 @@ describe('a release card', () => {
       args: { page_id: PAGE, content_md: 'Neu', reason: 'Neue Frist' },
       summary: `propose_page_change: page_id=${PAGE}`,
     })
-    const { api, channel } = channelWith(card('approval', 'ap-1', pending.summary), {
+    const { api, channel } = channelWith(card('approval', 'ap-1', pending.tool), {
       'GET /api/approvals/:id': pending,
       'GET /api/approvals/:id/diff': [
         { kind: 'delete', lines: ['Alt'] },
@@ -95,7 +95,7 @@ describe('a release card', () => {
 
   test('a rejection takes an optional reason and shows it', async () => {
     const pending = makeApproval({ id: 'ap-2', tool: 'comment_ticket', diff_url: null })
-    const { api, channel } = channelWith(card('approval', 'ap-2', pending.summary), {
+    const { api, channel } = channelWith(card('approval', 'ap-2', pending.tool), {
       'GET /api/approvals/:id': pending,
       'POST /api/approvals/:id/decide': (call: Call) =>
         makeApproval({
@@ -127,7 +127,7 @@ describe('a release card', () => {
   test('a decision that comes too late is put into words, and the card shows what happened', async () => {
     const pending = makeApproval({ id: 'ap-3' })
     let decided = false
-    const { channel } = channelWith(card('approval', 'ap-3', pending.summary), {
+    const { channel } = channelWith(card('approval', 'ap-3', pending.tool), {
       'GET /api/approvals/:id': () =>
         decided ? makeApproval({ ...pending, state: 'expired', version: 2 }) : pending,
       'POST /api/approvals/:id/decide': () => {
@@ -155,7 +155,7 @@ describe('a release card', () => {
       decided_at: '2026-11-14T10:00:00Z',
       version: 2,
     })
-    const { api, channel } = channelWith(card('approval', 'ap-4', approved.summary), {
+    const { api, channel } = channelWith(card('approval', 'ap-4', approved.tool), {
       'GET /api/approvals/:id': approved,
     })
     await renderApp(`/c/${channel.id}`)
@@ -176,7 +176,7 @@ describe('a release card', () => {
       decided_at: '2026-11-14T10:00:00Z',
       version: 2,
     })
-    const { channel } = channelWith(card('approval', 'ap-6', approved.summary), {
+    const { channel } = channelWith(card('approval', 'ap-6', approved.tool), {
       'GET /api/approvals/:id': approved,
     })
     await renderApp(`/c/${channel.id}`)
@@ -188,7 +188,7 @@ describe('a release card', () => {
   test('someone else who sees the run sees the card without actions, and who decides', async () => {
     const pending = makeApproval({ id: 'ap-5', args: null, diff_url: null })
     const { channel } = channelWith(
-      card('approval', 'ap-5', pending.summary),
+      card('approval', 'ap-5', pending.tool),
       { 'GET /api/approvals/:id': pending },
       'responsible',
     )
@@ -198,13 +198,13 @@ describe('a release card', () => {
     expect(within(shown).queryByRole('button')).toBeNull()
   })
 
-  test('a reader the API does not show the card sees its summary only', async () => {
-    const { channel } = channelWith(card('approval', 'ap-6', 'update_page: page_id=x'), {
+  test('a reader the API does not show the card sees the tool only', async () => {
+    const { channel } = channelWith(card('approval', 'ap-6', 'update_page'), {
       'GET /api/approvals/:id': apiError(404, 'approval.not_found'),
     })
     await renderApp(`/c/${channel.id}`)
     const shown = await screen.findByRole('region', { name: 'Freigabe' })
-    expect(within(shown).getByText('update_page: page_id=x')).toBeInTheDocument()
+    expect(within(shown).getByText('Seite direkt ändern')).toBeInTheDocument()
     expect(
       await within(shown).findByText(
         /Entscheiden kann nur die Person, die den Agenten gefragt hat/,

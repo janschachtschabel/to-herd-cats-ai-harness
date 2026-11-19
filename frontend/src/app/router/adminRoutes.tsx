@@ -3,7 +3,7 @@ import { adminLinks } from '@/app/shell/nav'
 import { hasPermission } from '@/features/auth/queries'
 import type { Me, Permission } from '@/lib/api'
 import { appRoute } from './base'
-import { serverSearch, skillsSearch } from './search'
+import { serverSearch, skillsSearch, usersSearch } from './search'
 
 const UsersPage = lazyRouteComponent(() => import('@/features/admin/users/UsersPage'), 'UsersPage')
 const GroupsPage = lazyRouteComponent(
@@ -11,6 +11,10 @@ const GroupsPage = lazyRouteComponent(
   'GroupsPage',
 )
 const GroupPage = lazyRouteComponent(() => import('@/features/admin/groups/GroupPage'), 'GroupPage')
+const OidcProvidersPage = lazyRouteComponent(
+  () => import('@/features/admin/oidc/OidcProvidersPage'),
+  'OidcProvidersPage',
+)
 const TagsPage = lazyRouteComponent(() => import('@/features/admin/tags/TagsPage'), 'TagsPage')
 const AuditPage = lazyRouteComponent(() => import('@/features/admin/audit/AuditPage'), 'AuditPage')
 const DmInspectPage = lazyRouteComponent(
@@ -56,6 +60,8 @@ const AgentAdminPage = lazyRouteComponent(
   'AgentAdminPage',
 )
 
+const BackupPage = lazyRouteComponent(() => import('@/features/backup/BackupPage'), 'BackupPage')
+
 const SkillsAdminPage = lazyRouteComponent(
   () => import('@/features/skills/SkillsAdminPage'),
   'SkillsAdminPage',
@@ -85,11 +91,28 @@ const adminIndexRoute = createRoute({
   },
 })
 
+/** People (`user.manage`); `?filter=pending`: the self-registered accounts awaiting
+ *  approval. */
 const usersRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/users',
+  validateSearch: usersSearch,
+  loader: async ({ context }) => {
+    requirePermission(context.me, 'user.manage')
+    await UsersPage.preload?.()
+  },
+  component: function UsersRoute() {
+    const { filter } = usersRoute.useSearch()
+    return <UsersPage filter={filter ?? 'all'} />
+  },
+})
+
+/** Sign-in providers (plan M9): Google and other OIDC providers, self-registration. */
+const signInRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/sign-in',
   loader: ({ context }) => requirePermission(context.me, 'user.manage'),
-  component: UsersPage,
+  component: OidcProvidersPage,
 })
 
 const groupsRoute = createRoute({
@@ -233,17 +256,29 @@ const skillsRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/skills',
   validateSearch: skillsSearch,
-  loader: ({ context }) => requirePermission(context.me, 'skill.manage'),
+  loader: async ({ context }) => {
+    requirePermission(context.me, 'skill.manage')
+    await SkillsAdminPage.preload?.()
+  },
   component: function SkillsRoute() {
     const { view } = skillsRoute.useSearch()
     return <SkillsAdminPage view={view ?? 'skills'} />
   },
 })
 
+/** Backups of the installation (plan M9 task 13): owners only (`backup.manage`). */
+const backupRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/backup',
+  loader: ({ context }) => requirePermission(context.me, 'backup.manage'),
+  component: BackupPage,
+})
+
 /** The administration (`/admin/...`): each page only for those with its right. */
 export const adminTree = adminRoute.addChildren([
   adminIndexRoute,
   usersRoute,
+  signInRoute,
   groupsRoute,
   groupRoute,
   tagsRoute,
@@ -261,4 +296,5 @@ export const adminTree = adminRoute.addChildren([
   agentsRoute,
   agentRoute,
   skillsRoute,
+  backupRoute,
 ])

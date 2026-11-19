@@ -29,11 +29,22 @@ class UserRepository(BaseRepository[User]):
         stmt = select(User).where(User.org_id == org_id, User.email == email.lower())
         return await self.session.scalar(stmt)
 
-    async def page(self, org_id: uuid.UUID, after: uuid.UUID | None, limit: int) -> list[User]:
+    async def page(
+        self, org_id: uuid.UUID, after: uuid.UUID | None, limit: int, *, pending: bool = False
+    ) -> list[User]:
+        """The organisation's people by id; `pending`: only those awaiting approval."""
         stmt = select(User).where(User.org_id == org_id).order_by(User.id).limit(limit)
+        if pending:
+            stmt = stmt.where(User.awaiting_approval_since.is_not(None))
         if after is not None:
             stmt = stmt.where(User.id > after)
         return list((await self.session.scalars(stmt)).all())
+
+    async def count_pending(self, org_id: uuid.UUID) -> int:
+        stmt = select(func.count()).where(
+            User.org_id == org_id, User.awaiting_approval_since.is_not(None)
+        )
+        return int(await self.session.scalar(stmt) or 0)
 
     async def names(
         self, org_id: uuid.UUID, user_ids: Collection[uuid.UUID]
@@ -47,6 +58,17 @@ class UserRepository(BaseRepository[User]):
     async def active_ids(self, org_id: uuid.UUID) -> list[uuid.UUID]:
         """Every active person of the organisation (for announcements to all)."""
         stmt = select(User.id).where(User.org_id == org_id, User.is_active.is_(True))
+        return list(await self.session.scalars(stmt.order_by(User.id)))
+
+    async def active_ids_with_roles(
+        self, org_id: uuid.UUID, roles: Collection[SystemRole]
+    ) -> list[uuid.UUID]:
+        """The active people of the organisation holding one of these system roles."""
+        stmt = select(User.id).where(
+            User.org_id == org_id,
+            User.is_active.is_(True),
+            User.system_role.in_([r.value for r in roles]),
+        )
         return list(await self.session.scalars(stmt.order_by(User.id)))
 
     async def exists_any(self) -> bool:

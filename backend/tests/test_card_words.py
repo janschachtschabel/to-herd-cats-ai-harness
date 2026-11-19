@@ -44,4 +44,4 @@ async def test_only_the_person_asked_reads_the_reason_of_a_rejection(work: Work)
     assert theirs.status_code == 200, theirs.text
     assert "Geheimnis-4711" not in theirs.text
     assert (theirs.json()["reason"], theirs.json()["redacted"]) == (None, True)
-    assert theirs.json()["summary"] == approval["summary"]  # tool and ids stay
+    assert theirs.json()["summary"] is None  # the person asked's too (review M8 5, L1)

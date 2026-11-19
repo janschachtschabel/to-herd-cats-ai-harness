@@ -34,6 +34,15 @@ def hash_password(password: str) -> str:
     return _hasher.hash(password)
 
 
+def needs_rehash(password_hash: str) -> bool:
+    """Whether the hash was made with other parameters than today's (ASVS 5.0 V11.2.2):
+    the next successful login stores a new one."""
+    try:
+        return _hasher.check_needs_rehash(password_hash)
+    except InvalidHashError:
+        return False
+
+
 def verify_password(password_hash: str, password: str) -> bool:
     try:
         return _hasher.verify(password_hash, password)

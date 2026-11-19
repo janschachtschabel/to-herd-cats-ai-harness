@@ -48,21 +48,10 @@ MAX_HANDLER_CHARS = 100
 class EventOutbox(UuidPk, OrgScoped, Base):
     """One event. Pending while neither `dispatched_at` nor `failed_at` is set; routed
     (`routed_at`) once its lanes are written; dispatched when no lane is left, failed
-    when only lanes that gave up are left.
-
-    `attempts` and `next_attempt_at` belong to the dispatcher of M4 (one pass over all
-    handlers): this release neither reads nor writes them (retries are counted per
-    lane), its predecessor's workers still do while both run during an update. They
-    and `ix_event_outbox_due` are dropped in the next release (expand, then
-    contract)."""
+    when only lanes that gave up are left. Retries are counted per lane."""
 
     __tablename__ = "event_outbox"
     __table_args__ = (
-        Index(
-            "ix_event_outbox_due",
-            "next_attempt_at",
-            postgresql_where=text("dispatched_at IS NULL AND failed_at IS NULL"),
-        ),
         Index(
             "ix_event_outbox_unrouted",
             "id",
@@ -94,10 +83,6 @@ class EventOutbox(UuidPk, OrgScoped, Base):
         DateTime(timezone=True), default=utcnow, nullable=False
     )
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    next_attempt_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
     failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     routed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The run whose step caused it (no foreign key, like the subject: the event outlives

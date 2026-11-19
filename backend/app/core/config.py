@@ -9,6 +9,12 @@ from pydantic import Field, PrivateAttr, SecretStr, field_validator, model_valid
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
+from app.core.config_auth import AuthSettings
+from app.core.config_database import DatabaseSettings
+from app.core.config_files import SecretFileSettings, read_secret_file
+from app.core.config_ops import OpsSettings
+from app.core.config_security import SecuritySettings
+from app.core.config_storage import StorageSettings
 from app.core.password_rule import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 
 INTERNAL_TOKEN_MIN_LENGTH = 32
@@ -16,7 +22,15 @@ SECRET_KEY_MIN_LENGTH = 32
 _REPO_ROOT = Path(__file__).resolve().parents[3]  # backend/app/core/config.py -> repo
 
 
-class Settings(BaseSettings):
+class Settings(
+    SecretFileSettings,
+    DatabaseSettings,
+    OpsSettings,
+    AuthSettings,
+    SecuritySettings,
+    StorageSettings,
+    BaseSettings,
+):
     # hide_input_in_errors: a start-up error must not echo secrets from the environment.
     model_config = SettingsConfigDict(
         env_prefix="HERD_", env_file=".env", extra="ignore", hide_input_in_errors=True
@@ -38,14 +52,21 @@ class Settings(BaseSettings):
     internal_port: int = 9090
     # Guards /internal/* (header X-Herd-Internal-Token); unset, /internal/* answers 503.
     # Shared with the collab process. At least 32 characters (`openssl rand -hex 32`).
+    # It, HERD_SECRET_KEY and HERD_BOOTSTRAP_ADMIN_PASSWORD may come from a file instead
+    # (HERD_<NAME>_FILE, `config_files.py`).
     internal_token: SecretStr | None = None
+    # While the token is being rotated: the one before it, still taken by the API (the
+    # collab process sends only HERD_INTERNAL_TOKEN); remove it once every collab
+    # process runs with the new one (docs/WIKI.md, plan M9 task 18, J12 c).
+    internal_token_previous: SecretStr | None = None
     # The address browsers use (scheme://host[:port]); WebSocket Origins must match it.
     # Unset, an Origin must match the host the request came to.
     public_url: str | None = None
-    # Live editing: where the API relays /collab to (the collab process), the port the
-    # collab process listens on, how it reaches the internal API (default: this
-    # process's internal port), and its script (`node <collab_script>`).
-    collab_url: str = "ws://127.0.0.1:1234"
+    # Live editing: the port the collab process listens on, how it reaches the internal
+    # API (default: this process's internal port), and its script (`node
+    # <collab_script>`). Where the API relays /collab to, each collab instance announces
+    # itself (HERD_COLLAB_ADVERTISE_URL, read by the collab process; role all: its child
+    # at 127.0.0.1, `launch.collab_env`).
     collab_port: int = 1234
     collab_api_url: str | None = None
     collab_script: Path = _REPO_ROOT / "collab" / "server.mjs"
@@ -67,7 +88,8 @@ class Settings(BaseSettings):
     max_body_bytes: int = Field(default=1024 * 1024, ge=1)
     # Most lines (both versions together) a page diff compares; more is answered 422.
     diff_max_lines: int = Field(default=20_000, ge=1)
-    # Where files live (attachments); a volume shared by all API replicas.
+    # Where files live (attachments, with HERD_STORAGE=local) and temporary files of
+    # uploads, imports and exports; a volume shared by all API replicas.
     data_dir: Path = Path("/data")
     # Largest attachment (bytes); its upload route takes bodies up to this size.
     attachment_max_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
@@ -150,13 +172,16 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _internal_token_is_long_enough(self) -> Self:
-        if self.internal_token is not None:
-            length = len(self.internal_token.get_secret_value())
+        for field in ("internal_token", "internal_token_previous"):
+            token: SecretStr | None = getattr(self, field)
+            if token is None:
+                continue
+            length = len(token.get_secret_value())
             if length == 0:
-                self.internal_token = None
+                setattr(self, field, None)
             elif length < INTERNAL_TOKEN_MIN_LENGTH:
                 raise ValueError(
-                    f"HERD_INTERNAL_TOKEN must be at least {INTERNAL_TOKEN_MIN_LENGTH} characters"
+                    f"HERD_{field.upper()} must be at least {INTERNAL_TOKEN_MIN_LENGTH} characters"
                 )
         return self
 
@@ -177,6 +202,11 @@ class Settings(BaseSettings):
         if self.ai_egress_proxy is not None and not self.ai_egress_proxy.get_secret_value():
             self.ai_egress_proxy = None  # compose: `${HERD_AI_EGRESS_PROXY:-}`
         return self
+
+    @field_validator("database_password_file", mode="before")
+    @classmethod
+    def _empty_password_file_is_none(cls, value: object) -> object:
+        return None if value == "" else value  # an overlay clears the base's file
 
     @field_validator("mcp_catalog_dir", mode="before")
     @classmethod
@@ -201,19 +231,20 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _production_is_safe(self) -> Self:
+        """Production reached over https marks its cookies Secure (and `__Host-`) even
+        behind a TLS proxy that sends no X-Forwarded-Proto (ASVS 5.0 V3.3.1)."""
+        https = (self.public_url or "").startswith("https://")
+        if self.environment == "production" and https and not self.cookie_secure:
+            raise ValueError("HERD_COOKIE_SECURE must be true when HERD_PUBLIC_URL is https")
+        return self
+
+    @model_validator(mode="after")
     def _resolve_database_password(self) -> Self:
         if self.database_password is not None and self.database_password_file is not None:
             raise ValueError("set HERD_DATABASE_PASSWORD or HERD_DATABASE_PASSWORD_FILE, not both")
         if self.database_password_file is not None:
-            try:
-                content = self.database_password_file.read_text(encoding="utf-8")
-            except OSError as exc:
-                raise ValueError(
-                    f"HERD_DATABASE_PASSWORD_FILE cannot be read: {exc.strerror}"
-                ) from None
-            content = content.rstrip("\r\n")  # mounted secrets often end with a newline
-            if not content:
-                raise ValueError("HERD_DATABASE_PASSWORD_FILE is empty")
+            content = read_secret_file(self.database_password_file, "HERD_DATABASE_PASSWORD_FILE")
             self._database_password = SecretStr(content)
         else:
             self._database_password = self.database_password
@@ -226,6 +257,11 @@ class Settings(BaseSettings):
         if self._database_password is not None:
             url = url.set(password=self._database_password.get_secret_value())
         return url
+
+    def migrate_database(self) -> URL:
+        """Migrations, backups and restores: the schema owner's URL when roles are
+        separate (HERD_MIGRATE_DATABASE_URL, J14), else `database()`."""
+        return self.migrate_database_url_with_password() or self.database()
 
 
 @lru_cache

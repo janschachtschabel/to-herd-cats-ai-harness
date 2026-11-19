@@ -1,0 +1,206 @@
+{
+  "signin": {
+    "or": "or with email and password",
+    "withGoogle": "Sign in with Google",
+    "with": "Sign in with {{name}}",
+    "failed": "Signing in did not work.",
+    "errors": {
+      "link_refused": "There is already an account with this email address. Sign in with your password, then link the account in your profile.",
+      "signup_closed": "There is no access here for this account. Please contact the administration.",
+      "domain_not_allowed": "Accounts of this domain cannot register themselves here.",
+      "email_unverified": "The provider did not send a verified email address.",
+      "account_inactive": "This account is deactivated.",
+      "identity_taken": "This account is already linked to another person.",
+      "flow_invalid": "The sign-in expired or was started in another browser. Please try again.",
+      "denied": "The sign-in was cancelled at the provider.",
+      "not_found": "This way of signing in is not available.",
+      "unavailable": "This way of signing in is not available.",
+      "rate_limited": "Too many attempts. Please wait a minute.",
+      "provider_unreachable": "The provider cannot be reached right now.",
+      "provider_error": "The provider answered unexpectedly. Please try again later.",
+      "issuer_mismatch": "The provider answered unexpectedly. Please try again later.",
+      "id_token_invalid": "The provider's answer could not be verified. Please try again later.",
+      "public_url_missing": "Signing in through providers is not set up.",
+      "account_pending": "Your account is waiting for approval by an administrator.",
+      "reauth_stale": "The sign-in at the provider was older than 10 minutes and does not count as confirmation. Please sign in there once more."
+    },
+    "hintWithProviders": "Sign in with your organisation's account or with your email address and password.",
+    "pending": {
+      "title": "Your account is waiting for approval",
+      "text": "Your account is waiting for approval by an administrator.",
+      "next": "The administrators have been notified. Once your account is approved, sign in through the provider again as you just did.",
+      "back": "Back to sign-in"
+    }
+  },
+  "profile": {
+    "identities": {
+      "title": "Linked accounts",
+      "description": "Accounts at sign-in providers you can sign in here with.",
+      "empty": "No account linked yet.",
+      "linkedAt": "Linked on {{date}}",
+      "lastLogin": "last signed in {{date}}",
+      "link": "Link with {{name}}",
+      "linking": "On to the provider …",
+      "unlink": "Unlink",
+      "unlinkNamed": "Unlink {{name}}",
+      "unlinkTitle": "Unlink the account?",
+      "unlinkText": "You can no longer sign in with {{name}} until you link the account again.",
+      "linked": "Your account at {{name}} is linked now.",
+      "linkFailed": "The account was not linked."
+    }
+  },
+  "oidcAdmin": {
+    "title": "Sign-in",
+    "description": "Sign-in through OpenID Connect providers such as Google, optionally with self-registration for allowed domains.",
+    "addGoogle": "Add Google",
+    "addGeneric": "Add another provider",
+    "empty": "No provider set up yet. People sign in with a password.",
+    "kinds": {
+      "google": "Google",
+      "generic": "OpenID Connect"
+    },
+    "status": {
+      "on": "On",
+      "off": "Off"
+    },
+    "signupOff": "Off",
+    "signupFor": "For {{domains}}",
+    "check": "Check",
+    "checking": "Checking …",
+    "checkOk": "Discovery and keys can be reached.",
+    "checkFailed": "Check failed.",
+    "delete": "Delete",
+    "deleteNamed": "Delete {{name}}",
+    "deleteTitle": "Delete the provider?",
+    "deleteText": "{{name}} is deleted with every person's link to it. Whoever signed in only this way then needs a password.",
+    "editNamed": "Edit {{name}}",
+    "callback": "Callback address",
+    "callbackHint": "Enter it at the provider as an allowed redirect URI.",
+    "callbackMissing": "Without HERD_PUBLIC_URL there is no callback address; the provider cannot be switched on.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "form": {
+      "createGoogle": "Set up Google",
+      "createGeneric": "Set up a provider",
+      "edit": "Edit the provider",
+      "googleHint": "Create an OAuth client ID of type web application in the Google Cloud Console and enter its client ID and secret. The callback address appears once saved.",
+      "genericHint": "The provider must support OpenID Connect Discovery.",
+      "key": "Key",
+      "keyHint": "Lower-case letters, digits and hyphens; part of the callback address.",
+      "name": "Name",
+      "nameHint": "Shown on the sign-in button.",
+      "issuer": "Issuer",
+      "clientId": "Client ID",
+      "secret": "Client secret",
+      "secretModes": {
+        "keep": "Keep the stored secret",
+        "value": "Enter the secret",
+        "env": "From an environment variable HERD_OIDC_…",
+        "none": "No secret (public client)"
+      },
+      "secretValue": "Secret",
+      "secretValueHint": "Stored encrypted and never shown again.",
+      "secretEnv": "Name of the environment variable",
+      "scopes": "Scopes",
+      "trustEmail": "Trust this provider's email addresses",
+      "trustEmailHint": "Only switch it on if the provider is authoritative for every verified address (your own company directory, say, where nobody changes their own address); the first sign-in then links an existing account with the same address. Self-registration needs this setting.",
+      "allowSignup": "Allow self-registration",
+      "allowSignupHint": "New people from the allowed domains can register. Their account waits for approval under People → Awaiting approval; only then can they sign in, as members without AI. With a generic provider only together with “Trust this provider's email addresses”.",
+      "domains": "Allowed domains",
+      "domainsHint": "One domain per line, exactly (no subdomains).",
+      "domainsRequired": "Self-registration needs at least one domain.",
+      "signupNeedsTrust": "Self-registration is only possible if you trust this provider's email addresses.",
+      "enabled": "On (button on the sign-in page)",
+      "submitCreate": "Add the provider",
+      "issuerPlaceholder": "https://login.example.com/realms/company",
+      "secretEnvPlaceholder": "HERD_OIDC_GOOGLE_SECRET",
+      "domainsPlaceholder": "example.com",
+      "editHint": "The stored secret is never shown; keep it or replace it."
+    },
+    "userIdentities": {
+      "title": "Linked accounts",
+      "empty": "No linked accounts.",
+      "unlinkNamed": "Unlink {{name}}"
+    },
+    "secretStored": "A secret is stored.",
+    "secretMissing": "No secret stored (public client).",
+    "secretKinds": {
+      "env": "Secret from an environment variable",
+      "enc": "Secret stored encrypted"
+    },
+    "noSecret": "Public client (no secret)",
+    "notDiscovered": "Not checked yet",
+    "discovered": "Checked",
+    "enable": "Switch on",
+    "disable": "Switch off",
+    "listLabel": "Sign-in providers",
+    "signup": "Self-registration"
+  },
+  "nav": {
+    "signIn": "Sign-in"
+  },
+  "errors": {
+    "oidc": {
+      "not_found": "This provider does not exist (any more).",
+      "preset_fixed": "Google's issuer and scopes are fixed.",
+      "secret_required": "Google requires a client secret.",
+      "fields_required": "Key, name and issuer are required.",
+      "url_not_allowed": "This address is not allowed (https only, no private addresses unless allowed).",
+      "scopes_invalid": "The scopes must include openid.",
+      "domains_required": "Self-registration needs at least one domain.",
+      "signup_needs_trust": "Self-registration through a generic provider is only possible if you trust its email addresses.",
+      "domain_invalid": "A domain is not valid (no wildcards, no trailing dot).",
+      "public_url_missing": "HERD_PUBLIC_URL is not set; no provider can be switched on without it.",
+      "key_taken": "This key is taken already.",
+      "version_conflict": "Someone changed the provider in the meantime.",
+      "last_identity": "This is the account's last way to sign in. Set a password first.",
+      "identity_not_found": "This link does not exist (any more).",
+      "rate_limited": "Too many attempts. Please wait a minute.",
+      "secret_unavailable": "The client secret cannot be read (variable missing or wrong key).",
+      "provider_unreachable": "The provider cannot be reached.",
+      "provider_error": "The provider answered unexpectedly.",
+      "issuer_mismatch": "The discovery document names another issuer."
+    },
+    "users": {
+      "not_pending": "This account has already been decided on.",
+      "awaiting_approval": "This account is awaiting approval. Approve it instead of reactivating it."
+    }
+  },
+  "users": {
+    "views": "People views",
+    "allTab": "All people",
+    "status": {
+      "pending": "Awaiting approval"
+    },
+    "pending": {
+      "tab": "Awaiting approval",
+      "count_one": "{{count}} account awaiting approval",
+      "count_other": "{{count}} accounts awaiting approval",
+      "navCount_one": "{{count}} account awaiting approval",
+      "navCount_other": "{{count}} accounts awaiting approval",
+      "hint": "These people registered themselves through a sign-in provider. They cannot sign in until you approve them; until then they have no access. Approved accounts start as members without AI.",
+      "empty": "Nobody is awaiting approval.",
+      "approve": {
+        "action": "Approve",
+        "openNamed": "Approve {{name}}",
+        "title": "Approve account?",
+        "text": "{{name}} can then sign in as a member (without AI until you assign otherwise under AI)."
+      },
+      "reject": {
+        "action": "Reject",
+        "openNamed": "Reject {{name}}",
+        "title": "Reject account?",
+        "text": "The account of {{name}} is deleted, with everything registering created. The address is free again: the person can register anew, or you add them yourself."
+      }
+    }
+  },
+  "activity": {
+    "reasons": {
+      "signup": "registered"
+    },
+    "signup": {
+      "waiting": "{{name}} registered and is awaiting approval.",
+      "decided": "{{name}} registered; the approval has been decided."
+    }
+  }
+}

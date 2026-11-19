@@ -15,7 +15,7 @@ test("a client destroyed while its connection is being set up raises nothing", a
   const record = (error) => uncaught.push(error.message);
   process.on("uncaughtException", record);
   try {
-    const c = client(`ws://127.0.0.1:${server.address().port}`, { cookie: "a=b" });
+    const c = client(`ws://127.0.0.1:${server.address().port}`, { grant: "herd_cg_a" });
     while (pending.length === 0) await new Promise((resolve) => setImmediate(resolve));
     c.destroy();
     await new Promise((resolve) => setTimeout(resolve, 100));

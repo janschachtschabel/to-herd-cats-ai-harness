@@ -139,6 +139,9 @@ test("two tabs change the title: the later save gets a conflict and keeps the te
   await one.getByRole("button", { name: "Speichern" }).click();
   await expect(one.getByText("Jemand hat diesen Eintrag inzwischen geändert.")).toBeVisible();
   await one.getByRole("button", { name: "Aktuelle Fassung laden" }).click();
+  // The notice goes once the reload has the current version; saving before that would
+  // send the old one again (and the reload's reset would hide that second conflict).
+  await expect(one.getByText("Jemand hat diesen Eintrag inzwischen geändert.")).toBeHidden();
   await expect(one.getByRole("textbox", { name: "Titel" })).toHaveValue("Titel aus Tab eins");
   await one.getByRole("button", { name: "Speichern" }).click();
   await expect(one.getByRole("heading", { name: "Titel aus Tab eins", level: 1 })).toBeVisible();

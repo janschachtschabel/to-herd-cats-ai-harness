@@ -16,7 +16,7 @@ export type Classification = Schemas['Classification']
 export type Localized = Schemas['Localized']
 
 /** How a provider's sign-in ended (`/ai/oauth/done?status=…`, the API's fixed words). */
-export type OAuthStatus = 'connected' | 'denied' | 'failed' | 'invalid'
+export type OAuthStatus = 'connected' | 'denied' | 'failed' | 'invalid' | 'issuer_mismatch'
 
 export const CONNECTOR_USES: readonly ConnectorUse[] = ['none', 'shared', 'personal']
 export const AUTH_KINDS: readonly AuthKind[] = ['bearer', 'header', 'oauth']

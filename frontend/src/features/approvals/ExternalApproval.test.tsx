@@ -31,7 +31,7 @@ function channelWith(approval: ReturnType<typeof makeApproval>, meId: string) {
     'GET /api/spaces/:id': space,
     'GET /api/conversations/:id': channel,
     'GET /api/conversations/:id/messages': page([
-      { ...card(approval.id, approval.summary), conversation_id: channel.id },
+      { ...card(approval.id, approval.tool), conversation_id: channel.id },
     ]),
     'POST /api/conversations/:id/read': { status: 204 },
     'GET /api/runs/:id': makeRun({ id: 'run-1', state: 'waiting', stop_reason: null }),

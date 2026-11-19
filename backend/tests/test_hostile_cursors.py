@@ -51,6 +51,14 @@ HOSTILE: dict[str, str] = {
     "non_ascii": "äöü",
     "invalid_utf8": _b64(b"\xff\xfe\xfd|x"),
     "short_id": _b64(b"\x01\x02\x03"),
+    # The overlays' five parts (day, kind, id, zone, term), a term past `datetime`'s
+    # range once read in UTC (review M10 task 9, R9-1).
+    "parts_term_overflow_high": _b64(
+        json.dumps(["2026-11-23", "automations", UUID, "UTC", "9999-12-31T23:59:59-01:00"])
+    ),
+    "parts_term_overflow_low": _b64(
+        json.dumps(["2026-11-23", "tickets", UUID, "UTC", "0001-01-01T00:00:00+01:00"])
+    ),
     "empty": "",
 }
 
@@ -87,6 +95,8 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/ai/mcp/tokens",
         "/api/tokens/{token_id}/calls",
         "/api/ai/mcp/tokens/{token_id}/calls",
+        "/api/calendar/events",
+        "/api/calendar/overlays",
     } <= set(endpoints)
 
 
@@ -101,6 +111,12 @@ NEED_A_RUN = {
 }
 
 SERVER_TOOLS = "/api/ai/mcp-servers/{server_id}/tools"
+
+# Lists that need more than a cursor (besides the DM inspection's person).
+EXTRA: dict[str, dict[str, str]] = {
+    "/api/calendar/events": {"from": "2026-11-23T00:00:00Z", "to": "2026-11-24T00:00:00Z"},
+    "/api/calendar/overlays": {"from": "2026-11-23", "to": "2026-11-24"},
+}
 
 AGENT_TOKENS = {
     "/api/agents/{agent_id}/tokens",
@@ -130,7 +146,13 @@ async def test_hostile_cursors_answer_422_everywhere(
     token = await owner.post(
         "/api/tokens", json={"name": "t", "mode": "read", "expires_in_days": 1}
     )
+    calendar = await owner.post(f"/api/spaces/{space_id}/calendars", json={"name": "K"})
+    event = await owner.post(
+        f"/api/calendars/{calendar.json()['id']}/events",
+        json={"title": "T", "starts_at": "2026-11-23T10:00:00Z", "ends_at": "2026-11-23T11:00:00Z"},
+    )
     ids = {
+        "{event_id}": event.json()["id"],
         "{number}": str(ticket.json()["number"]),
         "{category}": "open",
         "{status_id}": ticket.json()["status"]["id"],
@@ -142,6 +164,7 @@ async def test_hostile_cursors_answer_422_everywhere(
         "{message_id}": message.json()["id"],
         "{skill_id}": skill.json()["id"],
         "{token_id}": token.json()["id"],
+        "{user_id}": str(member.id),
     }
     for template in _list_endpoints():
         if template in NEED_A_RUN:
@@ -155,7 +178,9 @@ async def test_hostile_cursors_answer_422_everywhere(
             path = path.replace(placeholder, value)
         assert "{" not in path, f"no id for {path}: add one above"
         # Lists that need more than a cursor.
-        extra = {"user_id": str(member.id)} if template == "/api/admin/dm-inspect" else {}
+        extra = EXTRA.get(template, {})
+        if template == "/api/admin/dm-inspect":
+            extra = {"user_id": str(member.id)}
         response = await owner.get(path, params={"cursor": HOSTILE[name], **extra})
         if name == "empty":
             # An empty cursor means "first page".

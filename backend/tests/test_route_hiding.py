@@ -1,10 +1,11 @@
 """The guards that hide what someone may not see (`tests/route_table.py`): an AI route,
-a space, page, conversation, message, ticket status, ticket or sprint without a role
+a space, page, conversation, message, ticket status, ticket, sprint or calendar without
+a role
 answers 404 exactly like something that does not exist; so does a page proposal, a
-skill proposal one may not decide, a skill for people without AI, and one's access
-tokens without `mcp.use`."""
+skill proposal one may not decide, a skill for people without AI, one's access
+tokens without `mcp.use`, and the backups for anyone but an owner."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -13,6 +14,9 @@ from uuid_utils.compat import uuid7
 
 from app.core.actor import Actor
 from app.core.principal import Principal, SystemRole
+from app.modules.calendars.event_times import Times
+from app.modules.calendars.events import EventService, NewEvent
+from app.modules.calendars.service import CalendarService, NewCalendar
 from app.modules.messaging.channels import ChannelService
 from app.modules.messaging.service import MessageService
 from app.modules.proposals.service import ProposalService
@@ -48,6 +52,7 @@ async def test_agent_and_run_routes_do_not_exist_for_people_without_the_right(
         "approval": "approval.not_found",
         "question": "question.not_found",
         "automation": "automation.not_found",
+        "backup": "backup.not_found",
     }
     for client in (member_client, guest_client):
         for method, template, guard in ROUTES:
@@ -229,3 +234,37 @@ async def test_sprint_routes_hide_sprints_of_unseen_spaces(
             response = await member_client.request(method, path, json=body)
             assert response.status_code == 404, (method, template, response.text)
             assert response.json()["error"]["code"] == "sprint.not_found"
+
+
+async def test_calendar_routes_hide_calendars_of_unseen_spaces(
+    member_client: AsyncClient, team_space: Space, session: AsyncSession, owner_user: User
+) -> None:
+    actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
+    calendar = await CalendarService(session).create(actor, team_space.id, NewCalendar("Geheim"))
+    for method, template, guard in ROUTES:
+        if guard == "calendar":
+            path = concrete(template, calendar_id=calendar.id)
+            body = BODIES.get((method, template))
+            response = await member_client.request(method, path, json=body)
+            assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "calendar.not_found"
+
+
+async def test_event_routes_hide_events_of_unseen_spaces(
+    member_client: AsyncClient, team_space: Space, session: AsyncSession, owner_user: User
+) -> None:
+    actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
+    calendar = await CalendarService(session).create(actor, team_space.id, NewCalendar("Geheim"))
+    times = Times(
+        starts_at=datetime(2026, 11, 23, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 11, 23, 11, tzinfo=UTC),
+    )
+    made = await EventService(session).create(actor, calendar.id, NewEvent("Geheim", times))
+    for method, template, guard in ROUTES:
+        if guard == "event":
+            path = concrete(template, event_id=made.id)
+            response = await member_client.request(
+                method, path, json=BODIES.get((method, template))
+            )
+            assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "event.not_found"

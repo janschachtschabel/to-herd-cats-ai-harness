@@ -15,7 +15,10 @@ from app.modules.agents.approvals.models import (
     QuestionState,
     RunQuestion,
 )
-from app.modules.agents.approvals.service import PAGE_TOOLS, Shown
+from app.modules.agents.approvals.service import Shown
+from app.modules.agents.approvals.shown import PAGE_TOOLS
+from app.modules.agents.toolbox.base import Effect
+from app.modules.agents.toolbox.catalog import CATALOG
 
 
 class ApprovalExternalOut(BaseModel):
@@ -28,7 +31,10 @@ class ApprovalExternalOut(BaseModel):
 
 class ApprovalOut(BaseModel):
     """A tool call waiting for (or given) a person's release. `summary`: the tool and
-    the ids the call names. `args`: the call's arguments, only for the person asked
+    what the system resolved of the call's arguments (a ticket's key, a status's name,
+    the ids of what it changes; never a text the model chose), or for an external
+    tool its server and tool; only for the person asked (null for others, module
+    review M8 5, L1). `args`: the call's arguments, only for the person asked
     (null for others). `diff_url`: for a page's new content, where that person reads
     the diff against the page as it is now (`GET`), instead of the text. `step` and
     `call_id`: the call it waits for, as the run's journal names it (the step a run
@@ -38,8 +44,11 @@ class ApprovalOut(BaseModel):
     asked; for everyone else both are null and `redacted` is true (as in the run
     view, review M6 finding 6). `external`: for a call of an external tool (it sends
     `args` to that server once released), else null. `personal`: asked because the
-    run carries the asker's personal mark: what is released is written (or sent)
-    where others read it (module review M8 2)."""
+    run carries the asker's personal mark (every release then but a message into its
+    DM alone with her): what is released is written (or sent) where others can read
+    it now or later (module review M8 2; M8 5, L2). `reads`: the call only reads (a
+    catalog tool that writes nothing); under the mark its card says so instead of
+    that others can read what is released."""
 
     id: uuid.UUID
     run_id: uuid.UUID
@@ -48,7 +57,7 @@ class ApprovalOut(BaseModel):
     step: int
     call_id: str
     tool: str
-    summary: str
+    summary: str | None
     state: ApprovalState
     outcome: ApprovalOutcome | None
     addressed_to: uuid.UUID
@@ -63,6 +72,7 @@ class ApprovalOut(BaseModel):
     created_at: datetime
     version: int
     personal: bool = False
+    reads: bool = False
 
     @classmethod
     def of(cls, shown: Shown[Approval]) -> "ApprovalOut":
@@ -76,7 +86,7 @@ class ApprovalOut(BaseModel):
             step=a.step,
             call_id=a.call_id,
             tool=a.tool,
-            summary=a.summary,
+            summary=a.summary if shown.addressed else None,
             state=a.state,
             outcome=a.outcome,
             addressed_to=a.addressed_to,
@@ -91,7 +101,19 @@ class ApprovalOut(BaseModel):
             created_at=a.created_at,
             version=a.version,
             personal=a.personal,
+            reads=_reads(a.tool),
         )
+
+
+# READ in the catalog, but released they write a message: the question card, the answer.
+_SPEAKS = frozenset({"ask_user", "submit_result"})
+
+
+def _reads(tool: str) -> bool:
+    """A catalog tool that writes nothing at all (an external tool sends what it is
+    given; `ask_user` and `submit_result` write a message once released)."""
+    spec = CATALOG.get(tool)
+    return spec is not None and spec.effect == Effect.READ and tool not in _SPEAKS
 
 
 def _external(subjects: list[dict[str, Any]]) -> ApprovalExternalOut | None:

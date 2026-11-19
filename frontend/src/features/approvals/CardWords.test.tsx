@@ -54,7 +54,7 @@ describe("an agent's words on a card are the asked person's to read", () => {
       reason: null,
       redacted: true,
     })
-    const channel = seenByOthers('approval', 'ap-9', rejected.summary, rejected)
+    const channel = seenByOthers('approval', 'ap-9', rejected.tool, rejected)
     await renderApp(`/c/${channel.id}`)
     const shown = await screen.findByRole('region', { name: 'Freigabe' })
     expect(await within(shown).findByText('Abgelehnt')).toBeInTheDocument()
@@ -62,5 +62,23 @@ describe("an agent's words on a card are the asked person's to read", () => {
       within(shown).getByText('Eine Begründung sieht nur die Person, die gefragt wurde.'),
     ).toBeInTheDocument()
     expect(within(shown).queryByText(/^Begründung:/)).toBeNull()
+  })
+
+  test('someone else reads an approval without its summary, and says so', async () => {
+    const theirs = makeApproval({
+      id: 'ap-8',
+      tool: 'set_ticket_status',
+      summary: null,
+      args: null,
+      diff_url: null,
+      redacted: true,
+    })
+    const channel = seenByOthers('approval', 'ap-8', 'set_ticket_status', theirs)
+    await renderApp(`/c/${channel.id}`)
+    const shown = await screen.findByRole('region', { name: 'Freigabe' })
+    expect(
+      await within(shown).findByText('Die Einzelheiten sieht nur die Person, die gefragt wurde.'),
+    ).toBeInTheDocument()
+    expect(within(shown).queryByText(/key=/)).toBeNull()
   })
 })

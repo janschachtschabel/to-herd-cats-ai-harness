@@ -18,34 +18,54 @@ imagePullSecrets: []
 
 ## @section API (HERD_ROLE=api)
 
-## @param api.replicas Number of API pods; the processes are stateless (each holds one database connection for live updates, LISTEN, besides its pool; browsers reconnect to another pod when one stops)
-## @param api.resources Resource requests and limits of the API container
+## @param api.replicas Number of API pods; the processes are stateless (each holds one database connection for live updates, LISTEN, besides its pool; browsers reconnect to another pod when one stops). Ignored with api.autoscaling.enabled
+## @param api.autoscaling.enabled Scale the API pods with a HorizontalPodAutoscaler (autoscaling/v2) on CPU instead of api.replicas; needs metrics-server and api.resources.requests.cpu. Every pod holds up to 16 database connections (docs/STECKBRIEF.md, Clusterfähigkeit): maxReplicas × 16 plus the worker's must fit the database's max_connections
+## @param api.autoscaling.minReplicas Fewest API pods (at least 1; from 2 a PodDisruptionBudget keeps one up during drains)
+## @param api.autoscaling.maxReplicas Most API pods (more than 1 needs persistence.accessModes [ReadWriteMany])
+## @param api.autoscaling.targetCPUUtilizationPercentage Average CPU use, in percent of api.resources.requests.cpu, the autoscaler aims at (1 to 100)
+## @param api.resources Resource requests and limits of the API container; the defaults come from the load test (docs/STECKBRIEF.md, Empfehlung Request und Limit: with the autoscaler's 70 % of 500m a pod gets help where P95 was still far below its targets). No CPU limit: throttling costs latency, and sign-in bursts (argon2) use several cores for seconds
 ## @param api.cookieSecure Send the session cookie with Secure (HERD_COOKIE_SECURE); keep true unless the app is reached over plain http from something other than localhost
 ## @param api.forwardedAllowIps Reverse proxies whose X-Forwarded-For/-Proto the app believes (HERD_FORWARDED_ALLOW_IPS: comma-separated IPs or CIDRs, e.g. the pod network of the ingress controller, 10.0.0.0/8). Without it every client has the ingress pod's address (audit, login limits) and the scheme stays http. Required when ingress.enabled
-## @param api.env Extra environment variables of the API and the migration job (name: value), e.g. HERD_LOG_LEVEL
+## @param api.sessionIdleHours Hours without a request after which a login session ends, 0 to 8760 (HERD_SESSION_IDLE_HOURS; API). 0: no idle limit (a session still ends after 7 days). Opening the live stream is no use
+## @param api.env Extra environment variables of the API and the migration job (name: value), e.g. HERD_LOG_LEVEL. Never a secret's name (PASSWORD, SECRET, TOKEN, EGRESS_PROXY, OFFSITE, in any case) nor a name the chart sets itself (HERD_DATABASE_URL, HERD_ROLE, …): the render fails
 api:
   replicas: 2
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 500m
+      memory: 320Mi
     limits:
       memory: 512Mi
   cookieSecure: true
   forwardedAllowIps: ""
+  sessionIdleHours: 24
   env: {}
 
 ## @section Worker (HERD_ROLE=worker)
 
-## @param worker.replicas Number of worker pods (the outbox dispatcher: notifications, page timelines, live updates). One is enough; more are safe (they claim disjoint batches) and only add throughput or a spare. 0 stops the delivery of all of these
-## @param worker.resources Resource requests and limits of the worker container
-## @param worker.env Extra environment variables of the worker (name: value), e.g. HERD_LOG_LEVEL (api.env does not apply here)
+## @param worker.replicas Number of worker pods (the outbox dispatcher: notifications, page timelines, live updates). One is enough; more are safe (they claim disjoint batches) and only add throughput or a spare. 0 stops the delivery of all of these. Ignored with worker.autoscaling.enabled
+## @param worker.autoscaling.enabled Scale the worker pods with a HorizontalPodAutoscaler (autoscaling/v2) on CPU instead of worker.replicas; needs metrics-server and worker.resources.requests.cpu. Agent runs mostly wait for providers, so CPU rises with the outbox and the due loop rather than with runs; a pod removed on scale-down drops its runs, which another worker takes up after their lease
+## @param worker.autoscaling.minReplicas Fewest worker pods (at least 1; from 2 a PodDisruptionBudget keeps one up during drains)
+## @param worker.autoscaling.maxReplicas Most worker pods (each holds up to 16 database connections)
+## @param worker.autoscaling.targetCPUUtilizationPercentage Average CPU use, in percent of worker.resources.requests.cpu, the autoscaler aims at (1 to 100)
+## @param worker.resources Resource requests and limits of the worker container; the defaults come from the load test (docs/STECKBRIEF.md). More HERD_RUN_CONCURRENCY needs more memory
+## @param worker.env Extra environment variables of the worker (name: value), e.g. HERD_LOG_LEVEL (api.env does not apply here); the same refusals as api.env
 worker:
   replicas: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
   resources:
     requests:
-      cpu: 50m
-      memory: 192Mi
+      cpu: 250m
+      memory: 256Mi
     limits:
       memory: 384Mi
   env: {}
@@ -80,12 +100,40 @@ mcp:
   catalogConfigMap: ""
   maxCallsPerRun: 20
 
+## @section Sign-in through OIDC (M9; docs/ANMELDUNG.md)
+
+## @param oidc.allowedHosts Private hosts an OIDC identity provider may run on (an in-house Keycloak): exact host names or private networks in CIDR form (HERD_OIDC_ALLOWED_HOSTS; API). Empty: public addresses only (Google needs nothing here). With networkPolicy.enabled, oidc.egress must also let the API pods reach the provider. Providers themselves are set up in the administration; publicUrl (or an Ingress host) is required
+## @param oidc.ratePerMinute Starts and callbacks of OIDC sign-ins per client address and minute, counted in PostgreSQL across all API pods, 1 to 10000 (HERD_OIDC_RATE_PER_MINUTE; API)
+## @param oidc.existingSecret Name of an existing Secret with the client secrets providers reference as env:HERD_OIDC_<NAME> (API pods; envFrom). Empty: none; a secret can instead be stored encrypted under HERD_SECRET_KEY (ai.existingSecret)
+## @param oidc.egress Egress rules (NetworkPolicyEgressRule list) of the API pods alone to the identity providers, with networkPolicy.enabled (Google: accounts.google.com, oauth2.googleapis.com and www.googleapis.com on 443; NetworkPolicy knows no host names, so their address ranges or an egress gateway). OIDC never goes through HERD_AI_EGRESS_PROXY, so networkPolicy.aiEgress does not cover it. Empty: with networkPolicy.enabled no provider is reachable (Check answers provider_unreachable)
+oidc:
+  allowedHosts: []
+  ratePerMinute: 30
+  existingSecret: ""
+  egress: []
+
+## @section Write limit (M9b; docs/SICHERHEIT.md)
+
+## @param writeLimit.perMinute Writes to content (pages, messages, reactions, tickets, proposals, tags) one person, or one agent on its own count, may make per minute, counted in PostgreSQL across all pods, 1 to 100000 (HERD_WRITE_RATE_PER_MINUTE; API and worker). Beyond: 429 rate.limited with Retry-After; an agent's tool is refused and writes nothing
+## @param writeLimit.uploadsPerMinute Uploads (attachments, imports) one person may make per minute, counted apart from other writes, 1 to 100000 (HERD_UPLOAD_RATE_PER_MINUTE; API)
+writeLimit:
+  perMinute: 120
+  uploadsPerMinute: 30
+
+## @section Virus scan (M9b; docs/WIKI.md, docs/SICHERHEIT.md)
+
+## @param virusScan.clamavAddress A clamd of your own, not shipped with the chart, as host:port (e.g. clamav.tools.svc:3310; HERD_CLAMAV_ADDRESS; API). Set: attachments and imports are scanned before they are stored; a find answers 422 attachment.rejected_by_scan, a scanner that cannot answer 503 attachment.scan_unavailable (fails closed). Its StreamMaxLength must be at least the import limit (100 MiB). Empty: no scan
+## @param virusScan.egress Egress rules (NetworkPolicyEgressRule list) of the API pods alone to clamd, with networkPolicy.enabled (e.g. its pods on 3310). Empty: with networkPolicy.enabled clamd is reachable only through networkPolicy.egress
+virusScan:
+  clamavAddress: ""
+  egress: []
+
 ## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
 publicUrl: ""
 
 ## @section Files (HERD_DATA_DIR=/data)
 
-## @param persistence.enabled Keep the files (attachments) on a PersistentVolumeClaim mounted at /data in every API pod; off: an emptyDir per pod (files are lost with the pod; for trials only)
+## @param persistence.enabled Keep the files (attachments) on a PersistentVolumeClaim mounted at /data in every API pod and the worker (it removes the files of deleted attachments after their grace; on a ReadWriteOnce claim it runs beside an API pod, on ReadWriteOncePod those files stay); off: an emptyDir per pod (files are lost with the pod; for trials only, or with s3.enabled, where /data holds temporary files only)
 ## @param persistence.existingClaim Name of an existing PersistentVolumeClaim to use; empty: the chart creates one (kept on uninstall)
 ## @param persistence.size Size of the claim the chart creates
 ## @param persistence.storageClass Storage class of the claim the chart creates; empty: the cluster default
@@ -98,14 +146,84 @@ persistence:
   accessModes:
     - ReadWriteMany
 
+## @section Attachments in S3 (plan M9 decision 18; docs/SICHERUNG.md)
+
+## @param s3.enabled Keep the attachments in an S3-compatible store (AWS S3, SeaweedFS, Ceph, Garage, ...; HERD_STORAGE=s3) instead of the files claim: several API pods then need no ReadWriteMany volume (persistence.enabled may be false: /data becomes an emptyDir for temporary files of uploads and imports), and the backup job takes the files from the store. Moving an installation's files: with persistence still enabled, `kubectl exec deploy/<release>-to-herd-cats-ai-api -- python -m app.ops storage copy --to s3`, then switch, then run the copy once more (it copies only what is missing)
+## @param s3.endpoint The store's address, scheme://host[:port] without a path (HERD_S3_ENDPOINT), e.g. https://s3.eu-central-1.amazonaws.com or http://seaweedfs.storage.svc:8333 (https outside the cluster); requests are path-style and pass the egress guard, with this host as the one private target. Required with s3.enabled
+## @param s3.region The region the store signs requests for (HERD_S3_REGION); most S3-compatible stores accept us-east-1
+## @param s3.bucket The bucket (HERD_S3_BUCKET, 3 to 63 of a-z 0-9 . -); it must exist. Required with s3.enabled
+## @param s3.prefix Keys go under this prefix inside the bucket (HERD_S3_PREFIX; lower-case segments separated by /), so several installations can share one bucket; empty: the bucket's top level
+## @param s3.existingSecret Name of an existing Secret with the bucket's keys: "access-key-id" (HERD_S3_ACCESS_KEY_ID) and "secret-access-key" (mounted as a file, HERD_S3_SECRET_ACCESS_KEY_FILE). Required with s3.enabled; keys are never values
+## @param s3.egress Egress rules (NetworkPolicyEgressRule list) of the API, worker and backup pods to the store, with networkPolicy.enabled (e.g. its Service's pods on 8333, or its address range on 443). Empty: with networkPolicy.enabled the store is reachable only through networkPolicy.egress
+s3:
+  enabled: false
+  endpoint: ""
+  region: us-east-1
+  bucket: ""
+  prefix: ""
+  existingSecret: ""
+  egress: []
+
+## @section Backups (plan M9; docs/SICHERUNG.md)
+
+## @param backup.enabled Run the backup CronJob (`python -m app.ops backup run --scheduled`): an archive of the database and the attachments, read back and checked, on a PersistentVolumeClaim of its own, then the retention below and, with backup.offsite.existingSecret, a restic copy offsite. It mounts the files claim (persistence) read-only: on a claim the chart creates with ReadWriteOnce its pod is placed on an API pod's node (pod affinity); ReadWriteOncePod cannot be shared and is refused; an existing claim must be ReadWriteMany or the job must land on the right node by other means. Needs persistence.enabled, or s3.enabled (then it reads the files from the store and mounts no files claim)
+## @param backup.schedule When the CronJob runs (cron, five fields, time zone Etc/UTC). One at a time (concurrencyPolicy Forbid); a failed run is not retried (backoffLimit 0) and fires HerdBackupFailing
+## @param backup.keepDaily Days whose newest good archive stays on the claim, 0 to 1000 (HERD_BACKUP_KEEP_DAILY); the newest good archive always stays, failed ones are removed at once
+## @param backup.keepWeekly Older weeks whose newest good archive stays, 0 to 1000 (HERD_BACKUP_KEEP_WEEKLY); offsite, restic forget gets the same numbers but counts the periods overlapping, so it reaches back less far (docs/SICHERUNG.md)
+## @param backup.keepMonthly Older months whose newest good archive stays, 0 to 1000 (HERD_BACKUP_KEEP_MONTHLY)
+## @param backup.alertAfterHours Age of the last good backup at which HerdBackupTooOld fires, in hours (HERD_BACKUP_ALERT_AFTER_HOURS; worker, which exports it as herd_backup_alert_after_seconds); a little more than the schedule's interval
+## @param backup.uploadMaxBytes Largest archive an owner may upload under Verwaltung → Sicherung, in bytes (HERD_BACKUP_UPLOAD_MAX_BYTES, API pods; default 2 GiB). An Ingress in front must take bodies this large on /api/backups/archives (ingress-nginx: proxy-body-size, see ingress.annotations)
+## @param backup.tmpSizeLimit Size limit of the backup pod's /tmp (emptyDir; restic's cache lives there). The dump is written next to the archive on the backups claim, never to /tmp; a restore streams it into pg_restore
+## @param backup.resources Resource requests and limits of the backup container (pg_dump, tar and restic stream; memory does not grow with the data)
+## @param backup.persistence.existingClaim Name of an existing PersistentVolumeClaim for the archives; empty: the chart creates one (kept on uninstall)
+## @param backup.persistence.size Size of the claim the chart creates: room for the archives the retention keeps (each about the dump plus the attachments) and, while a backup runs, its dump once more (scratch file, removed afterwards)
+## @param backup.persistence.storageClass Storage class of the claim the chart creates; empty: the cluster default
+## @param backup.persistence.accessModes Access modes of the claim the chart creates. With ReadWriteMany (or backup.persistence.existingClaim, which must then be ReadWriteMany or reachable from every API and worker pod) the API and worker pods mount it on /backups too, for the administration's page (Verwaltung → Sicherung: "Jetzt sichern" in the worker; download, upload, check and restore in the API). ReadWriteOnce (the default, unchanged since 1.0: a claim's modes cannot change) keeps it the CronJob's alone; the page then lists the backups but has no archives, and "Jetzt sichern" fails with backup.io (docs/SICHERUNG.md)
+## @param backup.offsite.existingSecret Name of an existing Secret whose keys are environment variables of the backup job alone: HERD_BACKUP_OFFSITE_REPOSITORY (the restic repository, e.g. s3:https://s3.example/bucket/herd), HERD_BACKUP_OFFSITE_PASSWORD (its password) and the storage's credentials (AWS_*, B2_*, AZURE_*, GOOGLE_*, OS_*, ST_*), which go to restic and nothing else. Empty: no offsite copy (offsite=off)
+## @param backup.offsite.egress Egress rules (NetworkPolicyEgressRule list) of the backup pods to the offsite storage, with networkPolicy.enabled; DNS and the bundled PostgreSQL are always allowed, networkPolicy.egress applies too
+backup:
+  enabled: true
+  schedule: "30 2 * * *"
+  keepDaily: 7
+  keepWeekly: 4
+  keepMonthly: 6
+  alertAfterHours: 26
+  uploadMaxBytes: 2147483648
+  tmpSizeLimit: 2Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  persistence:
+    existingClaim: ""
+    size: 20Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+  offsite:
+    existingSecret: ""
+    egress: []
+
+## @section Disruptions
+
+## @param podDisruptionBudget.enabled A PodDisruptionBudget (policy/v1) for each of api, worker and collab that runs at least two pods (replicas, or autoscaling.minReplicas); one pod alone gets none, so a node drain never hangs on it. Pods that are not ready may always be evicted
+## @param podDisruptionBudget.maxUnavailable Pods of one component a voluntary disruption (drain, cluster upgrade) may take at once (at least 1; keep it below the component's pods)
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
 ## @section Live editing (HERD_ROLE=collab)
 
 ## @param collab.enabled Run the collab process (Hocuspocus, live editing) as its own Deployment; the API relays /collab/ WebSockets to it. Off: the live editor reports that live editing is off
+## @param collab.replicas Collab pods. 1: replaced with Recreate. From 2: each pod announces itself at its pod IP, the API binds every page to one of them and relays all of its browsers there (docs/WIKI.md); the pods roll one at a time and get a PodDisruptionBudget. Each pod holds its own memory budget (collab.resources)
 ## @param collab.resources Resource requests and limits of the collab container. Sizing rule (docs/WIKI.md): memory limit ≥ (130 MiB + 250 MiB × HERD_COLLAB_CHECK_WORKERS + HERD_COLLAB_MEMORY_BUDGET_MB) / 0.8; the defaults (1 worker, budget 400) need 975 MiB. A larger budget (collab.env) needs a larger limit
-## @param collab.env Extra environment variables of the collab process (name: value)
-## @param collab.internalToken.existingSecret Name of an existing Secret with the token the API and the collab process share (key "token", at least 32 characters); empty: the chart generates one, kept across upgrades and on uninstall (with `helm template` set it, see database.existingSecret)
+## @param collab.env Extra environment variables of the collab process (name: value); the same refusals as api.env
+## @param collab.internalToken.existingSecret Name of an existing Secret with the token the API and the collab process share (key "token", at least 32 characters); empty: the chart generates one, kept across upgrades and on uninstall (with `helm template` set it, see database.existingSecret). To rotate it without an outage, put the old token under the key "previous" and the new one under "token": the API pods accept both (HERD_INTERNAL_TOKEN_PREVIOUS), the collab pods send the new one once restarted; then remove "previous" (docs/WIKI.md)
 collab:
   enabled: true
+  replicas: 1
   resources:
     requests:
       cpu: 50m
@@ -125,27 +243,40 @@ secrets:
 ## @section Database
 
 ## @param database.url Connection URL of an external PostgreSQL without the password, e.g. postgresql+asyncpg://herd@db.example:5432/herd; ignored when postgresql.enabled
-## @param database.existingSecret Name of an existing Secret with the database password under the key "password"; mounted as a file (HERD_DATABASE_PASSWORD_FILE). Also used by the bundled PostgreSQL; set it there when rendering with `helm template` (Argo CD, Flux): the generated password relies on `lookup`, which is empty then, so every render would make a new one
+## @param database.existingSecret Name of an existing Secret with the database password under the key "password"; mounted as a file (HERD_DATABASE_PASSWORD_FILE). Also used by the bundled PostgreSQL, then with two keys: "password" for its superuser herd (the StatefulSet and the migration job's db-owner step only) and "owner-password" for the app's role herd_owner (API, worker, migration, backups; no superuser, so an archive's dump never runs as one, docs/SICHERUNG.md); set it there when rendering with `helm template` (Argo CD, Flux): the generated password relies on `lookup`, which is empty then, so every render would make a new one
+## @param database.sslMode TLS to the database, libpq's sslmode (HERD_DATABASE_SSLMODE; API, worker, migration and backup, asyncpg and pg_dump/pg_restore alike): verify-full is recommended for an external database; empty: the URL's own setting. With postgresql.enabled only "", disable, allow or prefer (the bundled PostgreSQL speaks no TLS); verify-ca needs database.caSecret
+## @param database.caSecret Name of an existing Secret with the CA certificate to verify the database server against, under the key "ca.crt"; mounted as a file (HERD_DATABASE_SSLROOTCERT). Empty: the image's system CAs (verify-full only; verify-ca needs it)
+## @param database.migrate.url Separate database roles (docs/SICHERUNG.md): the URL of the role that owns the schema, without the password; the migration job and the backup job connect with it (HERD_MIGRATE_DATABASE_URL), the API and worker pods with database.url, whose role then gets data rights only. Empty: one role (the default). External database only
+## @param database.migrate.existingSecret Name of an existing Secret with the schema owner's password under the key "password"; mounted as a file in the migration and backup pods only (HERD_MIGRATE_DATABASE_PASSWORD_FILE)
+## @param database.migrate.runtimeRole The role of database.url, which every migration gives SELECT, INSERT, UPDATE and DELETE on all tables and sequences, now and later (HERD_DATABASE_RUNTIME_ROLE); required with database.migrate.url. Restoring from the administration is then refused (restore.not_schema_owner): restore from the command line with the owner
 database:
   url: ""
   existingSecret: ""
+  sslMode: ""
+  caSecret: ""
+  migrate:
+    url: ""
+    existingSecret: ""
+    runtimeRole: ""
 
 ## @section Bundled PostgreSQL (for test and staging only)
 
-## @param postgresql.enabled Run a minimal single-pod pgvector StatefulSet; switch it off and set database.url for production
+## @param postgresql.enabled Run a minimal single-pod pgvector StatefulSet; switch it off and set database.url for production. The app connects as herd_owner, which the migration job's init container (`python -m app.stack db-owner`, as the superuser) makes and hands the database, schema public and every object in it on every revision
 ## @param postgresql.image PostgreSQL image (pgvector), pinned by digest
 ## @param postgresql.storage.size Size of the data volume
 ## @param postgresql.storage.storageClass Storage class of the data volume; empty: the cluster default
 ## @param postgresql.resources Resource requests and limits of the PostgreSQL container
+## @param postgresql.maxConnections PostgreSQL's max_connections (passed as a server argument). Every API or worker pod holds up to 16 connections; the chart refuses to render when 16 × (the most API pods + the most worker pods) + 10 (backup job, migration, psql) exceeds it. 200 fits the full default autoscaler bounds (154)
 postgresql:
   enabled: true
   image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+  maxConnections: 200
   storage:
     size: 8Gi
     storageClass: ""
   resources:
     requests:
-      cpu: 100m
+      cpu: 250m
       memory: 256Mi
     limits:
       memory: 1Gi
@@ -198,7 +329,7 @@ networkPolicy:
 ## @param metrics.serviceMonitor.enabled Create a ServiceMonitor (Prometheus Operator)
 ## @param metrics.serviceMonitor.interval Scrape interval
 ## @param metrics.serviceMonitor.labels Extra labels, e.g. the selector of your Prometheus
-## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics), HerdHigh5xx, HerdOutboxBacklog, HerdOutboxFailed, HerdWorkerStalled and HerdWorkerAbsent (the last four need the API and worker pods scraped with the chart's Service names as jobs: metrics.serviceMonitor or an equivalent scrape), for agent runs HerdRunsStuck, HerdRunsQueued and HerdRunsFailing, for automations HerdAutomationsLagging and HerdAutomationsFailing (all from the worker's metrics), and for MCP HerdExternalToolsFailing (worker), HerdOAuthRefreshFailing (API and worker), HerdMcpAuthFailures and HerdMcpCatalogProblems (API pods)
+## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics), HerdHigh5xx, HerdOutboxBacklog, HerdOutboxFailed, HerdWorkerStalled and HerdWorkerAbsent (the last four need the API and worker pods scraped with the chart's Service names as jobs: metrics.serviceMonitor or an equivalent scrape), for agent runs HerdRunsStuck, HerdRunsQueued and HerdRunsFailing, for automations HerdAutomationsLagging and HerdAutomationsFailing (all from the worker's metrics), and for MCP HerdExternalToolsFailing (worker), HerdOAuthRefreshFailing (API and worker), HerdMcpAuthFailures and HerdMcpCatalogProblems (API pods), and for backups HerdBackupTooOld, HerdBackupFailing, HerdOffsiteBackupFailing and HerdBackupNeverRan (worker)
 ## @param metrics.prometheusRule.labels Extra labels, e.g. the rule selector of your Prometheus
 metrics:
   serviceMonitor:

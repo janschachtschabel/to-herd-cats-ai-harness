@@ -127,6 +127,9 @@ class Conversation(UuidPk, OrgScoped, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+    # Where the person started her DM alone with an agent afresh: runs after it read
+    # nothing from before it (`agents/fresh_start.py`); NULL: never.
+    fresh_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Bumped by every change to the row; a write names the version it read (409).
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 

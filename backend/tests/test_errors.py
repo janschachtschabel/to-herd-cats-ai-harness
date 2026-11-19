@@ -57,3 +57,31 @@ async def test_swagger_ui_is_not_served_in_production() -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         assert (await c.get("/api/docs")).status_code == 404
         assert (await c.get("/api/openapi.json")).status_code == 200
+
+
+MARK = "Zq<b>MARK"  # never a field name: capitals and markup
+KEY_MARK = "zq_mark_key"  # an unknown key that looks like a field name
+
+
+async def test_error_bodies_never_echo_input(owner: AsyncClient) -> None:
+    """ASVS 5.0 V16.5.1: an error names the place of a fault (`body.locale`), never what
+    was sent: no value, no key of the client's, no stack trace."""
+    answers = [
+        await owner.get(f"/api/_test/needs-int?n={MARK}"),
+        await owner.get(f"/api/_test/items/{MARK}"),
+        await owner.post("/api/_test/db-error", json={MARK: 5, KEY_MARK: 6}),
+        await owner.patch("/api/auth/me", json={"locale": MARK, MARK: 1, KEY_MARK: 2}),
+        await owner.post(
+            "/api/auth/login", content=f'{{"email": "{MARK}"', headers={"content-type": "x"}
+        ),
+        await owner.post("/api/auth/login", json={"email": MARK, "password": MARK}),
+        await owner.get(f"/api/spaces/{MARK}"),
+        await owner.get(f"/api/spaces?limit={MARK}&cursor={MARK}"),
+        await owner.get(f"/api/nowhere/{MARK}"),
+    ]
+    for answer in answers:
+        assert answer.status_code >= 400, answer.request.url
+        assert "Zq" not in answer.text and "zq_" not in answer.text, answer.text
+        assert "Traceback" not in answer.text
+    named = (await owner.patch("/api/auth/me", json={"locale": MARK, "version": 1})).json()
+    assert named["error"]["message"] == "Invalid request: body.locale"

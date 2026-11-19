@@ -55,6 +55,9 @@
           "ticket.create",
           "ticket.edit",
           "ticket.assign",
+          "calendar.read",
+          "calendar.write",
+          "calendar.moderate",
           "space.create",
           "directory.read",
           "user.manage",
@@ -66,12 +69,35 @@
           "ai.manage",
           "agent.manage",
           "skill.manage",
+          "backup.manage",
+          "calendar.manage",
           "ai.use",
           "agent.create_personal",
-          "mcp.use"
+          "mcp.use",
+          "calendar.sync"
         ],
         "title": "Action",
         "type": "string"
+      },
+      "ActivityAccount": {
+        "description": "The self-registered account a `signup` notification is about (plan M9 task 5b;\nits address: the user administration's waiting accounts); the account is also the\nentry's `author`. `awaiting`: whether it still waits for approval.",
+        "properties": {
+          "awaiting": {
+            "title": "Awaiting",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "awaiting"
+        ],
+        "title": "ActivityAccount",
+        "type": "object"
       },
       "ActivityAuthor": {
         "properties": {
@@ -121,6 +147,60 @@
           "paused_reason"
         ],
         "title": "ActivityAutomation",
+        "type": "object"
+      },
+      "ActivityCalendarEvent": {
+        "description": "The calendar event an `invitation` or `invite_reply` is about (plan M10 task 4;\nits address: `/api/events/{id}`); shown only while the person attends it, so in\nfull. `cancelled`: called off or deleted; `response`: the person's own answer\n(null when she organises it).",
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "starts_at",
+          "ends_at",
+          "all_day",
+          "cancelled",
+          "response"
+        ],
+        "title": "ActivityCalendarEvent",
         "type": "object"
       },
       "ActivityConversation": {
@@ -212,8 +292,18 @@
         "type": "object"
       },
       "ActivityOut": {
-        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); a\n`skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`\nthe automation (plan M7); `author` may be an agent (`type`).",
+        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); a\n`skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`\nthe automation (plan M7), a `signup` the waiting account (plan M9), an\n`invitation` or `invite_reply` the calendar event (plan M10); `author` may be an\nagent (`type`).",
         "properties": {
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityAccount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "author": {
             "anyOf": [
               {
@@ -228,6 +318,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ActivityAutomation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "calendar_event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityCalendarEvent"
               },
               {
                 "type": "null"
@@ -500,6 +600,81 @@
           "user"
         ],
         "title": "AdminTokenOut",
+        "type": "object"
+      },
+      "AdminUserOut": {
+        "description": "A person as the people administration lists them: with whether TOTP is on.",
+        "properties": {
+          "awaiting_approval_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Awaiting Approval Since"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "locale": {
+            "title": "Locale",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "system_role": {
+            "$ref": "#/components/schemas/SystemRole"
+          },
+          "totp_enabled": {
+            "title": "Totp Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "system_role",
+          "is_active",
+          "locale",
+          "last_login_at",
+          "awaiting_approval_since",
+          "version",
+          "totp_enabled"
+        ],
+        "title": "AdminUserOut",
         "type": "object"
       },
       "AgentCreate": {
@@ -1407,7 +1582,7 @@
         "type": "object"
       },
       "ApprovalOut": {
-        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (the step a run\nlink points at). `outcome`: what became of the call once released: `ran`, or\n`stale` (what it would change had changed, so nothing ran); null before.\n`reason`: the person's reason for a rejection, and `args`, only for the person\nasked; for everyone else both are null and `redacted` is true (as in the run\nview, review M6 finding 6). `external`: for a call of an external tool (it sends\n`args` to that server once released), else null. `personal`: asked because the\nrun carries the asker's personal mark: what is released is written (or sent)\nwhere others read it (module review M8 2).",
+        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nwhat the system resolved of the call's arguments (a ticket's key, a status's name,\nthe ids of what it changes; never a text the model chose), or for an external\ntool its server and tool; only for the person asked (null for others, module\nreview M8 5, L1). `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (the step a run\nlink points at). `outcome`: what became of the call once released: `ran`, or\n`stale` (what it would change had changed, so nothing ran); null before.\n`reason`: the person's reason for a rejection, and `args`, only for the person\nasked; for everyone else both are null and `redacted` is true (as in the run\nview, review M6 finding 6). `external`: for a call of an external tool (it sends\n`args` to that server once released), else null. `personal`: asked because the\nrun carries the asker's personal mark (every release then but a message into its\nDM alone with her): what is released is written (or sent) where others can read\nit now or later (module review M8 2; M8 5, L2). `reads`: the call only reads (a\ncatalog tool that writes nothing); under the mark its card says so instead of\nthat others can read what is released.",
         "properties": {
           "addressed_to": {
             "format": "uuid",
@@ -1522,6 +1697,11 @@
             "title": "Personal",
             "type": "boolean"
           },
+          "reads": {
+            "default": false,
+            "title": "Reads",
+            "type": "boolean"
+          },
           "reason": {
             "anyOf": [
               {
@@ -1550,8 +1730,15 @@
             "type": "integer"
           },
           "summary": {
-            "title": "Summary",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
           },
           "tool": {
             "title": "Tool",
@@ -1606,6 +1793,124 @@
         ],
         "title": "ApprovalState",
         "type": "string"
+      },
+      "ArchiveCheckOut": {
+        "description": "`problems`: codes, any one blocks replacing (`can_replace` false); `key`:\nwhether HERD_SECRET_KEY fits the archive's `enc:` values.",
+        "properties": {
+          "archive": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiguresOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archive_name": {
+            "title": "Archive Name",
+            "type": "string"
+          },
+          "can_replace": {
+            "title": "Can Replace",
+            "type": "boolean"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "installation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiguresOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "anyOf": [
+              {
+                "enum": [
+                  "match",
+                  "mismatch",
+                  "missing",
+                  "not_needed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "archive_name",
+          "problems",
+          "warnings",
+          "created_at",
+          "archive",
+          "installation",
+          "key",
+          "can_replace"
+        ],
+        "title": "ArchiveCheckOut",
+        "type": "object"
+      },
+      "ArchiveOut": {
+        "description": "An archive in the backups directory; `uploaded`: an owner uploaded it.",
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "uploaded": {
+            "title": "Uploaded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "bytes",
+          "created_at",
+          "uploaded"
+        ],
+        "title": "ArchiveOut",
+        "type": "object"
       },
       "AssigneeIn": {
         "description": "A person, or (plan M6 decision 7) an agent: assigning an agent needs `ai.use`\nand `ticket.assign`, and starts its work on the ticket.",
@@ -1725,6 +2030,162 @@
           "version"
         ],
         "title": "AttachmentOut",
+        "type": "object"
+      },
+      "AttendeeIn": {
+        "additionalProperties": false,
+        "description": "A person (`type` `user`) or agent (`agent`) of the system by `id`, or an address\n(`email`, with an optional display `name`).",
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AttendeeRole",
+            "default": "required"
+          },
+          "type": {
+            "$ref": "#/components/schemas/Kind"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "AttendeeIn",
+        "type": "object"
+      },
+      "AttendeeOut": {
+        "description": "`principal_id` for a person or agent, `email` for an address (a person's\naddress is never shown); `name` the person's, agent's or the address's display\nname. `delivery`: `internal` (the activity view), `not_sent` (an address: pass the\nevent's `.ics` on).",
+        "properties": {
+          "delivery": {
+            "$ref": "#/components/schemas/Delivery"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "principal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Principal Id"
+          },
+          "response": {
+            "$ref": "#/components/schemas/Response"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AttendeeRole"
+          },
+          "type": {
+            "$ref": "#/components/schemas/Kind"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "principal_id",
+          "email",
+          "name",
+          "role",
+          "response",
+          "delivery"
+        ],
+        "title": "AttendeeOut",
+        "type": "object"
+      },
+      "AttendeeRole": {
+        "enum": [
+          "required",
+          "optional"
+        ],
+        "title": "AttendeeRole",
+        "type": "string"
+      },
+      "AttendeesIn": {
+        "additionalProperties": false,
+        "description": "The whole list of attendees (at most 100) at the event's `version` read.",
+        "properties": {
+          "attendees": {
+            "items": {
+              "$ref": "#/components/schemas/AttendeeIn"
+            },
+            "maxItems": 100,
+            "title": "Attendees",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "attendees"
+        ],
+        "title": "AttendeesIn",
+        "type": "object"
+      },
+      "AttendeesSetOut": {
+        "description": "The event's version after the change.",
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "AttendeesSetOut",
         "type": "object"
       },
       "AuditOut": {
@@ -2268,6 +2729,120 @@
         "title": "AutomationUpdate",
         "type": "object"
       },
+      "BackupRunOut": {
+        "description": "One backup. A run with trigger `admin` in state `running` and no archive yet may\nstill wait for a worker.",
+        "properties": {
+          "archive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive"
+          },
+          "archive_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive Sha256"
+          },
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "offsite_state": {
+            "$ref": "#/components/schemas/OffsiteState"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/BackupState"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/BackupTrigger"
+          }
+        },
+        "required": [
+          "id",
+          "trigger",
+          "state",
+          "started_at",
+          "finished_at",
+          "archive",
+          "bytes",
+          "archive_sha256",
+          "error_code",
+          "offsite_state"
+        ],
+        "title": "BackupRunOut",
+        "type": "object"
+      },
+      "BackupState": {
+        "enum": [
+          "running",
+          "ok",
+          "failed",
+          "interrupted"
+        ],
+        "title": "BackupState",
+        "type": "string"
+      },
+      "BackupTrigger": {
+        "enum": [
+          "schedule",
+          "cli",
+          "admin",
+          "pre_restore"
+        ],
+        "title": "BackupTrigger",
+        "type": "string"
+      },
       "BaseUrlSpec": {
         "additionalProperties": false,
         "description": "The instance's address, which the admin may change (a self-managed GitLab).",
@@ -2589,6 +3164,190 @@
         ],
         "title": "BudgetScope",
         "type": "string"
+      },
+      "CalendarColor": {
+        "description": "The eight fixed tones a calendar is drawn in (plan M10 decision 17).",
+        "enum": [
+          "blue",
+          "green",
+          "amber",
+          "red",
+          "violet",
+          "teal",
+          "pink",
+          "slate"
+        ],
+        "title": "CalendarColor",
+        "type": "string"
+      },
+      "CalendarCreate": {
+        "additionalProperties": false,
+        "description": "A new calendar of the space (`calendar.moderate`); at most 20 per space (409\n`calendar.limit`).",
+        "properties": {
+          "color": {
+            "$ref": "#/components/schemas/CalendarColor",
+            "default": "blue"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "time_zone": {
+            "default": "Europe/Berlin",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Time Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CalendarCreate",
+        "type": "object"
+      },
+      "CalendarOut": {
+        "description": "`is_default`: made by the system for a personal space (\u201eMein Kalender\u201c) or the\ngeneral space; there is at most one per space, and it cannot be archived. `name`\nis null for a default nobody renamed: the interface words it. `time_zone`: the\nzone of a new event that names none.",
+        "properties": {
+          "color": {
+            "$ref": "#/components/schemas/CalendarColor"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "time_zone": {
+            "title": "Time Zone",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "space_id",
+          "name",
+          "color",
+          "is_default",
+          "time_zone",
+          "version"
+        ],
+        "title": "CalendarOut",
+        "type": "object"
+      },
+      "CalendarSettingsIn": {
+        "additionalProperties": false,
+        "description": "`sync_enabled`: whether people may connect their own external calendars\n(`calendar.sync`; data leaves the house).",
+        "properties": {
+          "sync_enabled": {
+            "title": "Sync Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sync_enabled",
+          "version"
+        ],
+        "title": "CalendarSettingsIn",
+        "type": "object"
+      },
+      "CalendarSettingsOut": {
+        "properties": {
+          "sync_enabled": {
+            "title": "Sync Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sync_enabled",
+          "version"
+        ],
+        "title": "CalendarSettingsOut",
+        "type": "object"
+      },
+      "CalendarUpdate": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are (none can be null).",
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalendarColor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "CalendarUpdate",
+        "type": "object"
       },
       "CardOut": {
         "description": "A run's card (plan M6 task 7): what it waits for, `approval` or `question`, by\nid (`GET /api/approvals/{id}`, `GET /api/questions/{id}`, for those who may see\nit). The message's `body_md` is the card's summary or the question.",
@@ -2925,6 +3684,24 @@
               }
             ]
           },
+          "issuer": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "pattern": "^(https://[^\\s?#]+|http://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/[^\\s?#]*)?)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "issuer_in_response": {
+            "default": false,
+            "title": "Issuer In Response",
+            "type": "boolean"
+          },
           "name": {
             "maxLength": 120,
             "minLength": 1,
@@ -2990,6 +3767,17 @@
             "title": "Authorization Endpoint",
             "type": "string"
           },
+          "callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Callback Url"
+          },
           "client_id": {
             "title": "Client Id",
             "type": "string"
@@ -3017,6 +3805,21 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "issuer_in_response": {
+            "title": "Issuer In Response",
+            "type": "boolean"
           },
           "name": {
             "title": "Name",
@@ -3077,6 +3880,9 @@
           "token_auth",
           "scopes",
           "resource",
+          "issuer",
+          "issuer_in_response",
+          "callback_url",
           "version",
           "created_at",
           "updated_at"
@@ -3124,6 +3930,30 @@
                 "type": "null"
               }
             ]
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "pattern": "^(https://[^\\s?#]+|http://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/[^\\s?#]*)?)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "issuer_in_response": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer In Response"
           },
           "keep_shared_connectors": {
             "default": false,
@@ -3910,7 +4740,7 @@
         "type": "string"
       },
       "ConversationOut": {
-        "description": "`can_post`: whether the caller may write here now (the right in the space, and\nthe channel not archived). `created_by` is null for what the system set up.\n`version` guards writes (send it back; stale \u2192 409). A direct message lists its\n`participants` and, on its own (`GET /conversations/{id}`), every admin\n`inspections` of it; both are empty for other kinds. `page_id`: a page thread's\npage (null for other kinds).",
+        "description": "`can_post`: whether the caller may write here now (the right in the space, and\nthe channel not archived). `created_by` is null for what the system set up.\n`version` guards writes (send it back; stale \u2192 409). A direct message lists its\n`participants` and, on its own (`GET /conversations/{id}`), every admin\n`inspections` of it; both are empty for other kinds. `page_id`: a page thread's\npage (null for other kinds). `fresh_start_at`: where the person started her DM\nalone with an agent afresh (its agent sees nothing from before; null: never).",
         "properties": {
           "archived_at": {
             "anyOf": [
@@ -3942,6 +4772,18 @@
                 "type": "null"
               }
             ]
+          },
+          "fresh_start_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fresh Start At"
           },
           "id": {
             "format": "uuid",
@@ -4315,6 +5157,15 @@
         "title": "DefaultIn",
         "type": "object"
       },
+      "Delivery": {
+        "description": "How an invitation reaches its attendee: `internal` (a person or agent of the\nsystem: the activity view), `not_sent` (an address: nothing sends it; the `.ics`\nfile is for passing on). Task 16 adds addresses a linked calendar sends to.",
+        "enum": [
+          "internal",
+          "not_sent"
+        ],
+        "title": "Delivery",
+        "type": "string"
+      },
       "DiffOut": {
         "description": "Line by line from `from_number` to `to_number`; a changed line is a `delete`\nfollowed by an `insert`.",
         "properties": {
@@ -4438,6 +5289,10 @@
             ],
             "title": "Issuer"
           },
+          "issuer_in_response": {
+            "title": "Issuer In Response",
+            "type": "boolean"
+          },
           "pkce": {
             "title": "Pkce",
             "type": "boolean"
@@ -4491,6 +5346,7 @@
           "status",
           "resource",
           "issuer",
+          "issuer_in_response",
           "authorization_endpoint",
           "token_endpoint",
           "revocation_endpoint",
@@ -4577,6 +5433,18 @@
                 "type": "null"
               }
             ]
+          },
+          "fresh_start_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fresh Start At"
           },
           "id": {
             "format": "uuid",
@@ -4856,6 +5724,185 @@
         "title": "EpicOut",
         "type": "object"
       },
+      "EventChangeOut": {
+        "description": "The answer to a change: the event it shows (the series; with `scope=this` the\nnew override; with `scope=following` the new series; with `dry_run` the event as\nit is) and what the change drops: overrides and deleted occurrences (EXDATEs) that\nno longer name an occurrence of the series (with `dry_run`: would drop).",
+        "properties": {
+          "dropped_exdates": {
+            "title": "Dropped Exdates",
+            "type": "integer"
+          },
+          "dropped_overrides": {
+            "title": "Dropped Overrides",
+            "type": "integer"
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventOut"
+          }
+        },
+        "required": [
+          "event",
+          "dropped_overrides",
+          "dropped_exdates"
+        ],
+        "title": "EventChangeOut",
+        "type": "object"
+      },
+      "EventCreate": {
+        "additionalProperties": false,
+        "description": "An event with a time of day names `starts_at`, `ends_at` (instants) and its\n`time_zone` (IANA; default: the calendar's); an all-day one `all_day`, `first_day` and\n`last_day`. `rrule` (RFC 5545, `DAILY` or slower), `rdates` and `exdates` (wall\ntimes in the event's zone, without offset) make it a series. `busy` defaults to\ntrue, for all-day events to false.",
+        "properties": {
+          "all_day": {
+            "default": false,
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "busy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Busy"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 20000,
+            "title": "Description",
+            "type": "string"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "exdates": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Exdates",
+            "type": "array"
+          },
+          "first_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Day"
+          },
+          "last_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Day"
+          },
+          "location": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Location",
+            "type": "string"
+          },
+          "rdates": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Rdates",
+            "type": "array"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus",
+            "default": "confirmed"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
+          "title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "uid": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uid"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/EventVisibility",
+            "default": "default"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "EventCreate",
+        "type": "object"
+      },
       "EventIn": {
         "additionalProperties": false,
         "properties": {
@@ -4914,6 +5961,247 @@
         "title": "EventKind",
         "type": "string"
       },
+      "EventOut": {
+        "description": "`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`\nand of the day after `last_day`). `recurs_until`: when the last occurrence ends\n(null: endless). `series_id`: for an override (one occurrence changed on its own),\nthe series it belongs to, and `recurrence_id` the occurrence it takes the place of\n(its wall time in the series, ISO 8601 without offset); null otherwise.\n`time_zone`: the zone its series runs in (null for all-day). `redacted`: the caller\nsees only times and \"busy\"; content fields are null.",
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "busy": {
+            "title": "Busy",
+            "type": "boolean"
+          },
+          "calendar_id": {
+            "format": "uuid",
+            "title": "Calendar Id",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "exdates": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Exdates",
+            "type": "array"
+          },
+          "first_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Day"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Day"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "organizer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizerOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rdates": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Rdates",
+            "type": "array"
+          },
+          "recurrence_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence Id"
+          },
+          "recurs_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurs Until"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uid"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/EventVisibility"
+          }
+        },
+        "required": [
+          "id",
+          "calendar_id",
+          "space_id",
+          "series_id",
+          "recurrence_id",
+          "uid",
+          "title",
+          "description",
+          "location",
+          "all_day",
+          "starts_at",
+          "ends_at",
+          "first_day",
+          "last_day",
+          "time_zone",
+          "rrule",
+          "rdates",
+          "exdates",
+          "recurs_until",
+          "status",
+          "visibility",
+          "busy",
+          "organizer",
+          "redacted",
+          "version"
+        ],
+        "title": "EventOut",
+        "type": "object"
+      },
+      "EventStatus": {
+        "enum": [
+          "confirmed",
+          "tentative",
+          "cancelled"
+        ],
+        "title": "EventStatus",
+        "type": "string"
+      },
       "EventType": {
         "description": "What an event rule listens to (decision 8).",
         "enum": [
@@ -4924,6 +6212,274 @@
         ],
         "title": "EventType",
         "type": "string"
+      },
+      "EventUpdate": {
+        "additionalProperties": false,
+        "description": "A change: `version` (the one read) and only the fields that change, named as\nwhen making an event. Times start from the stored ones: an event moves by its\n`starts_at`/`ends_at` (all-day: `first_day`/`last_day`); `all_day` switches the kind\nand then needs the other kind's bounds. With `scope=all` the times are the series'\n(its first occurrence); with `scope=this` the occurrence's; with `scope=following`\nthose of the part from the occurrence on. `rrule: null` ends the rule.",
+        "properties": {
+          "all_day": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "All Day"
+          },
+          "busy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Busy"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "exdates": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exdates"
+          },
+          "first_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Day"
+          },
+          "last_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Day"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "rdates": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rdates"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "EventUpdate",
+        "type": "object"
+      },
+      "EventVisibility": {
+        "description": "`private`: only the organiser (and, on the named way, admins) sees its content;\nevery other reader of the calendar sees times and \"busy\" (`sight.py`).",
+        "enum": [
+          "default",
+          "private"
+        ],
+        "title": "EventVisibility",
+        "type": "string"
+      },
+      "FiguresOut": {
+        "description": "`tools_major`: the archive's pg_dump, this installation's pg_restore.",
+        "properties": {
+          "alembic_revision": {
+            "title": "Alembic Revision",
+            "type": "string"
+          },
+          "app_version": {
+            "title": "App Version",
+            "type": "string"
+          },
+          "file_bytes": {
+            "title": "File Bytes",
+            "type": "integer"
+          },
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "server_major": {
+            "title": "Server Major",
+            "type": "integer"
+          },
+          "storage": {
+            "title": "Storage",
+            "type": "string"
+          },
+          "tables": {
+            "title": "Tables",
+            "type": "integer"
+          },
+          "tools_major": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools Major"
+          }
+        },
+        "required": [
+          "app_version",
+          "alembic_revision",
+          "server_major",
+          "tools_major",
+          "storage",
+          "tables",
+          "rows",
+          "files",
+          "file_bytes"
+        ],
+        "title": "FiguresOut",
+        "type": "object"
       },
       "FiringOut": {
         "description": "One term of the log: how it went, the run it started, whether a heartbeat's\nrun answered `HEARTBEAT_OK` (nothing delivered).",
@@ -5414,6 +6970,53 @@
         "title": "HunkOut",
         "type": "object"
       },
+      "IdentityOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "provider_key": {
+            "title": "Provider Key",
+            "type": "string"
+          },
+          "provider_kind": {
+            "$ref": "#/components/schemas/ProviderKind"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "provider_key",
+          "provider_name",
+          "provider_kind",
+          "created_at",
+          "last_login_at"
+        ],
+        "title": "IdentityOut",
+        "type": "object"
+      },
       "ImportResultOut": {
         "description": "`created`: pages, folders without a file of their own included.",
         "properties": {
@@ -5700,6 +7303,15 @@
         "title": "InstallOut",
         "type": "object"
       },
+      "Kind": {
+        "enum": [
+          "user",
+          "agent",
+          "email"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
       "LastRunOut": {
         "description": "The latest term: how it went (`outcome`), its run and how that ended.",
         "properties": {
@@ -5769,6 +7381,39 @@
           "stop_reason"
         ],
         "title": "LastRunOut",
+        "type": "object"
+      },
+      "LinkStartIn": {
+        "description": "Linking a new account proves the person again (J9): her current password, or\nnone right after a sign-in through a provider (at most 10 minutes ago).",
+        "properties": {
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "title": "LinkStartIn",
+        "type": "object"
+      },
+      "LinkStartOut": {
+        "description": "Where the browser goes to link an account (the provider's sign-in page).",
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "LinkStartOut",
         "type": "object"
       },
       "LinkedPageOut": {
@@ -5857,6 +7502,50 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "MaintenanceOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MaintenanceReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "required": [
+          "active",
+          "reason",
+          "started_at"
+        ],
+        "title": "MaintenanceOut",
+        "type": "object"
+      },
+      "MaintenanceReason": {
+        "enum": [
+          "restore"
+        ],
+        "title": "MaintenanceReason",
+        "type": "string"
+      },
       "McpCallOut": {
         "properties": {
           "created_at": {
@@ -5938,7 +7627,7 @@
         "type": "object"
       },
       "MeOut": {
-        "description": "`permissions`: the system-wide actions the caller holds; clients decide what to\nshow from these (and from a space's `my_role`), never from the role's name.\n`ai_model`: with `ai.use`, the name of the model the caller's AI assignment gives\nthem (nothing else about the connection); null without.",
+        "description": "`permissions`: the system-wide actions the caller holds; clients decide what to\nshow from these (and from a space's `my_role`), never from the role's name.\n`ai_model`: with `ai.use`, the name of the model the caller's AI assignment gives\nthem (nothing else about the connection); null without. `session_limits`: what the\nsessions list tells the person (R18-11).",
         "properties": {
           "ai_model": {
             "anyOf": [
@@ -5961,6 +7650,9 @@
             "title": "Permissions",
             "type": "array"
           },
+          "session_limits": {
+            "$ref": "#/components/schemas/SessionLimitsOut"
+          },
           "user": {
             "$ref": "#/components/schemas/UserOut"
           }
@@ -5969,7 +7661,8 @@
           "user",
           "org",
           "permissions",
-          "ai_model"
+          "ai_model",
+          "session_limits"
         ],
         "title": "MeOut",
         "type": "object"
@@ -6916,7 +8609,11 @@
           "run_stopped",
           "skill_proposal",
           "automation",
-          "review_due"
+          "review_due",
+          "signup",
+          "totp_locked",
+          "invitation",
+          "invite_reply"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -6973,6 +8670,164 @@
         "title": "OAuthSpec",
         "type": "object"
       },
+      "OccurrenceOut": {
+        "description": "One occurrence in the window. `recurrence_id`: for an occurrence of a series,\nthe wall time it is named by (ISO 8601 without offset), which changing or deleting\njust this one takes back (task 3b); null for an event that is no series.\n`series_id`: for an override, which is listed as an event of its own, the series\nit belongs to (to change the whole series from it); null otherwise. `redacted`:\nthe caller sees only times and \"busy\" (`title`, `location` null).",
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "busy": {
+            "title": "Busy",
+            "type": "boolean"
+          },
+          "calendar_id": {
+            "format": "uuid",
+            "title": "Calendar Id",
+            "type": "string"
+          },
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "recurrence_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence Id"
+          },
+          "recurring": {
+            "title": "Recurring",
+            "type": "boolean"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/EventVisibility"
+          }
+        },
+        "required": [
+          "event_id",
+          "calendar_id",
+          "space_id",
+          "series_id",
+          "start",
+          "end",
+          "all_day",
+          "recurring",
+          "recurrence_id",
+          "title",
+          "location",
+          "status",
+          "visibility",
+          "busy",
+          "redacted"
+        ],
+        "title": "OccurrenceOut",
+        "type": "object"
+      },
+      "OffsiteState": {
+        "enum": [
+          "off",
+          "ok",
+          "failed"
+        ],
+        "title": "OffsiteState",
+        "type": "string"
+      },
+      "OidcSecretIn": {
+        "additionalProperties": false,
+        "description": "Either the secret itself (`value`, stored encrypted; needs `HERD_SECRET_KEY`) or\nthe name of an environment variable `HERD_OIDC_*` (`env`).",
+        "properties": {
+          "env": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "format": "password",
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "title": "OidcSecretIn",
+        "type": "object"
+      },
       "OnceIn": {
         "additionalProperties": false,
         "properties": {
@@ -7013,6 +8868,24 @@
         "title": "OrgOut",
         "type": "object"
       },
+      "OrganizerOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "title": "OrganizerOut",
+        "type": "object"
+      },
       "Outcome": {
         "enum": [
           "ok",
@@ -7022,6 +8895,154 @@
         ],
         "title": "Outcome",
         "type": "string"
+      },
+      "OverlayKind": {
+        "enum": [
+          "automations",
+          "sprints",
+          "tickets"
+        ],
+        "title": "OverlayKind",
+        "type": "string"
+      },
+      "OverlayOut": {
+        "description": "Something the calendar shows beside events, stored nowhere: a ticket's due day\n(`ref` its key), a sprint from its first to its last day, or an automation's next\nterm (`at`, on its day in the viewer's zone; `space_id` null in a DM). `ref` is\nwhat the interface links with: a ticket's key, else the id. `title`: the ticket's\ntitle, the sprint's name, the automation's agent.",
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "ends_on": {
+            "format": "date",
+            "title": "Ends On",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/OverlayKind"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          },
+          "starts_on": {
+            "format": "date",
+            "title": "Starts On",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "space_id",
+          "starts_on",
+          "ends_on",
+          "ref",
+          "title",
+          "at"
+        ],
+        "title": "OverlayOut",
+        "type": "object"
+      },
+      "OwnSessionOut": {
+        "description": "One of the caller's running login sessions. `device`: browser and system, no\nversion (null for an unknown client); `current`: the session of this request.",
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "format": "date-time",
+            "title": "Last Used At",
+            "type": "string"
+          },
+          "signed_in_at": {
+            "format": "date-time",
+            "title": "Signed In At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "device",
+          "signed_in_at",
+          "last_used_at",
+          "current"
+        ],
+        "title": "OwnSessionOut",
+        "type": "object"
+      },
+      "OwnSessionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OwnSessionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "OwnSessionPage",
+        "type": "object"
       },
       "PageCreate": {
         "additionalProperties": false,
@@ -7402,6 +9423,33 @@
         "title": "Page[AdminTokenOut]",
         "type": "object"
       },
+      "Page_AdminUserOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUserOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[AdminUserOut]",
+        "type": "object"
+      },
       "Page_AgentOut_": {
         "properties": {
           "items": {
@@ -7510,6 +9558,33 @@
         "title": "Page[ApprovalOut]",
         "type": "object"
       },
+      "Page_ArchiveOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ArchiveOut]",
+        "type": "object"
+      },
       "Page_AttachmentOut_": {
         "properties": {
           "items": {
@@ -7535,6 +9610,33 @@
           "items"
         ],
         "title": "Page[AttachmentOut]",
+        "type": "object"
+      },
+      "Page_AttendeeOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AttendeeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[AttendeeOut]",
         "type": "object"
       },
       "Page_AuditOut_": {
@@ -7591,6 +9693,33 @@
         "title": "Page[AutomationOut]",
         "type": "object"
       },
+      "Page_BackupRunOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BackupRunOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[BackupRunOut]",
+        "type": "object"
+      },
       "Page_BudgetOut_": {
         "properties": {
           "items": {
@@ -7616,6 +9745,33 @@
           "items"
         ],
         "title": "Page[BudgetOut]",
+        "type": "object"
+      },
+      "Page_CalendarOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[CalendarOut]",
         "type": "object"
       },
       "Page_CatalogEntry_": {
@@ -7942,6 +10098,33 @@
         "title": "Page[GroupOut]",
         "type": "object"
       },
+      "Page_IdentityOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IdentityOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[IdentityOut]",
+        "type": "object"
+      },
       "Page_InspectableDmOut_": {
         "properties": {
           "items": {
@@ -8050,6 +10233,60 @@
         "title": "Page[MessageOut]",
         "type": "object"
       },
+      "Page_OccurrenceOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OccurrenceOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[OccurrenceOut]",
+        "type": "object"
+      },
+      "Page_OverlayOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OverlayOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[OverlayOut]",
+        "type": "object"
+      },
       "Page_PersonalServerOut_": {
         "properties": {
           "items": {
@@ -8129,6 +10366,60 @@
           "items"
         ],
         "title": "Page[ProposalOut]",
+        "type": "object"
+      },
+      "Page_ProviderOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ProviderOut]",
+        "type": "object"
+      },
+      "Page_PublicProviderOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicProviderOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[PublicProviderOut]",
         "type": "object"
       },
       "Page_RunEventOut_": {
@@ -8644,33 +10935,6 @@
         "title": "Page[UserAssignmentOut]",
         "type": "object"
       },
-      "Page_UserOut_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/UserOut"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "Page[UserOut]",
-        "type": "object"
-      },
       "Page_VersionSummaryOut_": {
         "properties": {
           "items": {
@@ -8800,6 +11064,20 @@
         ],
         "title": "PausedReason",
         "type": "string"
+      },
+      "PendingCountOut": {
+        "description": "How many self-registered accounts wait for approval.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "title": "PendingCountOut",
+        "type": "object"
       },
       "PersonNameOut": {
         "description": "Who caused a timeline entry: a person, or (plan M6) an agent (`type`).",
@@ -9806,6 +12084,389 @@
         "title": "ProposalState",
         "type": "string"
       },
+      "ProviderCheckOut": {
+        "description": "`code` is None when discovery and the JWKS answered as OIDC promises.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "code"
+        ],
+        "title": "ProviderCheckOut",
+        "type": "object"
+      },
+      "ProviderCreate": {
+        "additionalProperties": false,
+        "description": "`google`: issuer and scopes are the preset's (`issuer`, `scopes`, `trust_email`\nare refused); `generic`: `issuer` is required, `scopes` must hold `openid`.",
+        "properties": {
+          "allow_signup": {
+            "default": false,
+            "title": "Allow Signup",
+            "type": "boolean"
+          },
+          "allowed_domains": {
+            "default": [],
+            "items": {
+              "maxLength": 253,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Allowed Domains",
+            "type": "array"
+          },
+          "client_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[ -~]+$",
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OidcSecretIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProviderKind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "pattern": "^[\\x21\\x23-\\x5b\\x5d-\\x7e]+( [\\x21\\x23-\\x5b\\x5d-\\x7e]+)*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
+          "trust_email": {
+            "default": false,
+            "title": "Trust Email",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "client_id"
+        ],
+        "title": "ProviderCreate",
+        "type": "object"
+      },
+      "ProviderKind": {
+        "enum": [
+          "google",
+          "generic"
+        ],
+        "title": "ProviderKind",
+        "type": "string"
+      },
+      "ProviderOut": {
+        "properties": {
+          "allow_signup": {
+            "title": "Allow Signup",
+            "type": "boolean"
+          },
+          "allowed_domains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Domains",
+            "type": "array"
+          },
+          "callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Callback Url"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret": {
+            "$ref": "#/components/schemas/SecretState"
+          },
+          "discovered": {
+            "title": "Discovered",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "issuer": {
+            "title": "Issuer",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProviderKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scopes": {
+            "title": "Scopes",
+            "type": "string"
+          },
+          "trust_email": {
+            "title": "Trust Email",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "kind",
+          "issuer",
+          "client_id",
+          "client_secret",
+          "scopes",
+          "trust_email",
+          "allow_signup",
+          "allowed_domains",
+          "enabled",
+          "discovered",
+          "callback_url",
+          "version"
+        ],
+        "title": "ProviderOut",
+        "type": "object"
+      },
+      "ProviderUpdate": {
+        "additionalProperties": false,
+        "description": "Only the fields sent change; `client_secret` replaces the stored one.",
+        "properties": {
+          "allow_signup": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Signup"
+          },
+          "allowed_domains": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 253,
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Domains"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "pattern": "^[ -~]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OidcSecretIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "pattern": "^[\\x21\\x23-\\x5b\\x5d-\\x7e]+( [\\x21\\x23-\\x5b\\x5d-\\x7e]+)*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
+          "trust_email": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trust Email"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ProviderUpdate",
+        "type": "object"
+      },
+      "PublicProviderOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProviderKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "kind"
+        ],
+        "title": "PublicProviderOut",
+        "type": "object"
+      },
       "Purpose": {
         "enum": [
           "chat",
@@ -9993,6 +12654,58 @@
         "title": "ReadPosition",
         "type": "object"
       },
+      "ReadPositionOut": {
+        "description": "The caller's read position: the message she read up to and when it was written;\nboth null before she read anything there.",
+        "properties": {
+          "last_read_message_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Read Message At"
+          },
+          "last_read_message_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Read Message Id"
+          }
+        },
+        "required": [
+          "last_read_message_id",
+          "last_read_message_at"
+        ],
+        "title": "ReadPositionOut",
+        "type": "object"
+      },
+      "RecoveryCodesOut": {
+        "description": "Ten recovery codes, shown this once; each signs in once instead of a code.",
+        "properties": {
+          "recovery_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recovery Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recovery_codes"
+        ],
+        "title": "RecoveryCodesOut",
+        "type": "object"
+      },
       "RecurringIn": {
         "additionalProperties": false,
         "properties": {
@@ -10067,6 +12780,131 @@
         ],
         "title": "RemoteStatus",
         "type": "string"
+      },
+      "ReplaceIn": {
+        "description": "The organisation's name, exactly, as the confirmation.",
+        "properties": {
+          "confirm": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "ReplaceIn",
+        "type": "object"
+      },
+      "ReplaceOut": {
+        "properties": {
+          "archive_name": {
+            "title": "Archive Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archive_name"
+        ],
+        "title": "ReplaceOut",
+        "type": "object"
+      },
+      "Response": {
+        "enum": [
+          "needs_action",
+          "accepted",
+          "tentative",
+          "declined"
+        ],
+        "title": "Response",
+        "type": "string"
+      },
+      "ResponseIn": {
+        "additionalProperties": false,
+        "description": "An answer (`accepted`, `tentative` or `declined`) at the event's `version`\nread.",
+        "properties": {
+          "response": {
+            "$ref": "#/components/schemas/Response"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "response",
+          "version"
+        ],
+        "title": "ResponseIn",
+        "type": "object"
+      },
+      "RestoreAttemptOut": {
+        "description": "The last attempt to replace the installation from here: `requested` (under way,\nor its process ended), `failed` with a code.",
+        "properties": {
+          "archive_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive Name"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "state": {
+            "enum": [
+              "requested",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "at",
+          "archive_name",
+          "code"
+        ],
+        "title": "RestoreAttemptOut",
+        "type": "object"
+      },
+      "RestoreStatusOut": {
+        "properties": {
+          "attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestoreAttemptOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "attempt"
+        ],
+        "title": "RestoreStatusOut",
+        "type": "object"
       },
       "RunEventOut": {
         "description": "One step of a run (model call: usage and the answer's parts; tool call: name,\narguments, result, the spaces it came from; stop: the reason). `redacted`: parts\nthe reader may not read are left out (`agents/runs.py`); the asking person always\ngets everything. `tokens_*`, `cost` (model calls with a price) and `duration_ms`\n(model and tool calls) where the step recorded them, null otherwise.",
@@ -10440,6 +13278,16 @@
         "title": "SchemaProblem",
         "type": "string"
       },
+      "Scope": {
+        "description": "Which occurrences of a series a write touches (decision 6): `this` one (an\noverride, or an EXDATE when deleting), this and the `following` (a split), or\n`all` (the series row; the only scope of an event that is no series).",
+        "enum": [
+          "this",
+          "following",
+          "all"
+        ],
+        "title": "Scope",
+        "type": "string"
+      },
       "SearchResults": {
         "description": "A page of hits of every kind, told apart by `type`.",
         "properties": {
@@ -10484,6 +13332,61 @@
           "items"
         ],
         "title": "SearchResults",
+        "type": "object"
+      },
+      "SecondFactorIn": {
+        "additionalProperties": false,
+        "description": "Exactly one of `code` (six digits from the authenticator) and `recovery_code`.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "recovery_code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Code"
+          }
+        },
+        "title": "SecondFactorIn",
+        "type": "object"
+      },
+      "SecondFactorNeededOut": {
+        "description": "The password (or the provider) was right; the sign-in waits for the second\nfactor until `expires_at` (`POST /api/auth/login/second-factor`).",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "second_factor": {
+            "const": "totp",
+            "default": "totp",
+            "title": "Second Factor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expires_at"
+        ],
+        "title": "SecondFactorNeededOut",
         "type": "object"
       },
       "SecretIn": {
@@ -10549,6 +13452,30 @@
           "kind"
         ],
         "title": "SecretOut",
+        "type": "object"
+      },
+      "SecretState": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "set": {
+            "title": "Set",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "set",
+          "kind"
+        ],
+        "title": "SecretState",
         "type": "object"
       },
       "ServerCreate": {
@@ -10802,6 +13729,47 @@
           "version"
         ],
         "title": "ServerUpdate",
+        "type": "object"
+      },
+      "SessionLimitsOut": {
+        "description": "The installation's limits of a login session: it ends after `idle_hours` without\nuse (null: no idle limit, HERD_SESSION_IDLE_HOURS=0) and at the latest after\n`ttl_hours` (HERD_SESSION_TTL_HOURS).",
+        "properties": {
+          "idle_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idle Hours"
+          },
+          "ttl_hours": {
+            "title": "Ttl Hours",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "idle_hours",
+          "ttl_hours"
+        ],
+        "title": "SessionLimitsOut",
+        "type": "object"
+      },
+      "SignupDecisionIn": {
+        "additionalProperties": false,
+        "description": "Approve or reject a waiting account: the version the client read (409).",
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "SignupDecisionIn",
         "type": "object"
       },
       "SkillAuthorOut": {
@@ -13662,6 +16630,19 @@
             "title": "Name",
             "type": "string"
           },
+          "second_factor_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Factor Code"
+          },
           "space_ids": {
             "anyOf": [
               {
@@ -13992,6 +16973,100 @@
           "version"
         ],
         "title": "ToolVersionIn",
+        "type": "object"
+      },
+      "TotpCodeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "TotpCodeIn",
+        "type": "object"
+      },
+      "TotpSetupIn": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "TotpSetupIn",
+        "type": "object"
+      },
+      "TotpSetupOut": {
+        "description": "The secret in base32 and as an `otpauth://` URI (for a QR code), shown this once.",
+        "properties": {
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "uri"
+        ],
+        "title": "TotpSetupOut",
+        "type": "object"
+      },
+      "TotpStatusOut": {
+        "description": "`enabled_at`: when TOTP was turned on (null: off). `unavailable`: why it cannot\nbe set up (`no_password`: an account without a password signs in through its\nprovider, whose MFA applies; `no_secret_key`: the operator set no\n`HERD_SECRET_KEY`); null when it can.",
+        "properties": {
+          "enabled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled At"
+          },
+          "recovery_codes_left": {
+            "title": "Recovery Codes Left",
+            "type": "integer"
+          },
+          "unavailable": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_password",
+                  "no_secret_key"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable"
+          }
+        },
+        "required": [
+          "enabled_at",
+          "recovery_codes_left",
+          "unavailable"
+        ],
+        "title": "TotpStatusOut",
         "type": "object"
       },
       "TrashedPageOut": {
@@ -14338,6 +17413,18 @@
       },
       "UserOut": {
         "properties": {
+          "awaiting_approval_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Awaiting Approval Since"
+          },
           "email": {
             "title": "Email",
             "type": "string"
@@ -14387,6 +17474,7 @@
           "is_active",
           "locale",
           "last_login_at",
+          "awaiting_approval_since",
           "version"
         ],
         "title": "UserOut",
@@ -14784,7 +17872,7 @@
   },
   "info": {
     "title": "to-herd-cats-ai",
-    "version": "0.1.0"
+    "version": "1.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -15061,6 +18149,66 @@
         "summary": "List Audit",
         "tags": [
           "audit"
+        ]
+      }
+    },
+    "/api/admin/calendar-settings": {
+      "get": {
+        "operationId": "get_calendar_settings_api_admin_calendar_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Calendar Settings",
+        "tags": [
+          "calendars"
+        ]
+      },
+      "put": {
+        "operationId": "set_calendar_settings_api_admin_calendar_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Calendar Settings",
+        "tags": [
+          "calendars"
         ]
       }
     },
@@ -15649,9 +18797,9 @@
         ]
       }
     },
-    "/api/admin/users": {
+    "/api/admin/oidc-providers": {
       "get": {
-        "operationId": "list_users_api_admin_users_get",
+        "operationId": "list_providers_api_admin_oidc_providers_get",
         "parameters": [
           {
             "in": "query",
@@ -15687,7 +18835,301 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_UserOut_"
+                  "$ref": "#/components/schemas/Page_ProviderOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Providers",
+        "tags": [
+          "oidc"
+        ]
+      },
+      "post": {
+        "operationId": "create_provider_api_admin_oidc_providers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Provider",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
+    "/api/admin/oidc-providers/{provider_id}": {
+      "delete": {
+        "description": "Also ends the sessions of the people linked through it, but the caller's own.",
+        "operationId": "delete_provider_api_admin_oidc_providers__provider_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Provider Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Provider",
+        "tags": [
+          "oidc"
+        ]
+      },
+      "get": {
+        "operationId": "get_provider_api_admin_oidc_providers__provider_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Provider",
+        "tags": [
+          "oidc"
+        ]
+      },
+      "patch": {
+        "operationId": "update_provider_api_admin_oidc_providers__provider_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Provider",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
+    "/api/admin/oidc-providers/{provider_id}/check": {
+      "post": {
+        "description": "Discovery and the JWKS, fetched now through the egress guard; a fixed code.",
+        "operationId": "check_provider_api_admin_oidc_providers__provider_id__check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Provider",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "operationId": "list_users_api_admin_users_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "true: only accounts awaiting approval",
+            "in": "query",
+            "name": "pending",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true: only accounts awaiting approval",
+              "title": "Pending",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AdminUserOut_"
                 }
               }
             },
@@ -15749,6 +19191,28 @@
         ]
       }
     },
+    "/api/admin/users/pending/count": {
+      "get": {
+        "description": "How many self-registered accounts wait for approval (the admin navigation's badge).",
+        "operationId": "count_pending_api_admin_users_pending_count_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingCountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Count Pending",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/admin/users/{user_id}": {
       "patch": {
         "operationId": "update_user_api_admin_users__user_id__patch",
@@ -15802,6 +19266,60 @@
         ]
       }
     },
+    "/api/admin/users/{user_id}/approve": {
+      "post": {
+        "description": "Let a self-registered account in (409 `users.not_pending` once decided).",
+        "operationId": "approve_signup_api_admin_users__user_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Signup",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/admin/users/{user_id}/deactivate": {
       "post": {
         "operationId": "deactivate_user_api_admin_users__user_id__deactivate_post",
@@ -15838,6 +19356,123 @@
         ]
       }
     },
+    "/api/admin/users/{user_id}/identities": {
+      "get": {
+        "operationId": "list_user_identities_api_admin_users__user_id__identities_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_IdentityOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List User Identities",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}/identities/{identity_id}": {
+      "delete": {
+        "operationId": "unlink_user_identity_api_admin_users__user_id__identities__identity_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "identity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identity Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unlink User Identity",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
     "/api/admin/users/{user_id}/reactivate": {
       "post": {
         "operationId": "reactivate_user_api_admin_users__user_id__reactivate_post",
@@ -15869,6 +19504,127 @@
           }
         },
         "summary": "Reactivate User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}/reject": {
+      "post": {
+        "description": "Refuse a self-registered account: it is deleted (it never was active), with\nwhat signing up created; its address is free again.",
+        "operationId": "reject_signup_api_admin_users__user_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Signup",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}/sign-out": {
+      "post": {
+        "description": "Ends every session of the person; they stay active and may sign in again.",
+        "operationId": "sign_out_user_api_admin_users__user_id__sign_out_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sign Out User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}/totp/reset": {
+      "post": {
+        "description": "Turns the person's TOTP off (a lost device); they sign in with the password\nalone until they set it up again. Idempotent.",
+        "operationId": "reset_totp_api_admin_users__user_id__totp_reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Totp",
         "tags": [
           "users"
         ]
@@ -19957,8 +23713,8 @@
     },
     "/api/ai/oauth/callback": {
       "get": {
-        "description": "The authorization server's redirect: finish the flow, then send the browser to\nthe result page (`/ai/oauth/done?status=...`).",
-        "operationId": "oauth_callback_api_ai_oauth_callback_get",
+        "description": "The shared callback of earlier releases: only for flows started with it.",
+        "operationId": "oauth_legacy_callback_api_ai_oauth_callback_get",
         "parameters": [
           {
             "in": "query",
@@ -20009,6 +23765,128 @@
                 }
               ],
               "title": "Error"
+            }
+          },
+          {
+            "in": "query",
+            "name": "iss",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Iss"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Oauth Legacy Callback",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/ai/oauth/{client_id}/callback": {
+      "get": {
+        "description": "An app's authorization server's redirect: finish the flow started with this\ncallback, then send the browser to its purpose's result page (`?status=...`).",
+        "operationId": "oauth_callback_api_ai_oauth__client_id__callback_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "client_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Client Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 4096,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          },
+          {
+            "in": "query",
+            "name": "iss",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Iss"
             }
           }
         ],
@@ -20614,12 +24492,65 @@
     },
     "/api/auth/login": {
       "post": {
+        "description": "Signed in (200, the session cookie), or, for a person with TOTP, 202: the\npassword was right and the sign-in waits for the second factor\n(`/auth/login/second-factor`, with the cookie set here); no session yet.",
         "operationId": "login_api_auth_login_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecondFactorNeededOut"
+                }
+              }
+            },
+            "description": "Second factor needed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/login/second-factor": {
+      "post": {
+        "description": "The second step of a sign-in: the browser's waiting sign-in (cookie) and a code\nor a recovery code; the login session opens only now.",
+        "operationId": "second_factor_api_auth_login_second_factor_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecondFactorIn"
               }
             }
           },
@@ -20647,7 +24578,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Login",
+        "summary": "Second Factor",
         "tags": [
           "auth"
         ]
@@ -20728,6 +24659,163 @@
         ]
       }
     },
+    "/api/auth/me/identities": {
+      "get": {
+        "operationId": "my_identities_api_auth_me_identities_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_IdentityOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Identities",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
+    "/api/auth/me/identities/{identity_id}": {
+      "delete": {
+        "operationId": "unlink_mine_api_auth_me_identities__identity_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identity Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unlink Mine",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
+    "/api/auth/me/identities/{key}/link": {
+      "post": {
+        "description": "Start linking the caller's account at the provider (from the profile): the\nbrowser goes to the returned address; the binding cookie comes with this answer.\nNeeds the current password, or a sign-in through a provider of this session at\nmost 10 minutes old (403 `auth.reauth_required`).",
+        "operationId": "link_api_auth_me_identities__key__link_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/LinkStartIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkStartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
     "/api/auth/me/password": {
       "post": {
         "description": "The caller's own password; this session stays, every other one ends.",
@@ -20760,6 +24848,513 @@
         "summary": "Change My Password",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/auth/me/sessions": {
+      "get": {
+        "description": "The caller's running sessions, newest first.",
+        "operationId": "list_own_sessions_api_auth_me_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnSessionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Own Sessions",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/sessions/sign-out-others": {
+      "post": {
+        "description": "Every session of the caller ends but this one.",
+        "operationId": "sign_out_others_api_auth_me_sessions_sign_out_others_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sign Out Others",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/sessions/{session_id}": {
+      "delete": {
+        "description": "One of the caller's sessions ends (this one too: then the cookie goes).",
+        "operationId": "end_own_session_api_auth_me_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Own Session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp": {
+      "get": {
+        "operationId": "my_totp_api_auth_me_totp_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Totp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp/confirm": {
+      "post": {
+        "description": "The first code turns TOTP on; every other session of the person ends.",
+        "operationId": "confirm_totp_api_auth_me_totp_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Totp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp/disable": {
+      "post": {
+        "operationId": "disable_totp_api_auth_me_totp_disable_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecondFactorIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disable Totp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp/recovery-codes": {
+      "post": {
+        "description": "A new set in place of the old one (a current code proves the device).",
+        "operationId": "renew_recovery_codes_api_auth_me_totp_recovery_codes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Renew Recovery Codes",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp/setup": {
+      "post": {
+        "description": "A new secret (the current password proves it is the person); it protects\nnothing until `/me/totp/confirm`. Shown this once.",
+        "operationId": "set_up_totp_api_auth_me_totp_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpSetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Up Totp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/touch": {
+      "post": {
+        "description": "The person works in this tab (typing in the live editor, say) though it asked\nthe API nothing for a while: a use of the session (J7, R18-4), nothing else. No\nwrite for the write limit.",
+        "operationId": "touch_me_api_auth_me_touch_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Touch Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/oidc/{key}/callback": {
+      "get": {
+        "description": "The provider's redirect: finish the flow, then the app's start page signed in,\nor the sign-in (profile) page with `?error=` (`?link_error=`) and a fixed code.",
+        "operationId": "callback_api_auth_oidc__key__callback_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 4096,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Callback",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
+    "/api/auth/oidc/{key}/start": {
+      "get": {
+        "description": "To the provider's sign-in page, with the browser binding as a cookie; a provider\nthat is unknown, off or unreachable sends the browser back to the sign-in page.\n`reauth`: the sign-in is the proof before linking (`fresh.py`): the provider is\nasked for a fresh login, and the browser comes back to the profile.",
+        "operationId": "start_api_auth_oidc__key__start_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "a fresh login as the proof before linking",
+            "in": "query",
+            "name": "reauth",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "a fresh login as the proof before linking",
+              "title": "Reauth",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start",
+        "tags": [
+          "oidc"
+        ]
+      }
+    },
+    "/api/auth/providers": {
+      "get": {
+        "description": "The enabled providers (key, name, kind) for the sign-in page; no session needed.",
+        "operationId": "list_providers_api_auth_providers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PublicProviderOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Providers",
+        "tags": [
+          "oidc"
         ]
       }
     },
@@ -21322,6 +25917,843 @@
         ]
       }
     },
+    "/api/backups": {
+      "get": {
+        "description": "The backups, newest first.",
+        "operationId": "list_backups_api_backups_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_BackupRunOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Backups",
+        "tags": [
+          "backups"
+        ]
+      },
+      "post": {
+        "description": "Back up now: a worker makes the backup; `backup.changed` tells its progress.\n409 `backup.already_running` while one runs or waits, `backup.busy` while another\nrequest is being handled.",
+        "operationId": "start_backup_api_backups_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start Backup",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/archives": {
+      "get": {
+        "description": "The archives in the backups directory, newest first.",
+        "operationId": "list_archives_api_backups_archives_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ArchiveOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Archives",
+        "tags": [
+          "backups"
+        ]
+      },
+      "post": {
+        "description": "An archive from elsewhere, checked: 413 `backup.upload_too_large`, 422\n`backup.archive_invalid` with the problems.",
+        "operationId": "upload_archive_api_backups_archives_post",
+        "requestBody": {
+          "content": {
+            "application/x-tar": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Upload Archive",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/archives/{name}": {
+      "get": {
+        "operationId": "download_archive_api_backups_archives__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/x-tar": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Archive",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/archives/{name}/check": {
+      "post": {
+        "description": "The archive against this installation; `can_replace` when nothing blocks.",
+        "operationId": "check_archive_api_backups_archives__name__check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Archive",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/archives/{name}/replace": {
+      "post": {
+        "description": "Replace the whole installation with the archive (a safety archive first, then\nmaintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409\n`restore.superuser_refused` (the app's database role is a superuser),\n`backup.already_running`, `backup.busy`, `backup.restore_running`,\n`backup.replace_refused`.",
+        "operationId": "replace_installation_api_backups_archives__name__replace_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Installation",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/restore": {
+      "get": {
+        "description": "The last attempt to replace the installation from the administration.",
+        "operationId": "restore_status_api_backups_restore_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Restore Status",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/calendar/events": {
+      "get": {
+        "description": "Every occurrence overlapping `[from, to)` of the events one may list (member\nspaces and the events one organises or is invited to; another space's only by\nnaming it with `space_id`; `mine`: only one's own and those one is invited to), by\nstart. Private events of others come `redacted`; `q` searches titles one sees. A\ncursor holds `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).",
+        "operationId": "list_events_api_calendar_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "calendar_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Calendar Ids"
+            }
+          },
+          {
+            "description": "the named way: this space's events only",
+            "in": "query",
+            "name": "space_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the named way: this space's events only",
+              "title": "Space Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 300,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "description": "the viewer's zone (all-day days), default UTC",
+            "in": "query",
+            "name": "time_zone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the viewer's zone (all-day days), default UTC",
+              "title": "Time Zone"
+            }
+          },
+          {
+            "description": "my events: only those I organise or am invited to",
+            "in": "query",
+            "name": "mine",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "my events: only those I organise or am invited to",
+              "title": "Mine",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OccurrenceOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Events",
+        "tags": [
+          "calendar events"
+        ]
+      }
+    },
+    "/api/calendar/overlays": {
+      "get": {
+        "description": "Ticket due dates, sprints and automations' next terms in the days `[from, to)`,\nstored nowhere: of the spaces one belongs to (never by admin power), automations\nas their sight rule shows them. By (starts_on, kind, id); a cursor holds\n`time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).",
+        "operationId": "list_calendar_overlays_api_calendar_overlays_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "description": "the first day after the range",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "description": "the first day after the range",
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "comma-separated: tickets, sprints, automations (default: all)",
+            "in": "query",
+            "name": "kinds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "comma-separated: tickets, sprints, automations (default: all)",
+              "title": "Kinds"
+            }
+          },
+          {
+            "description": "the viewer's zone (an automation's day), default UTC",
+            "in": "query",
+            "name": "time_zone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the viewer's zone (an automation's day), default UTC",
+              "title": "Time Zone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OverlayOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Calendar Overlays",
+        "tags": [
+          "calendars"
+        ]
+      }
+    },
+    "/api/calendars": {
+      "get": {
+        "description": "The calendars of the spaces one belongs to (or open spaces one reads), the same\nfor admins; another space's calendars only by naming it.",
+        "operationId": "list_calendars_api_calendars_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CalendarOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Calendars",
+        "tags": [
+          "calendars"
+        ]
+      }
+    },
+    "/api/calendars/{calendar_id}": {
+      "delete": {
+        "description": "Archives the calendar: out of every list, 404 by id.",
+        "operationId": "archive_calendar_api_calendars__calendar_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "calendar_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calendar Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Calendar",
+        "tags": [
+          "calendars"
+        ]
+      },
+      "patch": {
+        "operationId": "update_calendar_api_calendars__calendar_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "calendar_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calendar Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Calendar",
+        "tags": [
+          "calendars"
+        ]
+      }
+    },
+    "/api/calendars/{calendar_id}/events": {
+      "post": {
+        "description": "A new event in the calendar (`calendar.write` in its space); the caller is its\norganiser and sees it in full.",
+        "operationId": "create_event_api_calendars__calendar_id__events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "calendar_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calendar Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Event",
+        "tags": [
+          "calendar events"
+        ]
+      }
+    },
     "/api/channels": {
       "get": {
         "description": "The channels of every space the caller may read, by name.",
@@ -21605,6 +27037,60 @@
         ]
       }
     },
+    "/api/conversations/{conversation_id}/fresh-start": {
+      "post": {
+        "description": "Start her DM alone with an agent afresh: its runs read nothing from before now\n(the personal mark of what came before ends for them); open runs are cancelled.\n403 `conversation.not_alone_with_agent` anywhere else.",
+        "operationId": "start_conversation_afresh_api_conversations__conversation_id__fresh_start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__modules__messaging__schemas__ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Conversation Afresh",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/api/conversations/{conversation_id}/messages": {
       "get": {
         "description": "Top-level messages with their reply counts, newest first.",
@@ -21789,6 +27275,48 @@
       }
     },
     "/api/conversations/{conversation_id}/read": {
+      "get": {
+        "description": "The caller's read position in the conversation (nulls before she read any).",
+        "operationId": "read_position_api_conversations__conversation_id__read_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadPositionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Position",
+        "tags": [
+          "messaging"
+        ]
+      },
       "post": {
         "description": "Read up to a message of the conversation (never backwards).",
         "operationId": "mark_read_api_conversations__conversation_id__read_post",
@@ -22109,6 +27637,412 @@
         "summary": "Open Dm",
         "tags": [
           "messaging"
+        ]
+      }
+    },
+    "/api/events/{event_id}": {
+      "delete": {
+        "description": "Deletes the event (a tombstone for 30 days): the series with its overrides, one\noccurrence (`this`), or this and the following (`following`).",
+        "operationId": "delete_event_api_events__event_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Scope",
+              "default": "all"
+            }
+          },
+          {
+            "description": "with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it)",
+            "in": "query",
+            "name": "occurrence",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it)",
+              "title": "Occurrence"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Event",
+        "tags": [
+          "calendar events"
+        ]
+      },
+      "get": {
+        "operationId": "get_event_api_events__event_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Event",
+        "tags": [
+          "calendar events"
+        ]
+      },
+      "patch": {
+        "description": "Changes the event (`calendar.write` and full sight; 403 `event.private` with\n\"busy\" sight), at the version read (409 `event.version_conflict`): the whole series\n(`scope=all`), one occurrence (`this`: an override) or this and the following\n(`following`: the series is split).",
+        "operationId": "update_event_api_events__event_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Scope",
+              "default": "all"
+            }
+          },
+          {
+            "description": "with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it)",
+            "in": "query",
+            "name": "occurrence",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it)",
+              "title": "Occurrence"
+            }
+          },
+          {
+            "description": "only count what the change drops",
+            "in": "query",
+            "name": "dry_run",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "only count what the change drops",
+              "title": "Dry Run",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Event",
+        "tags": [
+          "calendar events"
+        ]
+      }
+    },
+    "/api/events/{event_id}/attendees": {
+      "get": {
+        "description": "The event's attendees (full sight of the event; 403 `event.private` with \"busy\"\nsight).",
+        "operationId": "list_attendees_api_events__event_id__attendees_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AttendeeOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Attendees",
+        "tags": [
+          "calendar events"
+        ]
+      },
+      "put": {
+        "description": "Sets the event's attendees (`calendar.write` and full sight, at the version\nread: 409 `event.version_conflict`); on a series, who comes and who goes reaches\nits overrides too. New people are told in their activity view.",
+        "operationId": "set_attendees_api_events__event_id__attendees_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendeesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendeesSetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Attendees",
+        "tags": [
+          "calendar events"
+        ]
+      }
+    },
+    "/api/events/{event_id}/response": {
+      "post": {
+        "description": "One's answer to the event (403 `event.not_invited` without an invitation), at\nthe event's version read (409 after a change).",
+        "operationId": "respond_api_events__event_id__response_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResponseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendeeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Respond",
+        "tags": [
+          "calendar events"
+        ]
+      }
+    },
+    "/api/maintenance": {
+      "get": {
+        "operationId": "maintenance_state_api_maintenance_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Maintenance State",
+        "tags": [
+          "maintenance"
         ]
       }
     },
@@ -25756,6 +31690,128 @@
         "summary": "Board Column",
         "tags": [
           "tickets"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/calendars": {
+      "get": {
+        "operationId": "list_space_calendars_api_spaces__space_id__calendars_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CalendarOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Space Calendars",
+        "tags": [
+          "calendars"
+        ]
+      },
+      "post": {
+        "operationId": "create_calendar_api_spaces__space_id__calendars_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Calendar",
+        "tags": [
+          "calendars"
         ]
       }
     },

@@ -46,7 +46,9 @@ async def test_commit_happens_before_the_response_starts(
     recorded.cookies = client.cookies
     response = await recorded.post("/api/spaces", json={"name": "Ordered", "kind": "team"})
     assert response.status_code == 201, response.text
-    assert events == ["commit", "response 201"]
+    # Creating a space counts towards the write limit (R18-5), whose count commits at
+    # once (J10, no lock held through the request); then the request's own transaction.
+    assert events == ["commit", "commit", "response 201"]
     # Read-your-own-write: the next request sees the space.
     space_id = response.json()["id"]
     assert (await client.get(f"/api/spaces/{space_id}")).status_code == 200

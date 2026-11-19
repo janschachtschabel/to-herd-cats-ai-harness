@@ -12,11 +12,15 @@ one bound to a skill proposal (plan M6 task 9) while the person sees the proposa
 paused, plan M7) is seen while the automation exists and the person may still see
 it (`automations/sight.py`: its owner, its agent's responsible person, a manager of
 its place's space, `agent.manage`): it names only the automation, its agent and why
-it is paused now.
+it is paused now. One bound to an account awaiting approval (plan M9 task 5b) is
+seen while the person holds `user.manage`; the account is its author, and whether
+it still waits comes with it. One bound to a calendar event (plan M10 task 4) is seen
+while the person attends that event row (`activity_calendar.py`). Only reasons this
+release knows are listed (a later release may write others, plan M10 decision 7).
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from sqlalchemy import (
     ColumnElement,
@@ -33,6 +37,7 @@ from sqlalchemy import (
     or_,
     select,
     table,
+    true,
     update,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -41,8 +46,10 @@ from sqlalchemy.orm import aliased
 
 from app.modules.automations.sight import AutomationSight
 from app.modules.automations.sight import seen as automation_seen
+from app.modules.messaging import activity_calendar
+from app.modules.messaging.activity_calendar import EventEntry
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
-from app.modules.messaging.notification_models import Notification
+from app.modules.messaging.notification_models import Notification, NotificationReason
 from app.modules.messaging.repository import ConversationScope, visible_conversations
 from app.modules.messaging.ticket_hooks import ticket_hooks
 from app.modules.skills.sight import SkillProposalSight
@@ -50,6 +57,7 @@ from app.modules.skills.sight import seen as skill_proposal_seen
 from app.modules.users.models import User
 
 SNIPPET_CHARS = 140
+KNOWN = [reason.value for reason in NotificationReason]
 
 # The proposals a notification may name (`proposals` builds on messaging, so it is not
 # imported): who made one, for the activity's author.
@@ -97,6 +105,8 @@ class ActivityEntry:
     snippet: str  # the start of the message's Markdown; empty for a timeline entry
     author_type: str | None = None  # `user` or `agent` (as the message or proposal says)
     automation_paused: str | None = None  # an automation's: why it is paused now
+    account_awaiting: bool | None = None  # an account's: whether it still awaits approval
+    calendar_event: EventEntry | None = None  # a calendar event's (plan M10 task 4)
 
 
 class ActivityRepository:
@@ -106,11 +116,14 @@ class ActivityRepository:
         scope: ConversationScope,
         skills: SkillProposalSight,
         automations: AutomationSight,
+        *,
+        manages_users: bool = False,
     ) -> None:
         self.session = session
         self.scope = scope
         self.skills = skills
         self.automations = automations
+        self.manages_users = manages_users
 
     def _mine(self) -> ColumnElement[bool]:
         # Self-contained subqueries: the list joins `conversation` and `message` too.
@@ -159,10 +172,20 @@ class ActivityRepository:
                 .correlate_except(automation, agent, place)
             )
         about_automation = and_(Notification.automation_id.is_not(None), sees_automation)
+        own_lock = and_(  # my own second factor was locked (review M9b F9)
+            Notification.reason == NotificationReason.TOTP_LOCKED,
+            Notification.account_id == self.scope.principal.id,
+        )
+        about_account = and_(
+            Notification.account_id.is_not(None),
+            or_(true() if self.manages_users else false(), own_lock),
+        )
+        about_event = activity_calendar.seen(self.scope.principal.id)
         return and_(
             Notification.org_id == self.scope.org_id,
             Notification.user_id == self.scope.principal.id,
-            or_(bound, about_proposal, about_skill, about_automation),
+            Notification.reason.in_(KNOWN),
+            or_(bound, about_proposal, about_skill, about_automation, about_account, about_event),
         )
 
     async def page(
@@ -177,7 +200,9 @@ class ActivityRepository:
         unbound = Notification.message_id.is_(None)
         about_skill = Notification.skill_proposal_id.is_not(None)
         about_automation = Notification.automation_id.is_not(None)
+        about_account = Notification.account_id.is_not(None)
         author_id = case(
+            (about_account, Notification.account_id),
             (about_automation, AUTOMATION.c.agent_id),
             (about_skill, SKILL_PROPOSAL.c.author_id),
             (unbound, PROPOSAL.c.author_id),
@@ -185,6 +210,7 @@ class ActivityRepository:
             else_=Message.author_id,
         )
         author_type = case(
+            (about_account, literal("user", String)),
             (about_automation, literal("agent", String)),
             (about_skill, SKILL_PROPOSAL.c.author_type),
             (unbound, PROPOSAL.c.author_type),
@@ -209,12 +235,18 @@ class ActivityRepository:
                 snippet,
                 author_type,
                 AUTOMATION.c.paused_reason,
+                case((about_account, User.awaiting_approval_since.is_not(None)), else_=None),
+                *activity_calendar.columns(self.scope.principal.id),
             )
             .outerjoin(Conversation, Conversation.id == Notification.conversation_id)
             .outerjoin(Message, Message.id == Notification.message_id)
             .outerjoin(PROPOSAL, PROPOSAL.c.id == Notification.proposal_id)
             .outerjoin(SKILL_PROPOSAL, SKILL_PROPOSAL.c.id == Notification.skill_proposal_id)
             .outerjoin(AUTOMATION, AUTOMATION.c.id == Notification.automation_id)
+            .outerjoin(
+                activity_calendar.EVENT,
+                activity_calendar.EVENT.c.id == Notification.calendar_event_id,
+            )
             .outerjoin(User, and_(User.id == author_id, User.org_id == Notification.org_id))
             .where(self._mine())
             .order_by(Notification.id.desc())
@@ -224,7 +256,10 @@ class ActivityRepository:
             stmt = stmt.where(Notification.done_at.is_(None))
         if before is not None:
             stmt = stmt.where(Notification.id < before)
-        return [ActivityEntry(*row) for row in await self.session.execute(stmt)]
+        return [
+            replace(ActivityEntry(*row[:13]), calendar_event=activity_calendar.entry(row[13:]))
+            for row in await self.session.execute(stmt)
+        ]
 
     async def counts(self) -> tuple[int, int]:
         """(open, unread): not done; not done and not read."""

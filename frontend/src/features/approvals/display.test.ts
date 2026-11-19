@@ -51,4 +51,7 @@ describe('what a call would change', () => {
     })
     expect(subjectsOf({ args: { page_id: 'not-an-id' }, summary: '' }).pageId).toBeNull()
   })
+  test('nothing for a reader who gets neither (not the person asked)', () => {
+    expect(subjectsOf({ args: null, summary: null })).toEqual({ pageId: null, ticketNumber: null })
+  })
 })

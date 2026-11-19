@@ -1,5 +1,6 @@
 """Alembic from code: the config, `upgrade head`, and whether this code fits the schema."""
 
+from enum import StrEnum
 from functools import cache
 from pathlib import Path
 
@@ -11,6 +12,9 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "alembic"
+# Migrating and restoring an archive (`app/ops/restore.py`) take this advisory lock, so
+# a process starting in role `all` never migrates a database that is being restored.
+SCHEMA_LOCK = "herd.schema"
 
 
 def alembic_config() -> Config:
@@ -26,6 +30,18 @@ def upgrade_head(connection: Connection | None = None) -> None:
     if connection is not None:
         config.attributes["connection"] = connection
     command.upgrade(config, "head")
+
+
+def lock_schema(connection: Connection) -> None:
+    """Hold SCHEMA_LOCK until the connection's transaction ends (alembic's env.py)."""
+    connection.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:name, 0))"), {"name": SCHEMA_LOCK}
+    )
+
+
+def known_revisions() -> tuple[frozenset[str], frozenset[str]]:
+    """The code's heads and every revision it knows."""
+    return _code_revisions()
 
 
 def stamp_head(connection: Connection) -> None:
@@ -49,6 +65,25 @@ def _code_revisions() -> tuple[frozenset[str], frozenset[str]]:
     script = ScriptDirectory.from_config(alembic_config())
     known = frozenset(rev.revision for rev in script.walk_revisions())
     return frozenset(script.get_heads()), known
+
+
+class SchemaState(StrEnum):
+    NONE = "none"  # no revision recorded
+    HEAD = "head"  # the code's head
+    BEHIND = "behind"  # a known, older revision: migrate first
+    AHEAD = "ahead"  # a revision this code does not know: a newer release migrated
+
+
+async def schema_state(engine: AsyncEngine) -> SchemaState:
+    """Where the database's schema stands against this code's migrations."""
+    async with engine.connect() as connection:
+        database = await connection.run_sync(_database_heads)
+    heads, known = _code_revisions()
+    if not database:
+        return SchemaState.NONE
+    if database == heads:
+        return SchemaState.HEAD
+    return SchemaState.BEHIND if database <= known else SchemaState.AHEAD
 
 
 async def schema_is_compatible(engine: AsyncEngine) -> bool:

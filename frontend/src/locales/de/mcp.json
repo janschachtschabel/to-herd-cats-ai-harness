@@ -242,7 +242,7 @@
       "create": {
         "open": "OAuth-App anlegen",
         "title": "OAuth-App anlegen",
-        "description": "Als Rückleitungsadresse beim Anbieter eintragen: <HERD_PUBLIC_URL>/api/ai/oauth/callback.",
+        "description": "Nach dem Anlegen zeigt die Karte der App ihre eigene Rückleitungsadresse; trage sie beim Anbieter ein.",
         "submit": "Anlegen"
       },
       "edit": {
@@ -274,7 +274,10 @@
         "secret": "Client-Geheimnis",
         "secretValue": "Client-Geheimnis",
         "scopes": "Scopes",
-        "resource": "Ressource"
+        "resource": "Ressource",
+        "issuer": "Aussteller (issuer)",
+        "issuerInResponse": "Der Anbieter schickt den Aussteller in jeder Antwort mit (iss, RFC 9207)",
+        "callback": "Rückleitungsadresse"
       },
       "optional": "Optional.",
       "scopesHint": "Durch Leerzeichen getrennt, etwa „mcp“.",
@@ -299,7 +302,9 @@
       "deleteTitle": "OAuth-App löschen?",
       "deleteText": "{{name}} wird gelöscht. Solange ein Konnektor oder Server sie nutzt, ist das nicht möglich.",
       "endpointsDisconnect": "Neue Adressen für Anmeldung, Token oder Widerruf trennt jede Verbindung über diese App: Eigene Verbindungen von Personen werden gelöscht und bei der bisherigen Adresse widerrufen; sie verbinden sich neu. Geteilte Konnektoren verlieren ihre Token, außer du lässt sie verbunden.",
-      "keepSharedConnectors": "Geteilte Konnektoren verbunden lassen (ihre Token gehen dann an die neuen Adressen)"
+      "keepSharedConnectors": "Geteilte Konnektoren verbunden lassen (ihre Token gehen dann an die neuen Adressen)",
+      "issuerHint": "Optional: die Adresse des Anmeldedienstes, wie er sie selbst nennt. Schickt er sie mit, muss sie genau passen.",
+      "callbackMissing": "Ohne HERD_PUBLIC_URL (https) gibt es keine Rückleitungsadresse."
     },
     "catalog": {
       "description": "Vorlagen für externe Server, mitgeliefert und aus dem Verzeichnis des Betriebs. Eine Vorlage schlägt nur vor: Jedes Werkzeug wird trotzdem einzeln freigegeben.",
@@ -365,6 +370,10 @@
       "invalid": {
         "title": "Anmeldung abgelaufen",
         "text": "Diese Anmeldung ist abgelaufen oder wurde schon verwendet. Bitte erneut verbinden."
+      },
+      "issuer_mismatch": {
+        "title": "Unerwarteter Anmeldedienst",
+        "text": "Die Antwort kam nicht vom erwarteten Anmeldedienst. Aus Sicherheitsgründen wurde nichts gespeichert; ein Admin prüft den Aussteller der OAuth-App."
       }
     }
   },
@@ -404,7 +413,8 @@
       "name_taken": "Diesen Namen trägt schon eine OAuth-App.",
       "not_found": "Diese OAuth-App gibt es nicht.",
       "url_not_allowed": "Diese Adresse ist nicht erlaubt (nur https, kein privates Netz).",
-      "version_conflict": "Die OAuth-App wurde inzwischen geändert."
+      "version_conflict": "Die OAuth-App wurde inzwischen geändert.",
+      "issuer_required": "Wer „schickt den Aussteller mit“ wählt, trägt auch den Aussteller ein."
     },
     "mcp_catalog": {
       "base_url_not_allowed": "Diese Adresse der Instanz ist nicht erlaubt.",

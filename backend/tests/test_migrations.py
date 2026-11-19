@@ -82,3 +82,17 @@ async def test_slugs_are_not_stored(engine) -> None:
             }
         )
     assert "slug" not in columns["organization"] | columns["space"]
+
+
+async def test_the_outbox_keeps_no_columns_of_the_m4_dispatcher(engine) -> None:
+    """Plan M9 decision 22: `attempts` and `next_attempt_at` lost their last reader with
+    the lanes (M4 review); they go before the first release, with their index."""
+    async with engine.connect() as conn:
+        columns, indexes = await conn.run_sync(
+            lambda c: (
+                {col["name"] for col in inspect(c).get_columns("event_outbox")},
+                {ix["name"] for ix in inspect(c).get_indexes("event_outbox")},
+            )
+        )
+    assert not columns & {"attempts", "next_attempt_at"}
+    assert "ix_event_outbox_due" not in indexes

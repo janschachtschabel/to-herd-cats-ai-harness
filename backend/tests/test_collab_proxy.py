@@ -1,12 +1,15 @@
 """The WebSocket relay `/collab/{page_id}` (plan M2 task 9): the public app checks
 Origin, session and `page.edit` like the REST API, then passes frames both ways to
-the collab process. Runs the real app on a real port (uvicorn) against a stand-in
+the collab process, which gets a grant for the page and generation instead of the
+session cookie (plan M9 task 6). Runs the real app on a real port (uvicorn) against a stand-in
 collab process (a local WebSocket server) and committed data (tests/real_db.py)."""
 
 import asyncio
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID, uuid4
 
 import pytest
 import uvicorn
@@ -16,6 +19,9 @@ from websockets.asyncio.server import ServerConnection, serve
 from websockets.exceptions import ConnectionClosed, InvalidStatus
 
 from app.core.config import get_settings
+from app.core.models_base import utcnow
+from app.modules.wiki import collab_grants, collab_instances
+from app.modules.wiki.collab_grants import PREFIX
 from app.web.public import create_public_app
 from tests.factories import login
 from tests.real_db import MakeRealClient, RealDb
@@ -32,8 +38,9 @@ class Upstream:
     closed: int = 0  # upstream connections that ended
 
 
-@pytest.fixture
-async def upstream(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Upstream]:
+@asynccontextmanager
+async def _stand_in(real_db: RealDb, instance: UUID) -> AsyncIterator[Upstream]:
+    """A stand-in collab process, announced as a live instance (plan M9 task 15)."""
     seen = Upstream()
 
     async def handler(ws: ServerConnection) -> None:
@@ -52,7 +59,19 @@ async def upstream(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Upstream]:
     async with serve(handler, "127.0.0.1", 0, max_size=None) as server:
         port = next(iter(server.sockets)).getsockname()[1]
         seen.url = f"ws://127.0.0.1:{port}"
-        monkeypatch.setattr(get_settings(), "collab_url", seen.url)
+        await _announce(real_db, instance, seen.url)
+        yield seen
+
+
+async def _announce(real_db: RealDb, instance: UUID, url: str) -> None:
+    async with real_db.database.session_factory() as session:
+        await collab_instances.announce(session, instance_id=instance, url=url, draining=False)
+        await session.commit()
+
+
+@pytest.fixture
+async def upstream(real_db: RealDb) -> AsyncIterator[Upstream]:
+    async with _stand_in(real_db, UUID(int=1)) as seen:
         yield seen
 
 
@@ -86,6 +105,7 @@ class Setup:
     cookie: str
     page: dict[str, Any]
     member_cookie: str
+    other: dict[str, Any]  # a second page of the space
 
 
 @pytest.fixture
@@ -97,13 +117,15 @@ async def setup(real_db: RealDb, make_real_client: MakeRealClient) -> Setup:
     space = (await owner.post("/api/spaces", json={"name": "Live", "kind": "team"})).json()
     page = (await owner.post(f"/api/spaces/{space['id']}/pages", json={"title": "S"})).json()
     r = await owner.post(f"/api/pages/{page['id']}/publish", json={"version": page["version"]})
+    other = (await owner.post(f"/api/spaces/{space['id']}/pages", json={"title": "T"})).json()
     r = await owner.put(
         f"/api/spaces/{space['id']}/members",
         json={"member_type": "user", "member_id": me["user"]["id"], "role": "viewer"},
     )
     assert r.status_code == 200, r.text
     name = get_settings().session_cookie_name
-    return Setup(f"{name}={owner.cookies.get(name)}", page, f"{name}={member.cookies.get(name)}")
+    cookie, member_cookie = (f"{name}={c.cookies.get(name)}" for c in (owner, member))
+    return Setup(cookie, page, member_cookie, other)
 
 
 def _url(base: str, page: dict[str, Any], generation: int = 0) -> str:
@@ -217,21 +239,54 @@ def test_the_relay_passes_what_the_collab_process_allows() -> None:
     assert MAX_MESSAGE_BYTES == MAX_YDOC_BYTES + MESSAGE_ENVELOPE_BYTES
 
 
-async def test_forwards_cookie_header(public_url: str, setup: Setup, upstream: Upstream) -> None:
+async def test_the_relay_sends_no_cookie_upstream(
+    public_url: str, setup: Setup, upstream: Upstream, real_db: RealDb
+) -> None:
+    """Plan M9 decision 16 (R14): the collab process gets a grant for exactly this
+    page and generation, never the session cookie or anything else of the browser's."""
     headers = {
         "Origin": "http://wiki.example",
         "Cookie": f"other=secret; {setup.cookie}",
         "Authorization": "Bearer nope",
     }
-    async with connect(_url(public_url, setup.page, 0), additional_headers=headers) as ws:
-        await ws.send("ping")
-        await ws.recv()
-    ((path, forwarded),) = upstream.requests
-    assert path == f"/collab/{setup.page['id']}?generation=0"
-    assert forwarded["Cookie"] == setup.cookie  # only the session cookie
-    assert forwarded["Origin"] == "http://wiki.example"
-    assert forwarded["X-Forwarded-Host"].startswith("127.0.0.1:")
-    assert "Authorization" not in forwarded
+    for _ in range(2):  # a grant per connection
+        async with connect(_url(public_url, setup.page, 0), additional_headers=headers) as ws:
+            await ws.send("ping")
+            await ws.recv()
+    grants = []
+    for path, forwarded in upstream.requests:
+        assert path == f"/collab/{setup.page['id']}?generation=0"
+        assert set(forwarded) == {
+            "Host",
+            "Upgrade",
+            "Connection",
+            "Sec-WebSocket-Key",
+            "Sec-WebSocket-Version",
+            "User-Agent",
+            "Authorization",
+            "Origin",
+            "X-Forwarded-Host",
+        }
+        assert forwarded["Origin"] == "http://wiki.example"
+        assert forwarded["X-Forwarded-Host"].startswith("127.0.0.1:")
+        scheme, grant = forwarded["Authorization"].split(" ")
+        assert scheme == "Bearer" and grant.startswith(PREFIX)
+        cookie_value = setup.cookie.split("=", 1)[1]
+        assert cookie_value not in str(forwarded)
+        grants.append(grant)
+    assert len(set(grants)) == 2
+    page_id = UUID(setup.page["id"])
+    async with real_db.database.session_factory() as session:
+        for grant in grants:
+            ref = await collab_grants.resolve(
+                session, grant, page_id=page_id, generation=0, now=utcnow()
+            )
+            assert ref is not None and ref.session_id is not None
+            for other_page, generation in ((page_id, 1), (uuid4(), 0)):
+                found = await collab_grants.resolve(
+                    session, grant, page_id=other_page, generation=generation, now=utcnow()
+                )
+                assert found is None
 
 
 async def test_live_editing_off_without_internal_token(
@@ -243,13 +298,50 @@ async def test_live_editing_off_without_internal_token(
     assert closed == (4503, "collab.disabled")
 
 
-async def test_collab_process_down_is_502(
-    public_url: str, setup: Setup, monkeypatch: pytest.MonkeyPatch
+async def test_live_editing_closes_in_maintenance(
+    public_url: str, setup: Setup, upstream: Upstream, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(get_settings(), "collab_url", "ws://127.0.0.1:1")
+    """Plan M9 decision 9: no new live connection while a restore may run."""
+    from app.modules.maintenance.cache import maintenance_cache
+    from app.modules.maintenance.models import MaintenanceReason
+    from app.modules.maintenance.state import MaintenanceState
+
+    on = MaintenanceState(True, MaintenanceReason.RESTORE, utcnow())
+    monkeypatch.setattr(maintenance_cache(), "state", on)
     url = _url(public_url, setup.page)
     closed = await _closed(url, Origin="http://wiki.example", Cookie=setup.cookie)
+    assert closed == (4503, "maintenance.active")
+    assert upstream.requests == []
+
+
+async def test_collab_process_down_is_502(public_url: str, setup: Setup, real_db: RealDb) -> None:
+    url = _url(public_url, setup.page)
+    # No collab instance has announced itself: nothing to relay to (the browser retries).
+    closed = await _closed(url, Origin="http://wiki.example", Cookie=setup.cookie)
     assert closed == (4502, "collab.unavailable")
+    # One has, but it cannot be reached.
+    await _announce(real_db, UUID(int=1), "ws://127.0.0.1:1")
+    closed = await _closed(url, Origin="http://wiki.example", Cookie=setup.cookie)
+    assert closed == (4502, "collab.unavailable")
+
+
+async def test_the_relay_sends_every_connection_of_a_page_to_its_owner(
+    public_url: str, setup: Setup, upstream: Upstream, real_db: RealDb
+) -> None:
+    """Plan M9 task 15: with two collab instances, the connections of one page all go
+    to the instance that owns it; another page goes to the less busy instance."""
+    headers = {"Origin": "http://wiki.example", "Cookie": setup.cookie}
+    async with _stand_in(real_db, UUID(int=2)) as second:
+        for page in (setup.page, setup.page, setup.other, setup.page, setup.other):
+            async with connect(_url(public_url, page), additional_headers=headers) as ws:
+                await ws.send("ping")
+                assert await ws.recv() == "ping"
+        first_paths = {path for path, _ in upstream.requests}
+        second_paths = {path for path, _ in second.requests}
+    assert first_paths == {f"/collab/{setup.page['id']}?generation=0"}
+    assert len(upstream.requests) == 3
+    assert second_paths == {f"/collab/{setup.other['id']}?generation=0"}
+    assert len(second.requests) == 2
 
 
 async def test_a_handshake_that_takes_too_long_is_closed(

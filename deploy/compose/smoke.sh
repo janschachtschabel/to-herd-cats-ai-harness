@@ -5,7 +5,8 @@
 # live stream (/api/stream: outbox, worker, NOTIFY, SSE), create a ticket and change its
 # status and find the worker's two system entries in its thread, let a one-off automation
 # come due (15 s) and find exactly one term, read the page through /mcp with an access
-# token (tools listed on node A, read_page called on node B), tear down. Runs as its own
+# token (tools listed on node A, read_page called on node B), back up in the service backup
+# and restore the archive into a second database, copy one with restic, tear down. Runs as its own
 # compose project on its own ports, with throwaway volumes, so a running installation
 # next to it is not touched. Ends with "SMOKE OK".
 #
@@ -13,8 +14,12 @@
 #   SMOKE_SKIP_BUILD=1 bash deploy/compose/smoke.sh   (use an image built beforehand,
 #                                            tagged to-herd-cats-ai:${HERD_IMAGE_TAG:-local})
 #   SMOKE_NODES=1 bash deploy/compose/smoke.sh        (compose.nodes.yml: two API nodes,
-#       a worker, collab and a migration run in place of role all; the message is posted
-#       on node A and must arrive on a stream of node B, SMOKE_PORT_B=18081 by default)
+#       a worker, two collab instances and a migration run in place of role all; the
+#       message is posted on node A and must arrive on a stream of node B,
+#       SMOKE_PORT_B=18081 by default)
+#   SMOKE_S3=1 bash deploy/compose/smoke.sh           (compose.s3.yml: attachments in
+#       SeaweedFS; the file must not reach /data, `storage check` passes, the restore puts
+#       the files under another prefix and `storage copy --to local` reads them back)
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -25,7 +30,8 @@ base="http://127.0.0.1:${HERD_HOST_PORT}"
 work="$(mktemp -d)"
 stream_pid=""
 
-# One node in role all (app), or two API nodes, a worker and collab (SMOKE_NODES=1).
+# One node in role all (app), or two API nodes, a worker and two collab instances
+# (SMOKE_NODES=1).
 project=to-herd-cats-ai-smoke
 files=(-f compose.yml)
 node_a=app
@@ -40,6 +46,12 @@ if [[ ${SMOKE_NODES:-0} == 1 ]]; then
   worker=worker
   base_b="http://127.0.0.1:${HERD_HOST_PORT_B}"
 fi
+s3=${SMOKE_S3:-0}
+if [[ $s3 == 1 ]]; then
+  [[ ${SMOKE_NODES:-0} == 1 ]] && { echo "SMOKE_S3 runs with role all only" >&2; exit 2; }
+  project=to-herd-cats-ai-smoke-s3
+  files+=(-f compose.s3.yml)
+fi
 
 # The secrets: .env if there is one, else a throwaway one (removed again below).
 env_file=.env
@@ -50,6 +62,8 @@ if [[ ! -f "$env_file" ]]; then
     echo "HERD_BOOTSTRAP_ADMIN_EMAIL=admin@example.com"
     echo "HERD_BOOTSTRAP_ADMIN_PASSWORD=$(openssl rand -hex 24)"
     echo "HERD_INTERNAL_TOKEN=$(openssl rand -hex 32)"
+    echo "HERD_S3_ACCESS_KEY_ID=herd$(openssl rand -hex 8)"
+    echo "HERD_S3_SECRET_ACCESS_KEY=$(openssl rand -hex 24)"
   } >"$env_file"
 fi
 compose=(docker compose -p "$project" --env-file "$env_file" "${files[@]}")
@@ -122,10 +136,38 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" -X POST -H 'X-Requested-
   -H 'Content-Type: application/octet-stream' --data-binary 'smoke' \
   "$base/api/pages/$page_id/attachments?filename=smoke.txt")
 [[ $code == 201 ]] || fail "uploading an attachment answered $code"
+if [[ $s3 == 1 ]]; then
+  stored="$("${compose[@]}" exec -T app find /data -path '*/attachments/*' -type f | wc -l)"
+  (( stored == 0 )) || fail "the attachment went to /data, not to S3"
+  checked="$("${compose[@]}" exec -T app python -m app.ops storage check | tr -d '\r' | tail -1)"
+  [[ $checked == "ok s3" ]] || fail "storage check printed: $checked"
+fi
+
+# Collab instances (plan M9 task 15): role all announces its one child, the nodes
+# setup collab-a and collab-b. `up --wait` means healthy, not announced: an instance
+# announces itself every 5 s from its start, and one that started before the API
+# listened is unknown to the relay (4502) until its next heartbeat after that. So the
+# WebSocket below waits until every instance is live (at most 30 s: several heartbeats).
+sql() { "${compose[@]}" exec -T db psql -tA -U herd -d herd -c "$1" | tr -d '\r'; }
+# The app's role (db-owner, review M9b F2-1): owner of the database, no superuser.
+[[ $(sql "SELECT rolsuper FROM pg_roles WHERE rolname = 'herd_owner'") == f ]] \
+  || fail "herd_owner is missing or a superuser"
+[[ $(sql "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'herd'") == herd_owner ]] \
+  || fail "herd_owner does not own the database"
+[[ $(sql "SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tableowner <> 'herd_owner'") == 0 ]] \
+  || fail "a table is not herd_owner's"
+live_instances() {
+  sql "SELECT count(*) FROM collab_instance WHERE heartbeat_at > now() - interval '15 seconds'"
+}
+want_instances=$([[ ${SMOKE_NODES:-0} == 1 ]] && echo 2 || echo 1)
+for _ in $(seq 60); do [[ $(live_instances) == "$want_instances" ]] && break; sleep 0.5; done
+instances=$(live_instances)
+[[ $instances == "$want_instances" ]] || fail "$instances live collab instances announced themselves"
 
 # Live editing: the WebSocket through the API's relay to the collab process. With the
-# owner's cookie the collab process authenticates the Hocuspocus client (answer:
-# Auth/Authenticated); without a cookie the relay closes with 4401.
+# owner's cookie the relay hands the collab process a grant for the page, which
+# authenticates the Hocuspocus client (answer: Auth/Authenticated); without a cookie
+# the relay closes with 4401.
 cookie="$(awk '$6 == "herd_session" {print $6 "=" $7}' "$jar")"
 origin="$(value HERD_PUBLIC_URL || true)"
 "${compose[@]}" exec -T -e COOKIE="$cookie" -e PAGE="$page_id" -e GENERATION="$generation" \
@@ -164,6 +206,11 @@ with connect(url, additional_headers=origin) as ws:
     except ConnectionClosed as closed:
         assert closed.rcvd is not None and closed.rcvd.code == 4401, closed.rcvd
 PY
+# Still every instance live, and the page just opened bound to exactly one of them.
+instances=$(live_instances)
+[[ $instances == "$want_instances" ]] || fail "$instances live collab instances after the WebSocket"
+[[ $(sql "SELECT count(*) FROM collab_page_owner WHERE page_id = '$page_id' AND epoch = 1") == 1 ]] \
+  || fail "the page is not bound to one collab instance"
 
 # Messages, live: a stream on node B (the one node without SMOKE_NODES), a message in
 # #allgemein posted on node A. The worker hands the outbox event to publish_live, which
@@ -280,18 +327,71 @@ state="$(json 'd["state"]' "$(api "$base_b/api/automations/$automation_id")")"
 [[ $state == done ]] || fail "automation $automation_id is $state after its one term"
 
 # The worker delivered both (with SMOKE_NODES the worker service is the only dispatcher).
-dispatched() {
+# Its /metrics is read whole before grep looks at it: `... | grep -q` under pipefail fails
+# when grep stops at the match and the exec loses the rest of the text (over 8 KiB).
+worker_metrics() {
   "${compose[@]}" exec -T "$worker" python -c \
-    "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
-    | grep -Eq "^herd_outbox_dispatch_total\\{handler=\"$1\",result=\"ok\"\\} [1-9]"
+    "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())"
+}
+dispatched() {
+  local metrics
+  metrics="$(worker_metrics)" || return 1
+  grep -Eq "^herd_outbox_dispatch_total\\{handler=\"$1\",result=\"ok\"\\} [1-9]" <<<"$metrics"
 }
 for handler in publish_live ticket_timeline; do
   for _ in $(seq 10); do dispatched "$handler" && break; sleep 0.5; done
   dispatched "$handler" || fail "$worker reports no $handler delivery"
 done
-"${compose[@]}" exec -T "$worker" python -c \
-  "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
-  | grep -Eq '^herd_automation_firings_total\{outcome="started"\} 1(\.0)?$' \
+metrics="$(worker_metrics)" || fail "$worker does not answer /metrics"
+grep -Eq '^herd_automation_firings_total\{outcome="started"\} 1(\.0)?$' <<<"$metrics" \
   || fail "$worker does not report exactly one fired term"
+
+# Backups (docs/SICHERUNG.md): one run in the service backup (as 10001, offsite off), the
+# worker's gauge of it, and the archive restored into a second, empty database with the
+# attachments into the container's /tmp; the restored page and its file are there.
+uid="$("${compose[@]}" exec -T backup id -u | tr -d '\r')"
+[[ $uid == 10001 ]] || fail "backup runs as uid $uid"
+made="$("${compose[@]}" exec -T backup python -m app.ops backup run | tr -d '\r' | tail -1)"
+[[ $made == *" offsite=off" ]] || fail "backup run printed: $made"
+archive="${made%% *}"
+runs="$("${compose[@]}" exec -T backup python -m app.ops backup list)" || fail "backup list failed"
+grep -q $'\tok\t' <<<"$runs" || fail "backup list shows no good run: $runs"
+backed_up() {
+  local metrics
+  metrics="$(worker_metrics)" || return 1
+  grep -Eq '^herd_backup_last_success_timestamp_seconds [1-9]' <<<"$metrics"
+}
+for _ in $(seq 1 30); do backed_up && break; sleep 1; done
+backed_up || fail "$worker does not export the backup's gauge"
+"${compose[@]}" exec -T db psql -q -U herd -d herd -c 'CREATE DATABASE herd_restore OWNER herd_owner' \
+  >/dev/null
+target=(-e HERD_DATABASE_URL=postgresql+asyncpg://herd_owner@db:5432/herd_restore
+  -e HERD_DATA_DIR=/tmp/restore-data)
+[[ $s3 == 1 ]] && target+=(-e HERD_S3_PREFIX=restored)
+applied="$("${compose[@]}" exec -T "${target[@]}" backup python -m app.ops restore apply "$archive" \
+  | tr -d '\r' | tail -1)" || fail "restore apply into herd_restore failed"
+[[ $applied == "restored "* ]] || fail "restore apply into herd_restore printed: $applied"
+if [[ $s3 == 1 ]]; then  # the restored files are under the prefix `restored`: read them back
+  copied="$("${compose[@]}" exec -T "${target[@]}" backup python -m app.ops storage copy --to local \
+    | tr -d '\r' | tail -1)" || fail "storage copy from S3 failed"
+  [[ $copied == "copied "[1-9]* ]] || fail "storage copy from S3 printed: $copied"
+fi
+pages="$("${compose[@]}" exec -T db psql -tA -U herd -d herd_restore \
+  -c "SELECT count(*) FROM page WHERE id = '$page_id'" | tr -d '\r')"
+[[ $pages == 1 ]] || fail "the restored database lacks the page"
+restored="$("${compose[@]}" exec -T backup find /tmp/restore-data -type f | wc -l)"
+(( restored >= 1 )) || fail "the restore wrote no attachment file"
+
+# restic, for real (the image's binary): a second run with a repository on the backup
+# container's /tmp (offsite=ok), its snapshot read back with the same password.
+offsite_password="$(openssl rand -hex 16)"
+made="$("${compose[@]}" exec -T -e HERD_BACKUP_OFFSITE_REPOSITORY=/tmp/offsite \
+  -e HERD_BACKUP_OFFSITE_PASSWORD="$offsite_password" backup python -m app.ops backup run \
+  | tr -d '\r' | tail -1)"
+[[ $made == *" offsite=ok" ]] || fail "backup run with restic printed: $made"
+"${compose[@]}" exec -T -e RESTIC_REPOSITORY=/tmp/offsite -e RESTIC_PASSWORD="$offsite_password" \
+  backup restic snapshots --tag herd --json \
+  | python3 -c "import json, sys; sys.exit(0 if len(json.load(sys.stdin)) == 1 else 1)" \
+  || fail "the restic repository holds no snapshot of the backup"
 
 echo "SMOKE OK"

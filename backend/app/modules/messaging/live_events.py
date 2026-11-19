@@ -11,7 +11,10 @@ only, never content:
      "x": <proposal_id> (proposal events with "s"; `skill_proposal.changed` with "u"),
      "a": <author_id> (proposal events of a person's proposal only),
      "n": <run_id>, "k": <step> (`run.progress` only),
-     "y": <automation_id> (`automation.changed`, with "u" and "s")}
+     "y": <automation_id> (`automation.changed`, with "u" and "s"),
+     "b": <backup_run_id|null> (`backup.changed`, with "u"),
+     "l": <calendar_id> (`calendar.changed`, with "s"),
+     "e": <event_id> (`event.invited`, with "u")}
 
 `u` names the one person an event is for (`notification.created`,
 `conversation.read`, `activity.changed`, `access.changed`); without it, whoever may
@@ -32,9 +35,20 @@ handler writes one per person), with the proposal's id; so is `automation.change
 (plan M7 task 7, for who may see the automation), with its id and its place's space
 (`s`, null for a DM). `run.progress` (plan M5 task 6) names an agent's run as `n` and
 its steps so far as `k`, for whoever may see its conversation `c`; a heartbeat's run
-before it delivers anything names no `c` but its asker `u` (review M7, finding 5). Every
-API process's hub (`live.py`) decodes it again; anything it cannot use is dropped.
+before it delivers anything names no `c` but its asker `u` (review M7, finding 5).
+`backup.changed` (plan M9 task 13, `u` an owner, `b` the run) is sent directly, not
+through the outbox (`modules/backups/live.py`). `calendar.changed` (plan M10, from
+`modules/calendars/live.py`) is for the space `s`, for its members alone (never by
+admin power), with the space's and the calendar's id `l`; `event.invited` (plan M10
+task 4: invited, the time changed, called off) is for the one person `u` invited to
+the event `e`, who may not be a member of its space. Every
+API process's hub (`live.py`) decodes it again (`live_decode.py`); anything it cannot use
+is dropped.
 Payloads stay far below Postgres' 8000-byte limit (about 330 bytes).
+
+This module is the shape (`LiveEvent`, names, the frame); the worker's side, from an
+outbox event to the NOTIFY, is `live_publish.py`; the API processes' side, from the
+payload back to a `LiveEvent`, is `live_decode.py`.
 """
 
 import json
@@ -42,10 +56,6 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.outbox import Event
 from app.core.permissions import Action
 
 LIVE_CHANNEL = "herd_live"
@@ -83,8 +93,12 @@ LIVE_TYPES: dict[str, str] = {
     "question.answered": "card.changed",
     "skill_proposal.changed": "skill_proposal.changed",
     "automation.changed": "automation.changed",
+    "calendar_event.invited": "event.invited",
 }
-LIVE_NAMES = frozenset(LIVE_TYPES.values())
+BACKUP = "backup.changed"  # sent directly (`modules/backups/live.py`), not from the outbox
+CALENDAR = "calendar.changed"  # published by `modules/calendars/live.py`
+INVITED = "event.invited"
+LIVE_NAMES = frozenset(LIVE_TYPES.values()) | {BACKUP, CALENDAR}
 TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
 # Events for a space (no conversation, no person): sprints for whoever may read tickets
 # there, proposals for whoever may edit pages there (`LiveEvent.space_action`).
@@ -103,6 +117,7 @@ FOR_ONE_PERSON = frozenset(
         "skill_proposal.changed",
         "automation.changed",
         "run.progress",  # a heartbeat's before it delivers: its asker alone, no `c`
+        "calendar_event.invited",
     }
 )
 
@@ -123,6 +138,9 @@ class LiveEvent:
     proposal_id: uuid.UUID | None = None  # proposal events only
     author_id: uuid.UUID | None = None  # a person's proposal: its author gets it too
     automation_id: uuid.UUID | None = None  # automation.changed only (with `space_id`)
+    backup_id: uuid.UUID | None = None  # backup.changed only
+    calendar_id: uuid.UUID | None = None  # calendar.changed only (with `space_id`)
+    event_id: uuid.UUID | None = None  # event.invited only (with `user_id`)
 
     @property
     def for_space(self) -> bool:
@@ -133,6 +151,8 @@ class LiveEvent:
     @property
     def space_action(self) -> Action:
         """What a space event's recipients may do in the space."""
+        if self.name == CALENDAR:
+            return Action.CALENDAR_READ
         return Action.PAGE_EDIT if self.name == "proposal.changed" else Action.TICKET_READ
 
     def payload(self) -> str:
@@ -159,12 +179,22 @@ class LiveEvent:
             data["a"] = str(self.author_id)
         if self.automation_id is not None:
             data["y"] = str(self.automation_id)
+        if self.backup_id is not None:
+            data["b"] = str(self.backup_id)
+        if self.calendar_id is not None:
+            data["l"] = str(self.calendar_id)
+        if self.event_id is not None:
+            data["e"] = str(self.event_id)
         return json.dumps(data, separators=(",", ":"))
 
     def frame(self) -> bytes:
         """The server-sent event: its name and the ids a client reloads by (a ticket
         event also `ticket_id` and `space_id`; a sprint event only `space_id` and
         `sprint_id`; a proposal event only `space_id` and `proposal_id`)."""
+        if self.for_space and self.name == CALENDAR:
+            return sse_frame(
+                self.name, {"space_id": str(self.space_id), "calendar_id": _text(self.calendar_id)}
+            )
         if self.for_space and self.name == "proposal.changed":
             return sse_frame(
                 self.name, {"space_id": str(self.space_id), "proposal_id": _text(self.proposal_id)}
@@ -173,6 +203,10 @@ class LiveEvent:
             return sse_frame(
                 self.name, {"space_id": str(self.space_id), "sprint_id": _text(self.sprint_id)}
             )
+        if self.name == BACKUP:
+            return sse_frame(self.name, {"backup_id": _text(self.backup_id)})
+        if self.name == INVITED:
+            return sse_frame(self.name, {"event_id": _text(self.event_id)})
         if self.name == AUTOMATION:
             return sse_frame(
                 self.name,
@@ -201,103 +235,3 @@ def sse_frame(name: str, data: dict[str, Any]) -> bytes:
 
 def _text(value: uuid.UUID | None) -> str | None:
     return None if value is None else str(value)
-
-
-def of_event(event: Event) -> LiveEvent | None:
-    """The live event of an outbox event; None for types that are not delivered live."""
-    name = LIVE_TYPES.get(event.type)
-    if name is None:
-        return None
-    payload = event.payload
-    ticket = event.type in TICKET_TYPES
-    if event.type in SPACE_TYPES:
-        if event.space_id is None:
-            return None
-        return LiveEvent(
-            name=name,
-            org_id=event.org_id,
-            conversation_id=None,
-            message_id=None,
-            parent_id=None,
-            user_id=None,
-            space_id=event.space_id,
-            sprint_id=_uuid(payload.get("sprint_id")),
-            proposal_id=_uuid(payload.get("proposal_id")),
-            author_id=_uuid(payload.get("author_id")) if event.type in PROPOSAL_TYPES else None,
-        )
-    run = event.type == "run.progress"
-    step = payload.get("step")
-    automation = name == AUTOMATION
-    return LiveEvent(
-        name=name,
-        org_id=event.org_id,
-        conversation_id=_uuid(payload.get("conversation_id")),
-        message_id=_uuid(payload.get("message_id")),
-        parent_id=_uuid(payload.get("parent_id")),
-        user_id=_uuid(payload.get("user_id")) if event.type in FOR_ONE_PERSON else None,
-        ticket_id=_uuid(payload.get("ticket_id")) if ticket else None,
-        space_id=event.space_id if ticket or automation else None,
-        run_id=_uuid(payload.get("run_id")) if run else None,
-        step=step if run and isinstance(step, int) else None,
-        proposal_id=_uuid(payload.get("proposal_id")) if name == SKILL_PROPOSAL else None,
-        automation_id=_uuid(payload.get("automation_id")) if automation else None,
-    )
-
-
-def _uuid(value: object) -> uuid.UUID | None:
-    return uuid.UUID(value) if isinstance(value, str) else None
-
-
-async def publish_live(session: AsyncSession, event: Event) -> None:
-    """Outbox handler: NOTIFY every API process. A second delivery notifies again,
-    which costs a client one reload of what it shows, nothing more."""
-    live = of_event(event)
-    if live is None:
-        return
-    payload = live.payload()
-    if len(payload.encode()) > MAX_PAYLOAD_BYTES:  # ids only: cannot happen
-        raise ValueError("live payload too large")
-    await session.execute(select(func.pg_notify(LIVE_CHANNEL, payload)))
-
-
-def decode(raw: str) -> LiveEvent | None:
-    """The event in a NOTIFY payload; None for anything else."""
-    try:
-        data = json.loads(raw)
-        if not isinstance(data, dict) or data.get("t") not in LIVE_NAMES:
-            return None
-        keys = ("c", "m", "p", "u", "w", "s", "r", "n", "x", "a", "y")
-        ids = {key: _strict_uuid(data.get(key)) for key in keys}
-        org_id = _strict_uuid(data.get("o"))
-        step = data.get("k")
-        if step is not None and (not isinstance(step, int) or isinstance(step, bool)):
-            raise TypeError("not a step")
-    except (ValueError, TypeError, RecursionError):
-        return None
-    if org_id is None:
-        return None
-    return LiveEvent(
-        data["t"],
-        org_id,
-        ids["c"],
-        ids["m"],
-        ids["p"],
-        ids["u"],
-        ids["w"],
-        ids["s"],
-        ids["r"],
-        ids["n"],
-        step,
-        ids["x"],
-        ids["a"],
-        ids["y"],
-    )
-
-
-def _strict_uuid(value: object) -> uuid.UUID | None:
-    """None for null; a UUID for its text; anything else is refused (ValueError)."""
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise TypeError("not an id")
-    return uuid.UUID(value)

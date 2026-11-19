@@ -17,6 +17,7 @@ tenant data (a login attempt has no organisation yet), so the table has no org_i
 """
 
 import ipaddress
+import math
 import uuid
 from datetime import datetime, timedelta
 
@@ -63,6 +64,13 @@ class RateLimiter:
 
         Commits at once: the hit must survive even if the request then fails (a
         rejected login is exactly what is counted), and the commit ends the lock."""
+        hit = await self.admit(key, now)
+        await self.session.commit()
+        return hit
+
+    async def admit(self, key: str, now: datetime | None = None) -> uuid.UUID | None:
+        """`acquire` inside the caller's transaction: the hit stands or falls with it,
+        and the key's lock is held until it ends (keep that transaction short)."""
         now = now or utcnow()
         cutoff = now - WINDOW
         await advisory_xact_lock(self.session, f"ratelimit:{key}")
@@ -74,12 +82,24 @@ class RateLimiter:
         )
         hits = int(await self.session.scalar(count_stmt) or 0)
         if hits >= self.limit:
-            await self.session.commit()
             return None
         hit = RateLimitHit(key=key, hit_at=now)
         self.session.add(hit)
-        await self.session.commit()
+        await self.session.flush()
         return hit.id
+
+    async def retry_after(self, key: str, now: datetime | None = None) -> int:
+        """Whole seconds until the oldest hit of `key` in the window leaves it (at
+        least 1): when the next attempt may pass."""
+        now = now or utcnow()
+        oldest = await self.session.scalar(
+            select(func.min(RateLimitHit.hit_at)).where(
+                RateLimitHit.key == key, RateLimitHit.hit_at >= now - WINDOW
+            )
+        )
+        if oldest is None:
+            return 1
+        return max(1, math.ceil((oldest + WINDOW - now).total_seconds()))
 
     async def release(self, hit_id: uuid.UUID) -> None:
         """Take a hit back (it did not count); part of the caller's transaction."""

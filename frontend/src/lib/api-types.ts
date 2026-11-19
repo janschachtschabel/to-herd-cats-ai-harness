@@ -104,6 +104,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/calendar-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Calendar Settings */
+        get: operations["get_calendar_settings_api_admin_calendar_settings_get"];
+        /** Set Calendar Settings */
+        put: operations["set_calendar_settings_api_admin_calendar_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/dm-inspect": {
         parameters: {
             query?: never;
@@ -222,6 +240,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/oidc-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Providers */
+        get: operations["list_providers_api_admin_oidc_providers_get"];
+        put?: never;
+        /** Create Provider */
+        post: operations["create_provider_api_admin_oidc_providers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/oidc-providers/{provider_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Provider */
+        get: operations["get_provider_api_admin_oidc_providers__provider_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Provider
+         * @description Also ends the sessions of the people linked through it, but the caller's own.
+         */
+        delete: operations["delete_provider_api_admin_oidc_providers__provider_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Provider */
+        patch: operations["update_provider_api_admin_oidc_providers__provider_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/oidc-providers/{provider_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Provider
+         * @description Discovery and the JWKS, fetched now through the egress guard; a fixed code.
+         */
+        post: operations["check_provider_api_admin_oidc_providers__provider_id__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/users": {
         parameters: {
             query?: never;
@@ -234,6 +312,26 @@ export interface paths {
         put?: never;
         /** Create User */
         post: operations["create_user_api_admin_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/pending/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count Pending
+         * @description How many self-registered accounts wait for approval (the admin navigation's badge).
+         */
+        get: operations["count_pending_api_admin_users_pending_count_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -257,6 +355,26 @@ export interface paths {
         patch: operations["update_user_api_admin_users__user_id__patch"];
         trace?: never;
     };
+    "/api/admin/users/{user_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Signup
+         * @description Let a self-registered account in (409 `users.not_pending` once decided).
+         */
+        post: operations["approve_signup_api_admin_users__user_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/users/{user_id}/deactivate": {
         parameters: {
             query?: never;
@@ -274,6 +392,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/users/{user_id}/identities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List User Identities */
+        get: operations["list_user_identities_api_admin_users__user_id__identities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/identities/{identity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlink User Identity */
+        delete: operations["unlink_user_identity_api_admin_users__user_id__identities__identity_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/users/{user_id}/reactivate": {
         parameters: {
             query?: never;
@@ -285,6 +437,68 @@ export interface paths {
         put?: never;
         /** Reactivate User */
         post: operations["reactivate_user_api_admin_users__user_id__reactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Signup
+         * @description Refuse a self-registered account: it is deleted (it never was active), with
+         *     what signing up created; its address is free again.
+         */
+        post: operations["reject_signup_api_admin_users__user_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/sign-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Out User
+         * @description Ends every session of the person; they stay active and may sign in again.
+         */
+        post: operations["sign_out_user_api_admin_users__user_id__sign_out_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/totp/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Totp
+         * @description Turns the person's TOTP off (a lost device); they sign in with the password
+         *     alone until they set it up again. Idempotent.
+         */
+        post: operations["reset_totp_api_admin_users__user_id__totp_reset_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1363,11 +1577,31 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Oauth Callback
-         * @description The authorization server's redirect: finish the flow, then send the browser to
-         *     the result page (`/ai/oauth/done?status=...`).
+         * Oauth Legacy Callback
+         * @description The shared callback of earlier releases: only for flows started with it.
          */
-        get: operations["oauth_callback_api_ai_oauth_callback_get"];
+        get: operations["oauth_legacy_callback_api_ai_oauth_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/oauth/{client_id}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Oauth Callback
+         * @description An app's authorization server's redirect: finish the flow started with this
+         *     callback, then send the browser to its purpose's result page (`?status=...`).
+         */
+        get: operations["oauth_callback_api_ai_oauth__client_id__callback_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1538,8 +1772,34 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Login */
+        /**
+         * Login
+         * @description Signed in (200, the session cookie), or, for a person with TOTP, 202: the
+         *     password was right and the sign-in waits for the second factor
+         *     (`/auth/login/second-factor`, with the cookie set here); no session yet.
+         */
         post: operations["login_api_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login/second-factor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second Factor
+         * @description The second step of a sign-in: the browser's waiting sign-in (cookie) and a code
+         *     or a recovery code; the login session opens only now.
+         */
+        post: operations["second_factor_api_auth_login_second_factor_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1584,6 +1844,63 @@ export interface paths {
         patch: operations["update_me_api_auth_me_patch"];
         trace?: never;
     };
+    "/api/auth/me/identities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Identities */
+        get: operations["my_identities_api_auth_me_identities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/identities/{identity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlink Mine */
+        delete: operations["unlink_mine_api_auth_me_identities__identity_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/identities/{key}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link
+         * @description Start linking the caller's account at the provider (from the profile): the
+         *     browser goes to the returned address; the binding cookie comes with this answer.
+         *     Needs the current password, or a sign-in through a provider of this session at
+         *     most 10 minutes old (403 `auth.reauth_required`).
+         */
+        post: operations["link_api_auth_me_identities__key__link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/me/password": {
         parameters: {
             query?: never;
@@ -1598,6 +1915,247 @@ export interface paths {
          * @description The caller's own password; this session stays, every other one ends.
          */
         post: operations["change_my_password_api_auth_me_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Own Sessions
+         * @description The caller's running sessions, newest first.
+         */
+        get: operations["list_own_sessions_api_auth_me_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/sessions/sign-out-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Out Others
+         * @description Every session of the caller ends but this one.
+         */
+        post: operations["sign_out_others_api_auth_me_sessions_sign_out_others_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * End Own Session
+         * @description One of the caller's sessions ends (this one too: then the cookie goes).
+         */
+        delete: operations["end_own_session_api_auth_me_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Totp */
+        get: operations["my_totp_api_auth_me_totp_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Totp
+         * @description The first code turns TOTP on; every other session of the person ends.
+         */
+        post: operations["confirm_totp_api_auth_me_totp_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disable Totp */
+        post: operations["disable_totp_api_auth_me_totp_disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp/recovery-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Renew Recovery Codes
+         * @description A new set in place of the old one (a current code proves the device).
+         */
+        post: operations["renew_recovery_codes_api_auth_me_totp_recovery_codes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Up Totp
+         * @description A new secret (the current password proves it is the person); it protects
+         *     nothing until `/me/totp/confirm`. Shown this once.
+         */
+        post: operations["set_up_totp_api_auth_me_totp_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/touch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Touch Me
+         * @description The person works in this tab (typing in the live editor, say) though it asked
+         *     the API nothing for a while: a use of the session (J7, R18-4), nothing else. No
+         *     write for the write limit.
+         */
+        post: operations["touch_me_api_auth_me_touch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/oidc/{key}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Callback
+         * @description The provider's redirect: finish the flow, then the app's start page signed in,
+         *     or the sign-in (profile) page with `?error=` (`?link_error=`) and a fixed code.
+         */
+        get: operations["callback_api_auth_oidc__key__callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/oidc/{key}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start
+         * @description To the provider's sign-in page, with the browser binding as a cookie; a provider
+         *     that is unknown, off or unreachable sends the browser back to the sign-in page.
+         *     `reauth`: the sign-in is the proof before linking (`fresh.py`): the provider is
+         *     asked for a fresh login, and the browser comes back to the profile.
+         */
+        get: operations["start_api_auth_oidc__key__start_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Providers
+         * @description The enabled providers (key, name, kind) for the sign-in page; no session needed.
+         */
+        get: operations["list_providers_api_auth_providers_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1769,6 +2327,248 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/backups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Backups
+         * @description The backups, newest first.
+         */
+        get: operations["list_backups_api_backups_get"];
+        put?: never;
+        /**
+         * Start Backup
+         * @description Back up now: a worker makes the backup; `backup.changed` tells its progress.
+         *     409 `backup.already_running` while one runs or waits, `backup.busy` while another
+         *     request is being handled.
+         */
+        post: operations["start_backup_api_backups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/archives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Archives
+         * @description The archives in the backups directory, newest first.
+         */
+        get: operations["list_archives_api_backups_archives_get"];
+        put?: never;
+        /**
+         * Upload Archive
+         * @description An archive from elsewhere, checked: 413 `backup.upload_too_large`, 422
+         *     `backup.archive_invalid` with the problems.
+         */
+        post: operations["upload_archive_api_backups_archives_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/archives/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Archive */
+        get: operations["download_archive_api_backups_archives__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/archives/{name}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Archive
+         * @description The archive against this installation; `can_replace` when nothing blocks.
+         */
+        post: operations["check_archive_api_backups_archives__name__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/archives/{name}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace Installation
+         * @description Replace the whole installation with the archive (a safety archive first, then
+         *     maintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409
+         *     `restore.superuser_refused` (the app's database role is a superuser),
+         *     `backup.already_running`, `backup.busy`, `backup.restore_running`,
+         *     `backup.replace_refused`.
+         */
+        post: operations["replace_installation_api_backups_archives__name__replace_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Restore Status
+         * @description The last attempt to replace the installation from the administration.
+         */
+        get: operations["restore_status_api_backups_restore_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Events
+         * @description Every occurrence overlapping `[from, to)` of the events one may list (member
+         *     spaces and the events one organises or is invited to; another space's only by
+         *     naming it with `space_id`; `mine`: only one's own and those one is invited to), by
+         *     start. Private events of others come `redacted`; `q` searches titles one sees. A
+         *     cursor holds `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).
+         */
+        get: operations["list_events_api_calendar_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar/overlays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Calendar Overlays
+         * @description Ticket due dates, sprints and automations' next terms in the days `[from, to)`,
+         *     stored nowhere: of the spaces one belongs to (never by admin power), automations
+         *     as their sight rule shows them. By (starts_on, kind, id); a cursor holds
+         *     `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).
+         */
+        get: operations["list_calendar_overlays_api_calendar_overlays_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Calendars
+         * @description The calendars of the spaces one belongs to (or open spaces one reads), the same
+         *     for admins; another space's calendars only by naming it.
+         */
+        get: operations["list_calendars_api_calendars_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendars/{calendar_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Archive Calendar
+         * @description Archives the calendar: out of every list, 404 by id.
+         */
+        delete: operations["archive_calendar_api_calendars__calendar_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Calendar */
+        patch: operations["update_calendar_api_calendars__calendar_id__patch"];
+        trace?: never;
+    };
+    "/api/calendars/{calendar_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Event
+         * @description A new event in the calendar (`calendar.write` in its space); the caller is its
+         *     organiser and sees it in full.
+         */
+        post: operations["create_event_api_calendars__calendar_id__events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels": {
         parameters: {
             query?: never;
@@ -1844,6 +2644,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/{conversation_id}/fresh-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Conversation Afresh
+         * @description Start her DM alone with an agent afresh: its runs read nothing from before now
+         *     (the personal mark of what came before ends for them); open runs are cancelled.
+         *     403 `conversation.not_alone_with_agent` anywhere else.
+         */
+        post: operations["start_conversation_afresh_api_conversations__conversation_id__fresh_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversation_id}/messages": {
         parameters: {
             query?: never;
@@ -1872,7 +2694,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Read Position
+         * @description The caller's read position in the conversation (nulls before she read any).
+         */
+        get: operations["read_position_api_conversations__conversation_id__read_get"];
         put?: never;
         /**
          * Mark Read
@@ -1938,6 +2764,100 @@ export interface paths {
          *     (201) or the one they have.
          */
         post: operations["open_dm_api_dms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event */
+        get: operations["get_event_api_events__event_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Event
+         * @description Deletes the event (a tombstone for 30 days): the series with its overrides, one
+         *     occurrence (`this`), or this and the following (`following`).
+         */
+        delete: operations["delete_event_api_events__event_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Event
+         * @description Changes the event (`calendar.write` and full sight; 403 `event.private` with
+         *     "busy" sight), at the version read (409 `event.version_conflict`): the whole series
+         *     (`scope=all`), one occurrence (`this`: an override) or this and the following
+         *     (`following`: the series is split).
+         */
+        patch: operations["update_event_api_events__event_id__patch"];
+        trace?: never;
+    };
+    "/api/events/{event_id}/attendees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Attendees
+         * @description The event's attendees (full sight of the event; 403 `event.private` with "busy"
+         *     sight).
+         */
+        get: operations["list_attendees_api_events__event_id__attendees_get"];
+        /**
+         * Set Attendees
+         * @description Sets the event's attendees (`calendar.write` and full sight, at the version
+         *     read: 409 `event.version_conflict`); on a series, who comes and who goes reaches
+         *     its overrides too. New people are told in their activity view.
+         */
+        put: operations["set_attendees_api_events__event_id__attendees_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{event_id}/response": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Respond
+         * @description One's answer to the event (403 `event.not_invited` without an invitation), at
+         *     the event's version read (409 after a change).
+         */
+        post: operations["respond_api_events__event_id__response_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/maintenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Maintenance State */
+        get: operations["maintenance_state_api_maintenance_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2854,6 +3774,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/spaces/{space_id}/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Space Calendars */
+        get: operations["list_space_calendars_api_spaces__space_id__calendars_get"];
+        put?: never;
+        /** Create Calendar */
+        post: operations["create_calendar_api_spaces__space_id__calendars_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces/{space_id}/channels": {
         parameters: {
             query?: never;
@@ -3541,7 +4479,22 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "ai.use" | "agent.create_personal" | "mcp.use";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "calendar.read" | "calendar.write" | "calendar.moderate" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "backup.manage" | "calendar.manage" | "ai.use" | "agent.create_personal" | "mcp.use" | "calendar.sync";
+        /**
+         * ActivityAccount
+         * @description The self-registered account a `signup` notification is about (plan M9 task 5b;
+         *     its address: the user administration's waiting accounts); the account is also the
+         *     entry's `author`. `awaiting`: whether it still waits for approval.
+         */
+        ActivityAccount: {
+            /** Awaiting */
+            awaiting: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** ActivityAuthor */
         ActivityAuthor: {
             /**
@@ -3567,6 +4520,38 @@ export interface components {
             id: string;
             /** Paused Reason */
             paused_reason: string | null;
+        };
+        /**
+         * ActivityCalendarEvent
+         * @description The calendar event an `invitation` or `invite_reply` is about (plan M10 task 4;
+         *     its address: `/api/events/{id}`); shown only while the person attends it, so in
+         *     full. `cancelled`: called off or deleted; `response`: the person's own answer
+         *     (null when she organises it).
+         */
+        ActivityCalendarEvent: {
+            /** All Day */
+            all_day: boolean;
+            /** Cancelled */
+            cancelled: boolean;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Response */
+            response: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Title */
+            title: string;
         };
         /**
          * ActivityConversation
@@ -3608,11 +4593,15 @@ export interface components {
          *     `author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top
          *     level has no conversation and no message, but `proposal` (plan M6); a
          *     `skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`
-         *     the automation (plan M7); `author` may be an agent (`type`).
+         *     the automation (plan M7), a `signup` the waiting account (plan M9), an
+         *     `invitation` or `invite_reply` the calendar event (plan M10); `author` may be an
+         *     agent (`type`).
          */
         ActivityOut: {
+            account?: components["schemas"]["ActivityAccount"] | null;
             author: components["schemas"]["ActivityAuthor"] | null;
             automation?: components["schemas"]["ActivityAutomation"] | null;
+            calendar_event?: components["schemas"]["ActivityCalendarEvent"] | null;
             conversation: components["schemas"]["ActivityConversation"] | null;
             /**
              * Created At
@@ -3704,6 +4693,34 @@ export interface components {
             /** Space Ids */
             space_ids: string[] | null;
             user: components["schemas"]["TokenUserOut"];
+        };
+        /**
+         * AdminUserOut
+         * @description A person as the people administration lists them: with whether TOTP is on.
+         */
+        AdminUserOut: {
+            /** Awaiting Approval Since */
+            awaiting_approval_since: string | null;
+            /** Email */
+            email: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Last Login At */
+            last_login_at: string | null;
+            /** Locale */
+            locale: string;
+            /** Name */
+            name: string;
+            system_role: components["schemas"]["SystemRole"];
+            /** Totp Enabled */
+            totp_enabled: boolean;
+            /** Version */
+            version: number;
         };
         /**
          * AgentCreate
@@ -4127,7 +5144,10 @@ export interface components {
         /**
          * ApprovalOut
          * @description A tool call waiting for (or given) a person's release. `summary`: the tool and
-         *     the ids the call names. `args`: the call's arguments, only for the person asked
+         *     what the system resolved of the call's arguments (a ticket's key, a status's name,
+         *     the ids of what it changes; never a text the model chose), or for an external
+         *     tool its server and tool; only for the person asked (null for others, module
+         *     review M8 5, L1). `args`: the call's arguments, only for the person asked
          *     (null for others). `diff_url`: for a page's new content, where that person reads
          *     the diff against the page as it is now (`GET`), instead of the text. `step` and
          *     `call_id`: the call it waits for, as the run's journal names it (the step a run
@@ -4137,8 +5157,11 @@ export interface components {
          *     asked; for everyone else both are null and `redacted` is true (as in the run
          *     view, review M6 finding 6). `external`: for a call of an external tool (it sends
          *     `args` to that server once released), else null. `personal`: asked because the
-         *     run carries the asker's personal mark: what is released is written (or sent)
-         *     where others read it (module review M8 2).
+         *     run carries the asker's personal mark (every release then but a message into its
+         *     DM alone with her): what is released is written (or sent) where others can read
+         *     it now or later (module review M8 2; M8 5, L2). `reads`: the call only reads (a
+         *     catalog tool that writes nothing); under the mark its card says so instead of
+         *     that others can read what is released.
          */
         ApprovalOut: {
             /**
@@ -4187,6 +5210,11 @@ export interface components {
              * @default false
              */
             personal?: boolean;
+            /**
+             * Reads
+             * @default false
+             */
+            reads?: boolean;
             /** Reason */
             reason: string | null;
             /** Redacted */
@@ -4200,7 +5228,7 @@ export interface components {
             /** Step */
             step: number;
             /** Summary */
-            summary: string;
+            summary: string | null;
             /** Tool */
             tool: string;
             /** Version */
@@ -4216,6 +5244,44 @@ export interface components {
          * @enum {string}
          */
         ApprovalState: "pending" | "approved" | "rejected" | "expired";
+        /**
+         * ArchiveCheckOut
+         * @description `problems`: codes, any one blocks replacing (`can_replace` false); `key`:
+         *     whether HERD_SECRET_KEY fits the archive's `enc:` values.
+         */
+        ArchiveCheckOut: {
+            archive: components["schemas"]["FiguresOut"] | null;
+            /** Archive Name */
+            archive_name: string;
+            /** Can Replace */
+            can_replace: boolean;
+            /** Created At */
+            created_at: string | null;
+            installation: components["schemas"]["FiguresOut"] | null;
+            /** Key */
+            key: ("match" | "mismatch" | "missing" | "not_needed") | null;
+            /** Problems */
+            problems: string[];
+            /** Warnings */
+            warnings: string[];
+        };
+        /**
+         * ArchiveOut
+         * @description An archive in the backups directory; `uploaded`: an owner uploaded it.
+         */
+        ArchiveOut: {
+            /** Bytes */
+            bytes: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Name */
+            name: string;
+            /** Uploaded */
+            uploaded: boolean;
+        };
         /**
          * AssigneeIn
          * @description A person, or (plan M6 decision 7) an agent: assigning an agent needs `ai.use`
@@ -4280,6 +5346,72 @@ export interface components {
             uploaded_by: components["schemas"]["PrincipalRef"];
             /** Url */
             url: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * AttendeeIn
+         * @description A person (`type` `user`) or agent (`agent`) of the system by `id`, or an address
+         *     (`email`, with an optional display `name`).
+         */
+        AttendeeIn: {
+            /** Email */
+            email?: string | null;
+            /** Id */
+            id?: string | null;
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            /** @default required */
+            role?: components["schemas"]["AttendeeRole"];
+            type: components["schemas"]["Kind"];
+        };
+        /**
+         * AttendeeOut
+         * @description `principal_id` for a person or agent, `email` for an address (a person's
+         *     address is never shown); `name` the person's, agent's or the address's display
+         *     name. `delivery`: `internal` (the activity view), `not_sent` (an address: pass the
+         *     event's `.ics` on).
+         */
+        AttendeeOut: {
+            delivery: components["schemas"]["Delivery"];
+            /** Email */
+            email: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Principal Id */
+            principal_id: string | null;
+            response: components["schemas"]["Response"];
+            role: components["schemas"]["AttendeeRole"];
+            type: components["schemas"]["Kind"];
+        };
+        /**
+         * AttendeeRole
+         * @enum {string}
+         */
+        AttendeeRole: "required" | "optional";
+        /**
+         * AttendeesIn
+         * @description The whole list of attendees (at most 100) at the event's `version` read.
+         */
+        AttendeesIn: {
+            /** Attendees */
+            attendees: components["schemas"]["AttendeeIn"][];
+            /** Version */
+            version: number;
+        };
+        /**
+         * AttendeesSetOut
+         * @description The event's version after the change.
+         */
+        AttendeesSetOut: {
             /** Version */
             version: number;
         };
@@ -4435,6 +5567,46 @@ export interface components {
             version: number;
         };
         /**
+         * BackupRunOut
+         * @description One backup. A run with trigger `admin` in state `running` and no archive yet may
+         *     still wait for a worker.
+         */
+        BackupRunOut: {
+            /** Archive */
+            archive: string | null;
+            /** Archive Sha256 */
+            archive_sha256: string | null;
+            /** Bytes */
+            bytes: number | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            offsite_state: components["schemas"]["OffsiteState"];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            state: components["schemas"]["BackupState"];
+            trigger: components["schemas"]["BackupTrigger"];
+        };
+        /**
+         * BackupState
+         * @enum {string}
+         */
+        BackupState: "running" | "ok" | "failed" | "interrupted";
+        /**
+         * BackupTrigger
+         * @enum {string}
+         */
+        BackupTrigger: "schedule" | "cli" | "admin" | "pre_restore";
+        /**
          * BaseUrlSpec
          * @description The instance's address, which the admin may change (a self-managed GitLab).
          */
@@ -4548,6 +5720,87 @@ export interface components {
          * @enum {string}
          */
         BudgetScope: "organisation" | "user" | "agent";
+        /**
+         * CalendarColor
+         * @description The eight fixed tones a calendar is drawn in (plan M10 decision 17).
+         * @enum {string}
+         */
+        CalendarColor: "blue" | "green" | "amber" | "red" | "violet" | "teal" | "pink" | "slate";
+        /**
+         * CalendarCreate
+         * @description A new calendar of the space (`calendar.moderate`); at most 20 per space (409
+         *     `calendar.limit`).
+         */
+        CalendarCreate: {
+            /** @default blue */
+            color?: components["schemas"]["CalendarColor"];
+            /** Name */
+            name: string;
+            /**
+             * Time Zone
+             * @default Europe/Berlin
+             */
+            time_zone?: string;
+        };
+        /**
+         * CalendarOut
+         * @description `is_default`: made by the system for a personal space („Mein Kalender“) or the
+         *     general space; there is at most one per space, and it cannot be archived. `name`
+         *     is null for a default nobody renamed: the interface words it. `time_zone`: the
+         *     zone of a new event that names none.
+         */
+        CalendarOut: {
+            color: components["schemas"]["CalendarColor"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Name */
+            name: string | null;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /** Time Zone */
+            time_zone: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * CalendarSettingsIn
+         * @description `sync_enabled`: whether people may connect their own external calendars
+         *     (`calendar.sync`; data leaves the house).
+         */
+        CalendarSettingsIn: {
+            /** Sync Enabled */
+            sync_enabled: boolean;
+            /** Version */
+            version: number;
+        };
+        /** CalendarSettingsOut */
+        CalendarSettingsOut: {
+            /** Sync Enabled */
+            sync_enabled: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * CalendarUpdate
+         * @description Fields left out stay as they are (none can be null).
+         */
+        CalendarUpdate: {
+            color?: components["schemas"]["CalendarColor"] | null;
+            /** Name */
+            name?: string | null;
+            /** Time Zone */
+            time_zone?: string | null;
+            /** Version */
+            version: number;
+        };
         /**
          * CardOut
          * @description A run's card (plan M6 task 7): what it waits for, `approval` or `question`, by
@@ -4669,6 +5922,13 @@ export interface components {
             /** Client Id */
             client_id: string;
             client_secret?: components["schemas"]["SecretIn"] | null;
+            /** Issuer */
+            issuer?: string | null;
+            /**
+             * Issuer In Response
+             * @default false
+             */
+            issuer_in_response?: boolean;
             /** Name */
             name: string;
             /** Resource */
@@ -4689,6 +5949,8 @@ export interface components {
         ClientOut: {
             /** Authorization Endpoint */
             authorization_endpoint: string;
+            /** Callback Url */
+            callback_url: string | null;
             /** Client Id */
             client_id: string;
             client_secret_kind: components["schemas"]["SecretKind"] | null;
@@ -4704,6 +5966,10 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Issuer */
+            issuer: string | null;
+            /** Issuer In Response */
+            issuer_in_response: boolean;
             /** Name */
             name: string;
             /** Resource */
@@ -4734,6 +6000,10 @@ export interface components {
             /** Client Id */
             client_id?: string | null;
             client_secret?: components["schemas"]["SecretIn"] | null;
+            /** Issuer */
+            issuer?: string | null;
+            /** Issuer In Response */
+            issuer_in_response?: boolean | null;
             /**
              * Keep Shared Connectors
              * @default false
@@ -4982,7 +6252,8 @@ export interface components {
          *     `version` guards writes (send it back; stale → 409). A direct message lists its
          *     `participants` and, on its own (`GET /conversations/{id}`), every admin
          *     `inspections` of it; both are empty for other kinds. `page_id`: a page thread's
-         *     page (null for other kinds).
+         *     page (null for other kinds). `fresh_start_at`: where the person started her DM
+         *     alone with an agent afresh (its agent sees nothing from before; null: never).
          */
         ConversationOut: {
             /** Archived At */
@@ -4995,6 +6266,8 @@ export interface components {
              */
             created_at: string;
             created_by: components["schemas"]["PrincipalRef"] | null;
+            /** Fresh Start At */
+            fresh_start_at?: string | null;
             /**
              * Id
              * Format: uuid
@@ -5127,6 +6400,14 @@ export interface components {
             version: number;
         };
         /**
+         * Delivery
+         * @description How an invitation reaches its attendee: `internal` (a person or agent of the
+         *     system: the activity view), `not_sent` (an address: nothing sends it; the `.ics`
+         *     file is for passing on). Task 16 adds addresses a linked calendar sends to.
+         * @enum {string}
+         */
+        Delivery: "internal" | "not_sent";
+        /**
          * DiffOut
          * @description Line by line from `from_number` to `to_number`; a changed line is a `delete`
          *     followed by an `insert`.
@@ -5182,6 +6463,8 @@ export interface components {
             authorization_endpoint: string | null;
             /** Issuer */
             issuer: string | null;
+            /** Issuer In Response */
+            issuer_in_response: boolean;
             /** Pkce */
             pkce: boolean;
             /** Registration */
@@ -5228,6 +6511,8 @@ export interface components {
              */
             created_at: string;
             created_by: components["schemas"]["PrincipalRef"] | null;
+            /** Fresh Start At */
+            fresh_start_at?: string | null;
             /**
              * Id
              * Format: uuid
@@ -5324,6 +6609,71 @@ export interface components {
             /** Via Token */
             via_token?: string | null;
         };
+        /**
+         * EventChangeOut
+         * @description The answer to a change: the event it shows (the series; with `scope=this` the
+         *     new override; with `scope=following` the new series; with `dry_run` the event as
+         *     it is) and what the change drops: overrides and deleted occurrences (EXDATEs) that
+         *     no longer name an occurrence of the series (with `dry_run`: would drop).
+         */
+        EventChangeOut: {
+            /** Dropped Exdates */
+            dropped_exdates: number;
+            /** Dropped Overrides */
+            dropped_overrides: number;
+            event: components["schemas"]["EventOut"];
+        };
+        /**
+         * EventCreate
+         * @description An event with a time of day names `starts_at`, `ends_at` (instants) and its
+         *     `time_zone` (IANA; default: the calendar's); an all-day one `all_day`, `first_day` and
+         *     `last_day`. `rrule` (RFC 5545, `DAILY` or slower), `rdates` and `exdates` (wall
+         *     times in the event's zone, without offset) make it a series. `busy` defaults to
+         *     true, for all-day events to false.
+         */
+        EventCreate: {
+            /**
+             * All Day
+             * @default false
+             */
+            all_day?: boolean;
+            /** Busy */
+            busy?: boolean | null;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Exdates */
+            exdates?: string[];
+            /** First Day */
+            first_day?: string | null;
+            /** Last Day */
+            last_day?: string | null;
+            /**
+             * Location
+             * @default
+             */
+            location?: string;
+            /** Rdates */
+            rdates?: string[];
+            /** Rrule */
+            rrule?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** @default confirmed */
+            status?: components["schemas"]["EventStatus"];
+            /** Time Zone */
+            time_zone?: string | null;
+            /** Title */
+            title: string;
+            /** Uid */
+            uid?: string | null;
+            /** @default default */
+            visibility?: components["schemas"]["EventVisibility"];
+        };
         /** EventIn */
         EventIn: {
             event_type: components["schemas"]["EventType"];
@@ -5347,11 +6697,162 @@ export interface components {
          */
         EventKind: "model_call" | "tool_call" | "stop" | "mark";
         /**
+         * EventOut
+         * @description `starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`
+         *     and of the day after `last_day`). `recurs_until`: when the last occurrence ends
+         *     (null: endless). `series_id`: for an override (one occurrence changed on its own),
+         *     the series it belongs to, and `recurrence_id` the occurrence it takes the place of
+         *     (its wall time in the series, ISO 8601 without offset); null otherwise.
+         *     `time_zone`: the zone its series runs in (null for all-day). `redacted`: the caller
+         *     sees only times and "busy"; content fields are null.
+         */
+        EventOut: {
+            /** All Day */
+            all_day: boolean;
+            /** Busy */
+            busy: boolean;
+            /**
+             * Calendar Id
+             * Format: uuid
+             */
+            calendar_id: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Exdates */
+            exdates: string[];
+            /** First Day */
+            first_day: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Day */
+            last_day: string | null;
+            /** Location */
+            location: string | null;
+            organizer: components["schemas"]["OrganizerOut"] | null;
+            /** Rdates */
+            rdates: string[];
+            /** Recurrence Id */
+            recurrence_id: string | null;
+            /** Recurs Until */
+            recurs_until: string | null;
+            /** Redacted */
+            redacted: boolean;
+            /** Rrule */
+            rrule: string | null;
+            /** Series Id */
+            series_id: string | null;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            status: components["schemas"]["EventStatus"];
+            /** Time Zone */
+            time_zone: string | null;
+            /** Title */
+            title: string | null;
+            /** Uid */
+            uid: string | null;
+            /** Version */
+            version: number;
+            visibility: components["schemas"]["EventVisibility"];
+        };
+        /**
+         * EventStatus
+         * @enum {string}
+         */
+        EventStatus: "confirmed" | "tentative" | "cancelled";
+        /**
          * EventType
          * @description What an event rule listens to (decision 8).
          * @enum {string}
          */
         EventType: "page.published" | "ticket.created" | "attachment.uploaded" | "page.review_due";
+        /**
+         * EventUpdate
+         * @description A change: `version` (the one read) and only the fields that change, named as
+         *     when making an event. Times start from the stored ones: an event moves by its
+         *     `starts_at`/`ends_at` (all-day: `first_day`/`last_day`); `all_day` switches the kind
+         *     and then needs the other kind's bounds. With `scope=all` the times are the series'
+         *     (its first occurrence); with `scope=this` the occurrence's; with `scope=following`
+         *     those of the part from the occurrence on. `rrule: null` ends the rule.
+         */
+        EventUpdate: {
+            /** All Day */
+            all_day?: boolean | null;
+            /** Busy */
+            busy?: boolean | null;
+            /** Description */
+            description?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Exdates */
+            exdates?: string[] | null;
+            /** First Day */
+            first_day?: string | null;
+            /** Last Day */
+            last_day?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Rdates */
+            rdates?: string[] | null;
+            /** Rrule */
+            rrule?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            status?: components["schemas"]["EventStatus"] | null;
+            /** Time Zone */
+            time_zone?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Version */
+            version: number;
+            visibility?: components["schemas"]["EventVisibility"] | null;
+        };
+        /**
+         * EventVisibility
+         * @description `private`: only the organiser (and, on the named way, admins) sees its content;
+         *     every other reader of the calendar sees times and "busy" (`sight.py`).
+         * @enum {string}
+         */
+        EventVisibility: "default" | "private";
+        /**
+         * FiguresOut
+         * @description `tools_major`: the archive's pg_dump, this installation's pg_restore.
+         */
+        FiguresOut: {
+            /** Alembic Revision */
+            alembic_revision: string;
+            /** App Version */
+            app_version: string;
+            /** File Bytes */
+            file_bytes: number;
+            /** Files */
+            files: number;
+            /** Rows */
+            rows: number;
+            /** Server Major */
+            server_major: number;
+            /** Storage */
+            storage: string;
+            /** Tables */
+            tables: number;
+            /** Tools Major */
+            tools_major: number | null;
+        };
         /**
          * FiringOut
          * @description One term of the log: how it went, the run it started, whether a heartbeat's
@@ -5565,6 +7066,26 @@ export interface components {
             /** Lines */
             lines: string[];
         };
+        /** IdentityOut */
+        IdentityOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Login At */
+            last_login_at: string | null;
+            /** Provider Key */
+            provider_key: string;
+            provider_kind: components["schemas"]["ProviderKind"];
+            /** Provider Name */
+            provider_name: string;
+        };
         /**
          * ImportResultOut
          * @description `created`: pages, folders without a file of their own included.
@@ -5687,6 +7208,11 @@ export interface components {
             server: components["schemas"]["CreatedServerOut"];
         };
         /**
+         * Kind
+         * @enum {string}
+         */
+        Kind: "user" | "agent" | "email";
+        /**
          * LastRunOut
          * @description The latest term: how it went (`outcome`), its run and how that ended.
          */
@@ -5713,6 +7239,23 @@ export interface components {
             run_id: string | null;
             run_state: components["schemas"]["RunState"] | null;
             stop_reason: components["schemas"]["StopReason"] | null;
+        };
+        /**
+         * LinkStartIn
+         * @description Linking a new account proves the person again (J9): her current password, or
+         *     none right after a sign-in through a provider (at most 10 minutes ago).
+         */
+        LinkStartIn: {
+            /** Password */
+            password?: string | null;
+        };
+        /**
+         * LinkStartOut
+         * @description Where the browser goes to link an account (the provider's sign-in page).
+         */
+        LinkStartOut: {
+            /** Url */
+            url: string;
         };
         /**
          * LinkedPageOut
@@ -5758,6 +7301,19 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MaintenanceOut */
+        MaintenanceOut: {
+            /** Active */
+            active: boolean;
+            reason: components["schemas"]["MaintenanceReason"] | null;
+            /** Started At */
+            started_at: string | null;
+        };
+        /**
+         * MaintenanceReason
+         * @enum {string}
+         */
+        MaintenanceReason: "restore";
         /** McpCallOut */
         McpCallOut: {
             /**
@@ -5801,7 +7357,8 @@ export interface components {
          * @description `permissions`: the system-wide actions the caller holds; clients decide what to
          *     show from these (and from a space's `my_role`), never from the role's name.
          *     `ai_model`: with `ai.use`, the name of the model the caller's AI assignment gives
-         *     them (nothing else about the connection); null without.
+         *     them (nothing else about the connection); null without. `session_limits`: what the
+         *     sessions list tells the person (R18-11).
          */
         MeOut: {
             /** Ai Model */
@@ -5809,6 +7366,7 @@ export interface components {
             org: components["schemas"]["OrgOut"];
             /** Permissions */
             permissions: components["schemas"]["Action"][];
+            session_limits: components["schemas"]["SessionLimitsOut"];
             user: components["schemas"]["UserOut"];
         };
         /**
@@ -6169,7 +7727,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due" | "signup" | "totp_locked" | "invitation" | "invite_reply";
         /** OAuthSpec */
         OAuthSpec: {
             /** Authorization Endpoint */
@@ -6190,6 +7748,76 @@ export interface components {
             token_auth?: components["schemas"]["TokenAuth"];
             /** Token Endpoint */
             token_endpoint: string;
+        };
+        /**
+         * OccurrenceOut
+         * @description One occurrence in the window. `recurrence_id`: for an occurrence of a series,
+         *     the wall time it is named by (ISO 8601 without offset), which changing or deleting
+         *     just this one takes back (task 3b); null for an event that is no series.
+         *     `series_id`: for an override, which is listed as an event of its own, the series
+         *     it belongs to (to change the whole series from it); null otherwise. `redacted`:
+         *     the caller sees only times and "busy" (`title`, `location` null).
+         */
+        OccurrenceOut: {
+            /** All Day */
+            all_day: boolean;
+            /** Busy */
+            busy: boolean;
+            /**
+             * Calendar Id
+             * Format: uuid
+             */
+            calendar_id: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /** Location */
+            location: string | null;
+            /** Recurrence Id */
+            recurrence_id: string | null;
+            /** Recurring */
+            recurring: boolean;
+            /** Redacted */
+            redacted: boolean;
+            /** Series Id */
+            series_id: string | null;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            status: components["schemas"]["EventStatus"];
+            /** Title */
+            title: string | null;
+            visibility: components["schemas"]["EventVisibility"];
+        };
+        /**
+         * OffsiteState
+         * @enum {string}
+         */
+        OffsiteState: "off" | "ok" | "failed";
+        /**
+         * OidcSecretIn
+         * @description Either the secret itself (`value`, stored encrypted; needs `HERD_SECRET_KEY`) or
+         *     the name of an environment variable `HERD_OIDC_*` (`env`).
+         */
+        OidcSecretIn: {
+            /** Env */
+            env?: string | null;
+            /** Value */
+            value?: string | null;
         };
         /** OnceIn */
         OnceIn: {
@@ -6214,11 +7842,92 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** OrganizerOut */
+        OrganizerOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            type: components["schemas"]["PrincipalType"];
+        };
         /**
          * Outcome
          * @enum {string}
          */
         Outcome: "ok" | "refused" | "invalid" | "failed";
+        /**
+         * OverlayKind
+         * @enum {string}
+         */
+        OverlayKind: "automations" | "sprints" | "tickets";
+        /**
+         * OverlayOut
+         * @description Something the calendar shows beside events, stored nowhere: a ticket's due day
+         *     (`ref` its key), a sprint from its first to its last day, or an automation's next
+         *     term (`at`, on its day in the viewer's zone; `space_id` null in a DM). `ref` is
+         *     what the interface links with: a ticket's key, else the id. `title`: the ticket's
+         *     title, the sprint's name, the automation's agent.
+         */
+        OverlayOut: {
+            /** At */
+            at: string | null;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["OverlayKind"];
+            /** Ref */
+            ref: string;
+            /** Space Id */
+            space_id: string | null;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * OwnSessionOut
+         * @description One of the caller's running login sessions. `device`: browser and system, no
+         *     version (null for an unknown client); `current`: the session of this request.
+         */
+        OwnSessionOut: {
+            /** Current */
+            current: boolean;
+            /** Device */
+            device: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Last Used At
+             * Format: date-time
+             */
+            last_used_at: string;
+            /**
+             * Signed In At
+             * Format: date-time
+             */
+            signed_in_at: string;
+        };
+        /** OwnSessionPage */
+        OwnSessionPage: {
+            /** Items */
+            items: components["schemas"]["OwnSessionOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** PageCreate */
         PageCreate: {
             /**
@@ -6368,6 +8077,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[AdminUserOut] */
+        Page_AdminUserOut_: {
+            /** Items */
+            items: components["schemas"]["AdminUserOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[AgentOut] */
         Page_AgentOut_: {
             /** Items */
@@ -6396,10 +8112,24 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[ArchiveOut] */
+        Page_ArchiveOut_: {
+            /** Items */
+            items: components["schemas"]["ArchiveOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[AttachmentOut] */
         Page_AttachmentOut_: {
             /** Items */
             items: components["schemas"]["AttachmentOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[AttendeeOut] */
+        Page_AttendeeOut_: {
+            /** Items */
+            items: components["schemas"]["AttendeeOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -6417,10 +8147,24 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[BackupRunOut] */
+        Page_BackupRunOut_: {
+            /** Items */
+            items: components["schemas"]["BackupRunOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[BudgetOut] */
         Page_BudgetOut_: {
             /** Items */
             items: components["schemas"]["BudgetOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[CalendarOut] */
+        Page_CalendarOut_: {
+            /** Items */
+            items: components["schemas"]["CalendarOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -6508,6 +8252,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[IdentityOut] */
+        Page_IdentityOut_: {
+            /** Items */
+            items: components["schemas"]["IdentityOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[InspectableDmOut] */
         Page_InspectableDmOut_: {
             /** Items */
@@ -6536,6 +8287,20 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[OccurrenceOut] */
+        Page_OccurrenceOut_: {
+            /** Items */
+            items: components["schemas"]["OccurrenceOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[OverlayOut] */
+        Page_OverlayOut_: {
+            /** Items */
+            items: components["schemas"]["OverlayOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[PersonalServerOut] */
         Page_PersonalServerOut_: {
             /** Items */
@@ -6554,6 +8319,20 @@ export interface components {
         Page_ProposalOut_: {
             /** Items */
             items: components["schemas"]["ProposalOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[ProviderOut] */
+        Page_ProviderOut_: {
+            /** Items */
+            items: components["schemas"]["ProviderOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[PublicProviderOut] */
+        Page_PublicProviderOut_: {
+            /** Items */
+            items: components["schemas"]["PublicProviderOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -6690,13 +8469,6 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
-        /** Page[UserOut] */
-        Page_UserOut_: {
-            /** Items */
-            items: components["schemas"]["UserOut"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-        };
         /** Page[VersionSummaryOut] */
         Page_VersionSummaryOut_: {
             /** Items */
@@ -6757,6 +8529,14 @@ export interface components {
          * @enum {string}
          */
         PausedReason: "manual" | "owner" | "failing";
+        /**
+         * PendingCountOut
+         * @description How many self-registered accounts wait for approval.
+         */
+        PendingCountOut: {
+            /** Count */
+            count: number;
+        };
         /**
          * PersonNameOut
          * @description Who caused a timeline entry: a person, or (plan M6) an agent (`type`).
@@ -7110,6 +8890,127 @@ export interface components {
          */
         ProposalState: "open" | "accepted" | "rejected" | "withdrawn";
         /**
+         * ProviderCheckOut
+         * @description `code` is None when discovery and the JWKS answered as OIDC promises.
+         */
+        ProviderCheckOut: {
+            /** Code */
+            code: string | null;
+            /** Ok */
+            ok: boolean;
+        };
+        /**
+         * ProviderCreate
+         * @description `google`: issuer and scopes are the preset's (`issuer`, `scopes`, `trust_email`
+         *     are refused); `generic`: `issuer` is required, `scopes` must hold `openid`.
+         */
+        ProviderCreate: {
+            /**
+             * Allow Signup
+             * @default false
+             */
+            allow_signup?: boolean;
+            /**
+             * Allowed Domains
+             * @default []
+             */
+            allowed_domains?: string[];
+            /** Client Id */
+            client_id: string;
+            client_secret?: components["schemas"]["OidcSecretIn"] | null;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled?: boolean;
+            /** Issuer */
+            issuer?: string | null;
+            /** Key */
+            key?: string | null;
+            kind: components["schemas"]["ProviderKind"];
+            /** Name */
+            name?: string | null;
+            /** Scopes */
+            scopes?: string | null;
+            /**
+             * Trust Email
+             * @default false
+             */
+            trust_email?: boolean;
+        };
+        /**
+         * ProviderKind
+         * @enum {string}
+         */
+        ProviderKind: "google" | "generic";
+        /** ProviderOut */
+        ProviderOut: {
+            /** Allow Signup */
+            allow_signup: boolean;
+            /** Allowed Domains */
+            allowed_domains: string[];
+            /** Callback Url */
+            callback_url: string | null;
+            /** Client Id */
+            client_id: string;
+            client_secret: components["schemas"]["SecretState"];
+            /** Discovered */
+            discovered: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Issuer */
+            issuer: string;
+            /** Key */
+            key: string;
+            kind: components["schemas"]["ProviderKind"];
+            /** Name */
+            name: string;
+            /** Scopes */
+            scopes: string;
+            /** Trust Email */
+            trust_email: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ProviderUpdate
+         * @description Only the fields sent change; `client_secret` replaces the stored one.
+         */
+        ProviderUpdate: {
+            /** Allow Signup */
+            allow_signup?: boolean | null;
+            /** Allowed Domains */
+            allowed_domains?: string[] | null;
+            /** Client Id */
+            client_id?: string | null;
+            client_secret?: components["schemas"]["OidcSecretIn"] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Issuer */
+            issuer?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Scopes */
+            scopes?: string | null;
+            /** Trust Email */
+            trust_email?: boolean | null;
+            /** Version */
+            version: number;
+        };
+        /** PublicProviderOut */
+        PublicProviderOut: {
+            /** Key */
+            key: string;
+            kind: components["schemas"]["ProviderKind"];
+            /** Name */
+            name: string;
+        };
+        /**
          * Purpose
          * @enum {string}
          */
@@ -7196,6 +9097,25 @@ export interface components {
              */
             message_id: string;
         };
+        /**
+         * ReadPositionOut
+         * @description The caller's read position: the message she read up to and when it was written;
+         *     both null before she read anything there.
+         */
+        ReadPositionOut: {
+            /** Last Read Message At */
+            last_read_message_at: string | null;
+            /** Last Read Message Id */
+            last_read_message_id: string | null;
+        };
+        /**
+         * RecoveryCodesOut
+         * @description Ten recovery codes, shown this once; each signs in once instead of a code.
+         */
+        RecoveryCodesOut: {
+            /** Recovery Codes */
+            recovery_codes: string[];
+        };
         /** RecurringIn */
         RecurringIn: {
             /** Cron */
@@ -7236,6 +9156,59 @@ export interface components {
          * @enum {string}
          */
         RemoteStatus: "ok" | "blocked" | "timeout" | "unreachable" | "unauthorized" | "forbidden" | "not_found" | "rate_limited" | "redirect" | "server_error" | "too_large" | "protocol_error" | "secret_unavailable";
+        /**
+         * ReplaceIn
+         * @description The organisation's name, exactly, as the confirmation.
+         */
+        ReplaceIn: {
+            /** Confirm */
+            confirm: string;
+        };
+        /** ReplaceOut */
+        ReplaceOut: {
+            /** Archive Name */
+            archive_name: string;
+        };
+        /**
+         * Response
+         * @enum {string}
+         */
+        Response: "needs_action" | "accepted" | "tentative" | "declined";
+        /**
+         * ResponseIn
+         * @description An answer (`accepted`, `tentative` or `declined`) at the event's `version`
+         *     read.
+         */
+        ResponseIn: {
+            response: components["schemas"]["Response"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * RestoreAttemptOut
+         * @description The last attempt to replace the installation from here: `requested` (under way,
+         *     or its process ended), `failed` with a code.
+         */
+        RestoreAttemptOut: {
+            /** Archive Name */
+            archive_name: string | null;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Code */
+            code: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "requested" | "failed";
+        };
+        /** RestoreStatusOut */
+        RestoreStatusOut: {
+            attempt: components["schemas"]["RestoreAttemptOut"] | null;
+        };
         /**
          * RunEventOut
          * @description One step of a run (model call: usage and the answer's parts; tool call: name,
@@ -7387,6 +9360,14 @@ export interface components {
          */
         SchemaProblem: "schema_too_large" | "schema_unsupported" | "schema_property_names";
         /**
+         * Scope
+         * @description Which occurrences of a series a write touches (decision 6): `this` one (an
+         *     override, or an EXDATE when deleting), this and the `following` (a split), or
+         *     `all` (the series row; the only scope of an event that is no series).
+         * @enum {string}
+         */
+        Scope: "this" | "following" | "all";
+        /**
          * SearchResults
          * @description A page of hits of every kind, told apart by `type`.
          */
@@ -7395,6 +9376,34 @@ export interface components {
             items: (components["schemas"]["PageHitOut"] | components["schemas"]["MessageHitOut"] | components["schemas"]["TicketHitOut"])[];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /**
+         * SecondFactorIn
+         * @description Exactly one of `code` (six digits from the authenticator) and `recovery_code`.
+         */
+        SecondFactorIn: {
+            /** Code */
+            code?: string | null;
+            /** Recovery Code */
+            recovery_code?: string | null;
+        };
+        /**
+         * SecondFactorNeededOut
+         * @description The password (or the provider) was right; the sign-in waits for the second
+         *     factor until `expires_at` (`POST /api/auth/login/second-factor`).
+         */
+        SecondFactorNeededOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Second Factor
+             * @default totp
+             * @constant
+             */
+            second_factor?: "totp";
         };
         /**
          * SecretIn
@@ -7414,6 +9423,12 @@ export interface components {
         SecretKind: "env" | "enc";
         /** SecretOut */
         SecretOut: {
+            kind: components["schemas"]["SecretKind"] | null;
+            /** Set */
+            set: boolean;
+        };
+        /** SecretState */
+        SecretState: {
             kind: components["schemas"]["SecretKind"] | null;
             /** Set */
             set: boolean;
@@ -7497,6 +9512,26 @@ export interface components {
             oauth_client_id?: string | null;
             /** Url */
             url?: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * SessionLimitsOut
+         * @description The installation's limits of a login session: it ends after `idle_hours` without
+         *     use (null: no idle limit, HERD_SESSION_IDLE_HOURS=0) and at the latest after
+         *     `ttl_hours` (HERD_SESSION_TTL_HOURS).
+         */
+        SessionLimitsOut: {
+            /** Idle Hours */
+            idle_hours: number | null;
+            /** Ttl Hours */
+            ttl_hours: number;
+        };
+        /**
+         * SignupDecisionIn
+         * @description Approve or reject a waiting account: the version the client read (409).
+         */
+        SignupDecisionIn: {
             /** Version */
             version: number;
         };
@@ -8618,6 +10653,8 @@ export interface components {
             mode: components["schemas"]["TokenMode"];
             /** Name */
             name: string;
+            /** Second Factor Code */
+            second_factor_code?: string | null;
             /** Space Ids */
             space_ids?: string[] | null;
         };
@@ -8744,6 +10781,41 @@ export interface components {
         ToolVersionIn: {
             /** Version */
             version: number;
+        };
+        /** TotpCodeIn */
+        TotpCodeIn: {
+            /** Code */
+            code: string;
+        };
+        /** TotpSetupIn */
+        TotpSetupIn: {
+            /** Password */
+            password: string;
+        };
+        /**
+         * TotpSetupOut
+         * @description The secret in base32 and as an `otpauth://` URI (for a QR code), shown this once.
+         */
+        TotpSetupOut: {
+            /** Secret */
+            secret: string;
+            /** Uri */
+            uri: string;
+        };
+        /**
+         * TotpStatusOut
+         * @description `enabled_at`: when TOTP was turned on (null: off). `unavailable`: why it cannot
+         *     be set up (`no_password`: an account without a password signs in through its
+         *     provider, whose MFA applies; `no_secret_key`: the operator set no
+         *     `HERD_SECRET_KEY`); null when it can.
+         */
+        TotpStatusOut: {
+            /** Enabled At */
+            enabled_at: string | null;
+            /** Recovery Codes Left */
+            recovery_codes_left: number;
+            /** Unavailable */
+            unavailable: ("no_password" | "no_secret_key") | null;
         };
         /**
          * TrashedPageOut
@@ -8894,6 +10966,8 @@ export interface components {
         };
         /** UserOut */
         UserOut: {
+            /** Awaiting Approval Since */
+            awaiting_approval_since: string | null;
             /** Email */
             email: string;
             /**
@@ -9202,6 +11276,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AuditOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_calendar_settings_api_admin_calendar_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSettingsOut"];
+                };
+            };
+        };
+    };
+    set_calendar_settings_api_admin_calendar_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSettingsOut"];
                 };
             };
             /** @description Validation Error */
@@ -9574,7 +11701,7 @@ export interface operations {
             };
         };
     };
-    list_users_api_admin_users_get: {
+    list_providers_api_admin_oidc_providers_get: {
         parameters: {
             query?: {
                 limit?: number;
@@ -9592,7 +11719,202 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_UserOut_"];
+                    "application/json": components["schemas"]["Page_ProviderOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_provider_api_admin_oidc_providers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_provider_api_admin_oidc_providers__provider_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_provider_api_admin_oidc_providers__provider_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_provider_api_admin_oidc_providers__provider_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_provider_api_admin_oidc_providers__provider_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_api_admin_users_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description true: only accounts awaiting approval */
+                pending?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AdminUserOut_"];
                 };
             };
             /** @description Validation Error */
@@ -9639,6 +11961,26 @@ export interface operations {
             };
         };
     };
+    count_pending_api_admin_users_pending_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingCountOut"];
+                };
+            };
+        };
+    };
     update_user_api_admin_users__user_id__patch: {
         parameters: {
             query?: never;
@@ -9651,6 +11993,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UserUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_signup_api_admin_users__user_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupDecisionIn"];
             };
         };
         responses: {
@@ -9703,7 +12080,162 @@ export interface operations {
             };
         };
     };
+    list_user_identities_api_admin_users__user_id__identities_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_IdentityOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_user_identity_api_admin_users__user_id__identities__identity_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                identity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     reactivate_user_api_admin_users__user_id__reactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_signup_api_admin_users__user_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_out_user_api_admin_users__user_id__sign_out_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_totp_api_admin_users__user_id__totp_reset_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -12303,15 +14835,50 @@ export interface operations {
             };
         };
     };
-    oauth_callback_api_ai_oauth_callback_get: {
+    oauth_legacy_callback_api_ai_oauth_callback_get: {
         parameters: {
             query?: {
                 state?: string | null;
                 code?: string | null;
                 error?: string | null;
+                iss?: string | null;
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oauth_callback_api_ai_oauth__client_id__callback_get: {
+        parameters: {
+            query?: {
+                state?: string | null;
+                code?: string | null;
+                error?: string | null;
+                iss?: string | null;
+            };
+            header?: never;
+            path: {
+                client_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -12659,6 +15226,48 @@ export interface operations {
                     "application/json": components["schemas"]["MeOut"];
                 };
             };
+            /** @description Second factor needed */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecondFactorNeededOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    second_factor_api_auth_login_second_factor_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecondFactorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeOut"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -12741,6 +15350,102 @@ export interface operations {
             };
         };
     };
+    my_identities_api_auth_me_identities_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_IdentityOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_mine_api_auth_me_identities__identity_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_api_auth_me_identities__key__link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LinkStartIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     change_my_password_api_auth_me_password_post: {
         parameters: {
             query?: never;
@@ -12760,6 +15465,350 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_own_sessions_api_auth_me_sessions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnSessionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_out_others_api_auth_me_sessions_sign_out_others_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    end_own_session_api_auth_me_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_totp_api_auth_me_totp_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpStatusOut"];
+                };
+            };
+        };
+    };
+    confirm_totp_api_auth_me_totp_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_totp_api_auth_me_totp_disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecondFactorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renew_recovery_codes_api_auth_me_totp_recovery_codes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_up_totp_api_auth_me_totp_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpSetupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpSetupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    touch_me_api_auth_me_touch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    callback_api_auth_oidc__key__callback_get: {
+        parameters: {
+            query?: {
+                state?: string | null;
+                code?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_api_auth_oidc__key__start_get: {
+        parameters: {
+            query?: {
+                /** @description a fresh login as the proof before linking */
+                reauth?: boolean;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_providers_api_auth_providers_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_PublicProviderOut_"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -13137,6 +16186,445 @@ export interface operations {
             };
         };
     };
+    list_backups_api_backups_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_BackupRunOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_backup_api_backups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupRunOut"];
+                };
+            };
+        };
+    };
+    list_archives_api_backups_archives_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ArchiveOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_archive_api_backups_archives_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-tar": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchiveOut"];
+                };
+            };
+        };
+    };
+    download_archive_api_backups_archives__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/x-tar": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_archive_api_backups_archives__name__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchiveCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_installation_api_backups_archives__name__replace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplaceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_status_api_backups_restore_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreStatusOut"];
+                };
+            };
+        };
+    };
+    list_events_api_calendar_events_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                limit?: number;
+                cursor?: string | null;
+                calendar_ids?: string[] | null;
+                /** @description the named way: this space's events only */
+                space_id?: string | null;
+                q?: string | null;
+                /** @description the viewer's zone (all-day days), default UTC */
+                time_zone?: string | null;
+                /** @description my events: only those I organise or am invited to */
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_OccurrenceOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_calendar_overlays_api_calendar_overlays_get: {
+        parameters: {
+            query: {
+                from: string;
+                /** @description the first day after the range */
+                to: string;
+                limit?: number;
+                cursor?: string | null;
+                /** @description comma-separated: tickets, sprints, automations (default: all) */
+                kinds?: string | null;
+                /** @description the viewer's zone (an automation's day), default UTC */
+                time_zone?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_OverlayOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_calendars_api_calendars_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CalendarOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_calendar_api_calendars__calendar_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                calendar_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_calendar_api_calendars__calendar_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                calendar_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_event_api_calendars__calendar_id__events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                calendar_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_channels_api_channels_get: {
         parameters: {
             query?: {
@@ -13304,6 +16792,41 @@ export interface operations {
             };
         };
     };
+    start_conversation_afresh_api_conversations__conversation_id__fresh_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__modules__messaging__schemas__ExpectedVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_messages_api_conversations__conversation_id__messages_get: {
         parameters: {
             query?: {
@@ -13375,6 +16898,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageWriteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_position_api_conversations__conversation_id__read_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadPositionOut"];
                 };
             };
             /** @description Validation Error */
@@ -13562,6 +17116,236 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_api_events__event_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_event_api_events__event_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+                scope?: components["schemas"]["Scope"];
+                /** @description with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it) */
+                occurrence?: string | null;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_event_api_events__event_id__patch: {
+        parameters: {
+            query?: {
+                scope?: components["schemas"]["Scope"];
+                /** @description with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it) */
+                occurrence?: string | null;
+                /** @description only count what the change drops */
+                dry_run?: boolean;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_attendees_api_events__event_id__attendees_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AttendeeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_attendees_api_events__event_id__attendees_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttendeesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendeesSetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    respond_api_events__event_id__response_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResponseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendeeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    maintenance_state_api_maintenance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaintenanceOut"];
                 };
             };
         };
@@ -15530,6 +19314,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_TicketSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_space_calendars_api_spaces__space_id__calendars_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CalendarOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_calendar_api_spaces__space_id__calendars_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarOut"];
                 };
             };
             /** @description Validation Error */

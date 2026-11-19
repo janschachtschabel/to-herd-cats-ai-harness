@@ -33,7 +33,12 @@ async def _posted(ext: Ext) -> dict[str, Any]:
 
 
 async def _marks(ext: Ext) -> list[RunEvent]:
-    stmt = select(RunEvent).where(RunEvent.kind == EventKind.MARK).order_by(RunEvent.seq)
+    stmt = (
+        select(RunEvent)
+        .where(RunEvent.kind == EventKind.MARK)
+        .join(Run, Run.id == RunEvent.run_id)
+        .order_by(Run.created_at, RunEvent.attempt, RunEvent.seq)
+    )
     return list(await ext.bench.session.scalars(stmt))
 
 

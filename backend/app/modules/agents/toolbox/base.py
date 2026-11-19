@@ -29,7 +29,7 @@ depends on the call: `assign_ticket` asks the ticket service's rule); see
 
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -146,13 +146,27 @@ class WriteContext(CallContext):
         raise NotImplementedError
 
 
+@dataclass(slots=True)
+class Owed:
+    """What one call owes before it writes: under the personal mark, the person's
+    release, noted by the checks (`writing.leaks_into`) and asked by `writing.effect`
+    once nothing else refused the call (module review M8 3, H3)."""
+
+    release: bool = False
+
+
 @dataclass(frozen=True, slots=True)
 class ToolContext(WriteContext):
     run: RunRef
     call: CallRef | None = None  # None only outside a run (a tool called directly)
     # The asking person released this call (`approvals/gate.py`): under the personal
-    # mark it may write where others read (`writing.release_first`).
+    # mark it may write outside its own DM alone with her (`writing.release_first`).
     released: bool = False
+    # Under the personal mark, a call the gate found to change nothing (`update_page`'s
+    # preview): it runs without a release, yet never writes (`writing.effect`), and
+    # its result is the asker's alone like every event of a marked run (`runs.py`).
+    previewing: bool = False
+    owed: Owed = field(default_factory=Owed)  # this call's, fresh for each call
 
     @property
     def by(self) -> Authorship:

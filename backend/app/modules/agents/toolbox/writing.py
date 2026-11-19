@@ -20,9 +20,15 @@
 - **A person's own content** (the personal mark, `agents/personal_mark.py`; module
   review M8 2, G2): a run that holds what the asking person read through her own
   connector (`Reads.personal`, journaled) writes nothing others may read without her
-  release: once every other check passed, `release_first` raises `ReleaseFirst` and
-  the host asks her to release exactly this call (`step_host.py`); after the
-  release the call runs (`ToolContext.released`) and what it writes is not marked.
+  release: the checks note it (`release_first`, `ToolContext.owed`), and once nothing
+  else refused the call (the draft mark, a leak, a space closed to AI, the tool's
+  own refusals: module review M8 3, H3) `effect` raises `ReleaseFirst` right before
+  the write and the host asks her to release exactly this call (`step_host.py`);
+  after the release the call runs (`ToolContext.released`) and what it writes is
+  not marked.
+  A call the gate finds to change nothing (`update_page`'s preview under a `confirm`
+  grant) runs without a release as `ToolContext.previewing`: `effect` never writes
+  for it (module review M8 3, H1).
   The draft's exceptions do not spare a release. Its own conversation is open
   without a release only while the person is alone with the agent (`into_own`):
   elsewhere `post_message` there asks for the release too, while a question and the
@@ -43,7 +49,9 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import write_limit
 from app.core.authorship import Authorship
+from app.core.config import get_settings
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.modules.agents.actor import Reads
 from app.modules.agents.personal_mark import ReleaseFirst
@@ -61,6 +69,11 @@ DRAFTS = (
     "Not allowed: you have read a draft in this run, and drafts are only for the editors "
     "of their space. Write nothing others may read; propose a change to a page of the "
     "draft's space instead, or answer here."
+)
+RELEASE_NEEDED = (
+    "Not without the person's release: you have read something through the asking "
+    "person's own connection in this run, and this call would write outside your "
+    "conversation alone with her. Call it again to ask her to release exactly this."
 )
 PERSONAL = (
     "Not allowed here: you have read something through the asking person's own "
@@ -134,10 +147,20 @@ async def _drafted(ctx: CallContext, editors_of: uuid.UUID | None = None) -> str
 
 
 def release_first(ctx: CallContext) -> None:
-    """Under the personal mark, a write others could read needs the asking person's
-    release of this very call (`ReleaseFirst`, which the host turns into one); a
-    released call goes on. Outside a run (`/mcp`) there is no mark."""
-    if ctx.reads.personal and not (isinstance(ctx, ToolContext) and ctx.released):
+    """Under the personal mark, every write needs the asking person's release of this
+    very call: noted here, asked by `effect` right before it writes (`ReleaseFirst`,
+    which the host turns into a release). Whoever reads the place now, its audience
+    can grow later, and what is written there carries no mark (module review M8 4, K1
+    and K2): her personal space, a space only she belongs to, memory pages alike. The
+    one place a marked run writes without it is its own conversation alone with her
+    (`into_own`; that message is marked personal), where no tool calls this. Outside a
+    run (`/mcp`) there is no mark."""
+    if ctx.reads.personal and isinstance(ctx, ToolContext):
+        ctx.owed.release = True
+
+
+def _ask_release(ctx: CallContext) -> None:
+    if isinstance(ctx, ToolContext) and ctx.owed.release and not ctx.released:
         raise ReleaseFirst
 
 
@@ -176,6 +199,11 @@ async def _read(ctx: CallContext) -> set[uuid.UUID]:
     return ctx.reads.spaces | now.spaces
 
 
+async def _within_limit(ctx: CallContext) -> bool:
+    writer = ctx.by.principal if isinstance(ctx, WriteContext) else ctx.actor.principal
+    return await write_limit.admit_within(ctx.session, get_settings(), writer)
+
+
 def refused(source: str, code: str, attrs: dict[str, str] | None = None) -> ToolResult:
     return ToolResult(source, f"Refused ({code}).", attrs or {}, failed=True)
 
@@ -191,7 +219,18 @@ async def effect(
     attrs: dict[str, str],
     write: Callable[[], Awaitable[ToolResult]],
 ) -> ToolResult:
-    """Run `write` in a savepoint; a service's refusal undoes it and is the result."""
+    """Run `write` in a savepoint; a service's refusal undoes it and is the result.
+    Every write counts towards its writer's write limit (J10: the agent of a run on
+    its own count, the person of a token at `/mcp`), in the step's transaction;
+    beyond it the tool is refused (`rate.limited`) and writes nothing. Under the
+    personal mark, a call whose checks noted a write others read asks the
+    person's release first (`release_first`); one that runs unreleased because the
+    gate found it to change nothing (`ToolContext.previewing`) never writes."""
+    if isinstance(ctx, ToolContext) and ctx.previewing:
+        return refusal(source, RELEASE_NEEDED, attrs)
+    _ask_release(ctx)  # every other check passed: her release of exactly this
+    if not await _within_limit(ctx):
+        return refused(source, write_limit.CODE, attrs)
     try:
         async with ctx.session.begin_nested():
             return await write()

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 from app.core.actor import Actor
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.auth.write_limits import COUNTED
 from app.modules.spaces.models import Space
 from app.modules.spaces.schemas import (
     MemberType,
@@ -39,7 +40,7 @@ async def list_spaces(
     )
 
 
-@router.post("", response_model=SpaceOut, status_code=201)
+@router.post("", response_model=SpaceOut, status_code=201, dependencies=COUNTED)
 async def create_space(body: SpaceCreate, actor: ActorDep, session: SessionDep) -> SpaceOut:
     service = SpaceService(session)
     space = await service.create(

@@ -131,6 +131,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     is_active: true,
     locale: 'de',
     last_login_at: null,
+    awaiting_approval_since: null,
     version: 1,
     ...overrides,
   }
@@ -142,6 +143,7 @@ export function makeMe(permissions: Permission[], user: Partial<User> = {}): Me 
     org: { id: id(), name: 'Beispiel GmbH' },
     permissions,
     ai_model: null,
+    session_limits: { idle_hours: 24, ttl_hours: 168 },
   }
 }
 

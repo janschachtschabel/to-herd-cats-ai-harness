@@ -4,13 +4,15 @@ by the caller's organisation and filtered by who may see an automation
 
 A row comes with what the API shows beside it: its agent's and its owner's name, its
 place (kind, space, a channel's name, a ticket's number) and its latest term with the
-run it started (one lateral look-up).
+run it started (one lateral look-up). `terms_between` reads the next terms the
+calendar overlays (plan M10 task 9).
 """
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 
-from sqlalchemy import ColumnElement, Select, and_, func, or_, select, true
+from sqlalchemy import ColumnElement, Select, and_, func, literal, or_, select, true, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -40,6 +42,15 @@ class Row:
     ticket_number: int | None
     last: AutomationFiring | None
     run: Run | None
+
+
+@dataclass(frozen=True, slots=True)
+class Term:
+    """An automation's next term as the calendar shows it."""
+
+    automation: Automation
+    agent_name: str
+    space_id: uuid.UUID | None  # its place's (None: a DM)
 
 
 class ManageRepository:
@@ -92,6 +103,37 @@ class ManageRepository:
         if before is not None:
             stmt = stmt.where(Automation.id < before)
         return await self._rows(stmt.order_by(Automation.id.desc()), limit)
+
+    async def terms_between(
+        self,
+        sight: AutomationSight,
+        *,
+        spaces: Select[uuid.UUID],
+        owner_id: uuid.UUID,
+        start: datetime,
+        end: datetime,
+        after: tuple[datetime, uuid.UUID] | None,
+        limit: int,
+    ) -> list[Term]:
+        """The active automations `sight` shows whose next term lies in `[start, end)`
+        and that sit at a place in one of `spaces` or are `owner_id`'s own, by (term,
+        id) after `after` (the calendar's overlays)."""
+        stmt = self._seen(sight).where(
+            Automation.state == AutomationState.ACTIVE,
+            Automation.next_due_at >= start,
+            Automation.next_due_at < end,
+            or_(Conversation.space_id.in_(spaces), Automation.owner_user_id == owner_id),
+        )
+        if after is not None:
+            stmt = stmt.where(
+                tuple_(Automation.next_due_at, Automation.id)
+                > tuple_(literal(after[0]), literal(after[1]))
+            )
+        stmt = stmt.order_by(Automation.next_due_at, Automation.id).limit(limit)
+        return [
+            Term(automation, agent.name, place.space_id)
+            for automation, agent, place in (await self.session.execute(stmt)).all()
+        ]
 
     def _seen(self, sight: AutomationSight) -> Select[Automation, Agent, Conversation]:
         return (

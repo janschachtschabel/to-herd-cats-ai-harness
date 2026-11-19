@@ -18,6 +18,9 @@ from contextlib import suppress
 import asyncpg
 from sqlalchemy.engine import URL
 
+from app.core.config import Settings, get_settings
+from app.core.db_tls import connect_args
+
 logger = logging.getLogger(__name__)
 
 PING_SECONDS = 30.0
@@ -29,6 +32,12 @@ MAX_WAIT_SECONDS = 30.0
 def asyncpg_dsn(url: URL) -> str:
     """The SQLAlchemy URL as a DSN for asyncpg itself (password included, escaped)."""
     return url.set(drivername="postgresql").render_as_string(hide_password=False)
+
+
+async def connect_listening(url: URL, settings: Settings | None = None) -> asyncpg.Connection:
+    """A connection of asyncpg's own (LISTEN needs one), with the configured TLS."""
+    tls = connect_args(settings or get_settings())
+    return await asyncpg.connect(asyncpg_dsn(url), **tls)
 
 
 class Listener:
@@ -65,7 +74,7 @@ class Listener:
                 self._wait = min(self._wait * 2, MAX_WAIT_SECONDS)
 
     async def _listen(self, stop: asyncio.Event) -> None:
-        connection = await asyncpg.connect(asyncpg_dsn(self.url))
+        connection = await connect_listening(self.url)
         try:
             lost = asyncio.Event()
             connection.add_termination_listener(lambda _connection: lost.set())

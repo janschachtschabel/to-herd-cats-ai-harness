@@ -169,9 +169,13 @@ test("a heartbeat answering HEARTBEAT_OK stays silent; one with something to say
 
   await scriptStub(anna.request, { replies: [{ content: "HEARTBEAT_OK" }] });
   await dueNow(anna, automation.id);
-  const [ok] = await loggedTerms(anna, automation.id, 1);
+  const [term] = await loggedTerms(anna, automation.id, 1);
+  expect(term).toMatchObject({ outcome: "started" });
+  await doneRun(anna, term.run_id);
+  // The term notes `heartbeat_ok` in the transaction that ends its run
+  // (`automations/runs.py`), so it is read again once the run is done.
+  const [ok] = await firings(anna, automation.id);
   expect(ok).toMatchObject({ outcome: "started", heartbeat_ok: true });
-  await doneRun(anna, ok.run_id);
   // Nothing at the place, nothing in anyone's activity; only the log says so.
   expect(await messages(anna, puls.id)).toEqual([]);
   expect([await unread(anna), await unread(ben)]).toEqual(counts);

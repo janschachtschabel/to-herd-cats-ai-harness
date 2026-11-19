@@ -29,7 +29,7 @@ CONTENT_SECURITY_POLICY = "; ".join(
         "style-src 'self' 'unsafe-inline'",
         "object-src 'none'",
         "frame-ancestors 'none'",
-        "base-uri 'self'",
+        "base-uri 'none'",
         "form-action 'self'",
     ]
 )

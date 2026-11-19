@@ -2,8 +2,9 @@ import type { QueryClient } from '@tanstack/react-query'
 import { createRouter, type RouterHistory } from '@tanstack/react-router'
 import { createElement } from 'react'
 import { meQuery } from '@/features/auth/queries'
+import { showMaintenance } from '@/features/shared/maintenance'
 import { LoadingState } from '@/features/shared/states'
-import { onUnauthorized } from '@/lib/api'
+import { onMaintenance, onUnauthorized } from '@/lib/api'
 import { routeTree } from './routes'
 
 export function createAppRouter(queryClient: QueryClient, history?: RouterHistory) {
@@ -24,6 +25,8 @@ export function createAppRouter(queryClient: QueryClient, history?: RouterHistor
       void router.navigate({ to: '/login', search: { redirect: here.href } })
     }
   })
+  // A request answered 503 `maintenance.active`: the maintenance page until it ends.
+  onMaintenance(showMaintenance)
   return router
 }
 

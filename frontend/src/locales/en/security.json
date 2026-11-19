@@ -1,0 +1,43 @@
+{
+  "errors": {
+    "auth": {
+      "session_not_found": "This session no longer exists.",
+      "reauth_required": "Please sign in again."
+    },
+    "rate": {
+      "limited": "Too many changes in a short time. Please wait a moment and try again."
+    },
+    "attachment": {
+      "rejected_by_scan": "The file was rejected by the virus scan.",
+      "scan_unavailable": "The virus scan cannot be reached right now, so nothing was stored. Please try again later."
+    }
+  },
+  "security": {
+    "sessions": {
+      "title": "Signed-in devices",
+      "description": "You are signed in here. A session ends after {{idle}} without use and at the latest after {{ttl}}.",
+      "descriptionNoIdle": "You are signed in here. A session ends at the latest after {{ttl}}.",
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "current": "This device",
+      "unknownDevice": "Unknown device",
+      "signedInAt": "Signed in {{date}}",
+      "lastUsed": "Last used {{date}}",
+      "end": "Sign out",
+      "endNamed": "Sign out {{device}}",
+      "endOthers": "Sign out all others",
+      "endOthersTitle": "Sign out all other devices?",
+      "endOthersText": "Every session but this one ends at once. Whoever was signed in there must sign in again."
+    },
+    "reauth": {
+      "title": "Sign in again",
+      "hint": "An account at {{name}} is another way into your account. Confirm that it is you first.",
+      "password": "Current password",
+      "noPassword": "Without a password: sign in again through a provider you already use; it will ask for your login. For 10 minutes after that you can link without a password.",
+      "submit": "Continue to the provider",
+      "viaProvider": "Sign in again through {{name}}"
+    }
+  }
+}

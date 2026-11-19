@@ -45,13 +45,14 @@ const OAuthDonePage = lazyRouteComponent(
 const RUN_STATES = new Set(['queued', 'running', 'waiting', 'done'])
 const STOP_REASONS = new Set<string>(STOP_REASONS_ALL)
 
-/** A run list's filters from the address; anything unknown is dropped. */
+/** A run list's filters from the address; anything unknown is undefined (every key is
+ *  returned: the router lays the result over the raw search). */
 export function runSearch(search: Record<string, unknown>): RunFilters {
   const state = typeof search.state === 'string' && RUN_STATES.has(search.state)
   const reason = typeof search.stop_reason === 'string' && STOP_REASONS.has(search.stop_reason)
   return {
-    ...(state ? { state: search.state as RunFilters['state'] } : {}),
-    ...(reason ? { stop_reason: search.stop_reason as RunFilters['stop_reason'] } : {}),
+    state: state ? (search.state as RunFilters['state']) : undefined,
+    stop_reason: reason ? (search.stop_reason as RunFilters['stop_reason']) : undefined,
   }
 }
 

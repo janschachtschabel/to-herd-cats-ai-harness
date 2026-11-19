@@ -25,6 +25,19 @@ export const unreadQuery = queryOptions({
     unwrap(await api.GET('/api/conversations/unread', { params: { query: { limit: 100 } } })),
 })
 
+/** The caller's read position; a failure leaves the "new" marker to the counters. */
+export const readPositionQuery = (conversationId: string) =>
+  queryOptions({
+    queryKey: messagingKeys.readPosition(conversationId),
+    queryFn: async () =>
+      unwrap(
+        await api.GET('/api/conversations/{conversation_id}/read', {
+          params: { path: { conversation_id: conversationId } },
+        }),
+      ),
+    retry: false,
+  })
+
 export const conversationQuery = (conversationId: string) =>
   queryOptions({
     queryKey: messagingKeys.conversation(conversationId),
@@ -130,6 +143,9 @@ export function useMarkRead(conversationId: string) {
           body: { message_id: messageId },
         }),
       ),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: messagingKeys.unread }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: messagingKeys.unread })
+      void queryClient.invalidateQueries({ queryKey: messagingKeys.readPosition(conversationId) })
+    },
   })
 }

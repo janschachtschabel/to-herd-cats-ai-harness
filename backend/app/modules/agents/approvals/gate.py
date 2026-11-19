@@ -4,7 +4,9 @@ A run offers a tool whose effective grant is `confirm` like any other. When the 
 calls it, the host asks the gate first, in the call's transaction (`step_host.py`):
 
 - No approval for the call yet: if the call changes nothing (`ToolSpec.subjects`
-  gives None, such as `update_page`'s preview) it runs at once. Otherwise an approval
+  gives None, such as `update_page`'s preview) it runs at once (`Passed.UNCHANGED`:
+  never as a released call; under the personal mark it runs `previewing`, module
+  review M8 3, H1). Otherwise an approval
   is made (the canonical arguments, what the call would change and the fingerprint),
   its card is posted (`cards.py`) and the run waits (`Wait`, until the approval
   expires: `HERD_AI_APPROVAL_HOURS`, 72 by default).
@@ -31,13 +33,18 @@ sorted) and each object's kind, id, version and space. Objects without a version
 a tool that changed since the release makes it stale; its card names the server and
 the tool, never an argument (`toolbox/external.py`).
 
-Under the personal mark (`agents/personal_mark.py`) a write others could read asks
-the same way, whatever the tool's grant (`step_host.py`); such an approval is
-`personal` and its card says that what is released goes where others read it.
+Under the personal mark (`agents/personal_mark.py`) every write but into the run's
+DM alone with the person asks the same way, whatever the tool's grant
+(`personal_step.py`); such an approval is `personal`, and so is every `confirm`
+grant's but a message into that DM (module review M8 5, L2). A personal card says
+that what is released can be read by others now or later, and shows it in full; a
+call whose content cannot be shown in full is refused instead (`shown.py`). An
+approved release that the call now owes as personal but was not asked so is stale.
 """
 
 import hashlib
 import json
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel
@@ -50,8 +57,11 @@ from app.core.principal import Principal
 from app.modules.agents.approvals import cards
 from app.modules.agents.approvals.models import Approval, ApprovalOutcome, ApprovalState
 from app.modules.agents.approvals.repository import WaitedRepository
+from app.modules.agents.approvals.shown import NOT_SHOWN, shown_in_full
+from app.modules.agents.approvals.summary import summary
 from app.modules.agents.toolbox import external
 from app.modules.agents.toolbox.base import CallRef, RunRef, Subject, ToolContext, ToolSpec, Wait
+from app.modules.agents.toolbox.writing import into_own_conversation
 from app.modules.messaging.models import MessageKind
 from app.runtime.loop import Halt, ToolResult
 
@@ -60,6 +70,13 @@ STALE = (
     "it, so it did not run. Read it again; call the tool again to ask for a new release."
 )
 REJECTED = "approval_rejected: the person did not release this call; it did not run."
+
+
+class Passed(StrEnum):
+    """Why the gate lets a call run now."""
+
+    RELEASED = "released"  # the person released exactly this call
+    UNCHANGED = "unchanged"  # the call changes nothing (a preview): nobody released it
 
 
 def fingerprint(tool: str, args: dict[str, Any], subjects: list[Subject]) -> str:
@@ -78,9 +95,10 @@ def fingerprint(tool: str, args: dict[str, Any], subjects: list[Subject]) -> str
 
 async def gate(
     ctx: ToolContext, spec: ToolSpec, args: BaseModel, *, personal: bool = False
-) -> ToolResult | Wait | None:
-    """None: the tool may run now; else what the call gets instead of running.
-    `personal`: asked because the run carries the personal mark (its card says so)."""
+) -> ToolResult | Wait | Passed:
+    """`Passed`: the tool may run now (and why); else what the call gets instead of
+    running. `personal`: asked because the run carries the personal mark (its card
+    says so)."""
     assert ctx.call is not None
     repo = WaitedRepository(ctx.session, ctx.run.org_id)
     found = await repo.for_call(Approval, ctx.run.id, ctx.call.step, ctx.call.id)
@@ -88,7 +106,11 @@ async def gate(
     canonical = args.model_dump(mode="json")
     if found is None:
         if subjects is None:
-            return None  # the call changes nothing (and finds what it may not, itself)
+            return Passed.UNCHANGED  # (and finds what it may not, itself)
+        if personal and not await shown_in_full(
+            ctx.session, ctx.actor, spec.name, canonical, for_ai=True
+        ):  # she releases only what she sees in full (module review M8 3, H5)
+            return ToolResult("approval", NOT_SHOWN, {"tool": spec.name}, failed=True)
         return Wait((await _ask(ctx, spec, canonical, subjects, personal)).expires_at)
     if found.state == ApprovalState.PENDING:
         if found.expires_at <= utcnow():
@@ -99,7 +121,11 @@ async def gate(
     if found.state == ApprovalState.REJECTED:
         said = f" The person's reason: {found.reason}" if found.reason else ""
         return ToolResult("approval", REJECTED + said, {"tool": spec.name})
-    if subjects is None or fingerprint(spec.name, canonical, subjects) != found.fingerprint:
+    if (
+        subjects is None
+        or fingerprint(spec.name, canonical, subjects) != found.fingerprint
+        or (personal and not found.personal)  # the mark owes a release she was not shown
+    ):
         await _settle(ctx, found, ApprovalOutcome.STALE)
         return ToolResult("approval", STALE, {"tool": spec.name})
     if (action := await spec.needs(ctx.session, ctx.actor, canonical)) is not None:
@@ -109,7 +135,7 @@ async def gate(
             ):
                 raise Halt("rights_revoked")
     await _settle(ctx, found, ApprovalOutcome.RAN)
-    return None
+    return Passed.RELEASED
 
 
 async def _settle(ctx: ToolContext, approval: Approval, outcome: ApprovalOutcome) -> None:
@@ -175,7 +201,7 @@ async def _ask(
             fingerprint=fingerprint(spec.name, canonical, subjects),
             summary=external.summary(spec.remote)
             if spec.remote
-            else cards.summary(spec.name, canonical),
+            else await summary(ctx, spec.name, canonical, subjects),
             state=ApprovalState.PENDING,
             addressed_to=ctx.run.user_id,
             expires_at=cards.until(),
@@ -183,8 +209,16 @@ async def _ask(
             personal=personal,
         )
     )
+    # The card names the tool only: the summary is the person asked's (module review
+    # M8 5, L1); in a marked run's DM alone with her it is marked like its messages.
+    alone = await into_own_conversation(ctx, ctx.run.conversation_id) is None
     card = await cards.post(
-        ctx, MessageKind.APPROVAL, approval.id, approval.summary, approval.addressed_to
+        ctx,
+        MessageKind.APPROVAL,
+        approval.id,
+        spec.name,
+        approval.addressed_to,
+        personal=ctx.reads.personal and alone,
     )
     approval.message_id = card.id
     await ctx.session.flush()

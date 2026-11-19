@@ -60,7 +60,7 @@ test("a page that takes too long to check is too large for live editing", async 
   const lines = [];
   const log = (message, fields) => lines.push({ message, ...fields });
   live = await liveFixture({ markdown: "Text", createCollabServer, checks: slow("open"), log });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await until(() => anna.closes.includes(4413));
   assert.equal(live.api.saves.length, 0);
   assert.equal(lines.find(({ message }) => message === "live check failed")?.reason, "timeout");
@@ -68,7 +68,7 @@ test("a page that takes too long to check is too large for live editing", async 
 
 test("a state that takes too long to check is not stored; the notice says why", async () => {
   live = await liveFixture({ markdown: "Text", createCollabServer, checks: slow("readBack") });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await synced(anna);
   const heard = [];
   anna.provider.on("stateless", ({ payload }) => heard.push(payload));
@@ -91,9 +91,9 @@ test("the reviewer's page holds another person's small page no longer than the l
   });
   live.api.pages[small] = "kleine Seite\n";
   const started = Date.now();
-  const heavy = live.open({ cookie: "herd_session=token-a" });
+  const heavy = live.open({ grant: "herd_cg_a" });
   await new Promise((resolve) => setTimeout(resolve, 400)); // as in the review
-  const ben = live.open({ cookie: "herd_session=token-b", name: `page:${small}` }, { page: small });
+  const ben = live.open({ grant: "herd_cg_b", name: `page:${small}` }, { page: small });
   await synced(ben);
   const waited = Date.now() - started;
   if (process.env.HERD_TEST_VERBOSE) console.log(`small page synced after ${waited} ms`);

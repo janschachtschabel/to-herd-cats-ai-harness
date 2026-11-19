@@ -5,9 +5,15 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
-**Stand: Meilenstein 8 (Öffnung: MCP) ist gebaut, dazu M7, M6 und aus M5 die
-KI-Grundlage (Tasks 1 bis 7); hybride Suche und Embeddings (M5 Tasks 8 bis 11) fehlen
-noch.** Aus M1:
+**Version 1.0.0** (erste Freigabe; was sie enthält, Hinweise zum Update und bekannte
+Grenzen: [`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md)). Was seitdem dazukam und beim
+Update von einem 1.0.0-Build zu beachten ist (noch nicht veröffentlicht; ein Tag folgt,
+wenn die ganze App fertig ist): [`docs/RELEASE-NEXT.md`](docs/RELEASE-NEXT.md).
+
+**Stand: M9 (Produktion, M9a und M9b) ist gebaut, auf Meilenstein 8 (Öffnung: MCP),
+M7, M6 und aus M5 der KI-Grundlage (Tasks 1 bis 7); M10 (Kalender) hat begonnen
+([`docs/KALENDER.md`](docs/KALENDER.md)); hybride Suche und Embeddings (M5 Tasks 8 bis
+11) fehlen noch.** Aus M1:
 Anmeldung, Personen, Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine
 Rechteprüfung, Audit, die Oberfläche mit Navigation und Verwaltung, Image, Compose,
 Helm-Chart und CI. Aus M2 ein Wiki in jedem Bereich:
@@ -130,20 +136,77 @@ Aus M8 die Öffnung über MCP:
   fragenden Person; **Konnektoren** (Token oder OAuth, geteilt oder persönlich) und ein
   **Katalog** mit GitHub und GitLab, erweiterbar ohne Codeänderung.
 
+Aus M9a der Betrieb in Produktion:
+
+- **Sicherung** des ganzen Datenstands (Datenbank und Anhänge aus einem Snapshot) als
+  geprüftes Archiv, über die Kommandozeile (`python -m app.ops backup …`) und nach
+  Zeitplan (Compose-Dienst `backup`, CronJob im Chart) mit Aufbewahrung
+  (Großvater-Vater-Sohn), verschlüsselter Offsite-Kopie mit restic und Alarmen;
+  **Wiederherstellung** in eine leere Installation (`python -m app.ops restore …`), als
+  Probe durchgespielt; seit M9b auch **im laufenden Betrieb** (`restore apply …
+  --replace --confirm "<Organisation>"`): erst ein Sicherheitsarchiv, dann der
+  **Wartungsmodus** (die API antwortet 503, der Worker pausiert), der Tausch in einer
+  Transaktion (scheitert er, bleibt der alte Stand ganz), danach ist jede Person
+  abgemeldet. Inhaber erledigen das alles auch in **Verwaltung → Sicherung**: sichern auf
+  Knopfdruck, Archive herunter- und hochladen, gegen die Installation prüfen und
+  einspielen (Bestätigung mit dem Namen der Organisation, danach die Wartungsseite).
+- **Anmeldung über OpenID Connect**: Google als Vorlage (nur Client-ID und Secret
+  eintragen), jeder andere Anbieter mit Discovery (Keycloak, Entra ID …); Konten
+  verknüpfen im Profil. **Selbstregistrierung** für erlaubte Domains: das neue Konto
+  wartet, bis ein Admin es freigibt („ohne Freigabe kommt niemand ins System“), und hat
+  keine KI, bis ein Admin sie zuordnet.
+- **Härtung**: Der Collab-Prozess bekommt kurzlebige, an eine Seite gebundene
+  Berechtigungen statt des Sitzungs-Cookies; häufige und geleakte Passwörter werden
+  abgelehnt; Cookies unter https mit `__Host-`; Admins melden eine Person überall ab;
+  jede Tabelle hat eine Aufbewahrungsregel. Geprüft gegen OWASP ASVS 5.0 Stufe 2
+  ([`docs/SICHERHEIT.md`](docs/SICHERHEIT.md)).
+- **Chart** mit Autoskalierung (HPA) für API und Worker, PodDisruptionBudgets,
+  Sicherungs-CronJob und gemessenen Requests; **Lasttest** mit 200 Personen
+  ([Steckbrief](docs/STECKBRIEF.md#gemessen-lasttest-mit-200-personen-m9)).
+
+Aus M9b der Rest des Betriebs:
+
+- **Anhänge in S3** (`HERD_STORAGE=s3`, eigener S3-Client, Umzug mit `python -m app.ops
+  storage copy --to s3`) und **mehrere Collab-Instanzen** (jede Seite in PostgreSQL an
+  eine gebunden, ohne Redis; ein Rollout schickt die Browser ohne Verlust auf eine andere
+  Instanz).
+- **Zweiter Faktor mit TOTP**, freiwillig für jedes Konto mit Passwort (QR-Code,
+  Wiederherstellungscodes, Zurücksetzen durch Admins); **„Angemeldete Geräte“** im
+  Profil (einzelne oder alle anderen abmelden); Sitzungen enden nach 24 Stunden ohne
+  Nutzung; erneute Anmeldung vor dem Verknüpfen eines Anbieters.
+- **Härtung nach ASVS J7 bis J14:** Schreibgrenze je Person und Minute, optionaler
+  Virenscan (clamd), TLS zur Datenbank, wechselbares internes Token, eigener Rückruf je
+  OAuth-App mit Prüfung von `iss`, optional getrennte Datenbankrollen.
+
 Bedienung und Betrieb des Wikis: [`docs/WIKI.md`](docs/WIKI.md), der Nachrichten:
 [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md), der Tickets:
 [`docs/TICKETS.md`](docs/TICKETS.md), der KI-Anbindung (Verbindungen, Schlüssel,
 Zuordnung, Verbrauch, Richtlinie): [`docs/KI.md`](docs/KI.md), der Agenten (Bedienung,
 Verwaltung, Worker, Metriken) und der Aufgaben: [`docs/AGENTEN.md`](docs/AGENTEN.md), von
 MCP (Token, `/mcp` mit Claude Code und Codex, externe Agenten, Server, Konnektoren,
-Katalog, Betrieb): [`docs/MCP.md`](docs/MCP.md).
+Katalog, Betrieb): [`docs/MCP.md`](docs/MCP.md), von Sicherung und Wiederherstellung:
+[`docs/SICHERUNG.md`](docs/SICHERUNG.md), der Anmeldung (Passwort, OIDC, Freigabe):
+[`docs/ANMELDUNG.md`](docs/ANMELDUNG.md), die Installation auf einem Hostinger-VPS:
+[`docs/HOSTINGER.md`](docs/HOSTINGER.md), die Sicherheitsprüfung:
+[`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
 
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
 Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
 [Demo M3](docs/demo/m3.md), [Demo M4](docs/demo/m4.md), [Demo M6](docs/demo/m6.md),
-[Demo M7](docs/demo/m7.md),
+[Demo M7](docs/demo/m7.md), [Demo M8](docs/demo/m8.md), [Demo M9](docs/demo/m9.md),
 [Compose-Referenz](deploy/compose/README.md),
 [Helm-Chart](deploy/helm/to-herd-cats-ai/values.yaml).
+
+## Installation auf einem Hostinger-VPS (der einfachste Weg)
+
+Ohne Kommandozeile, ohne eigenen Proxy: Im Hostinger Docker Manager **Compose from URL**
+mit `https://github.com/janschachtschabel/to-herd-cats-ai-harness` bereitstellen, dann
+in der `.env` `DOMAIN`, `ADMIN_EMAIL` und `ADMIN_PASSWORD` eintragen und erneut
+bereitstellen. Die [`docker-compose.yml`](docker-compose.yml) im Hauptordner nimmt das
+fertige Image von GHCR, erzeugt alle Geheimnisse beim ersten Start selbst und bekommt
+HTTPS von Hostingers Traefik. Schritt für Schritt, die Felder der `.env`, DNS, Updates,
+Sicherungen und Diagnose: [`docs/HOSTINGER.md`](docs/HOSTINGER.md). Derselbe Stack läuft
+auf jedem Server mit einem Traefik auf 80/443 (`docker compose up -d` im Hauptordner).
 
 ## Schnellstart mit Docker Compose
 
@@ -157,7 +220,11 @@ docker compose up -d --build --wait
 
 Dann <http://127.0.0.1:8080> öffnen und mit `HERD_BOOTSTRAP_ADMIN_EMAIL` und
 `HERD_BOOTSTRAP_ADMIN_PASSWORD` aus `.env` anmelden. Diese erste Person (Inhaberin)
-entsteht nur beim allerersten Start; das Passwort danach in der App ändern (Menü oben
+entsteht nur beim allerersten Start. Ihr Passwort muss die Passwortregeln erfüllen
+([`docs/ANMELDUNG.md`](docs/ANMELDUNG.md): 10 bis 200 Zeichen, nicht auf der Liste
+geleakter Passwörter, kein Wort aus Organisation oder Adresse); sonst bricht der Start
+mit „bootstrap refused“ und Exit-Status 4 ab, und es wird nichts angelegt. Das Passwort
+danach in der App ändern (Menü oben
 rechts → „Profil und Einstellungen“; dort ändert jede Person ihr eigenes Passwort und
 ihre Sprache).
 
@@ -200,8 +267,12 @@ Das Secret `herd-db` enthält das Datenbank-Passwort unter dem Schlüssel `passw
 `herd-env` die Variablen `HERD_BOOTSTRAP_ADMIN_EMAIL` und
 `HERD_BOOTSTRAP_ADMIN_PASSWORD`. Jeder Wert ist in [`values.yaml`](deploy/helm/to-herd-cats-ai/values.yaml) beschrieben;
 `ci/production-values.yaml` ist ein vollständiges Beispiel (externe Datenbank, Ingress
-mit TLS, NetworkPolicy, ServiceMonitor, PrometheusRule). Vor dem Einsatz die
-[Betriebshinweise](#betriebshinweise) lesen.
+mit TLS, NetworkPolicy, ServiceMonitor, PrometheusRule, Autoskalierung, Sicherung mit
+Offsite, OIDC), `ci/full-values.yaml` schaltet alles zugleich ein. Vor dem Einsatz die
+[Betriebshinweise](#betriebshinweise) lesen. Lokal ohne helm prüft
+`cd backend && uv run python ../deploy/helm/scripts/check_values.py` jede Werte-Datei
+gegen `values.schema.json` und jede `@param` gegen das Schema (auch als Test
+`tests/test_chart_values.py`).
 
 > **Wichtig – Volume für Anhänge:** Das Chart legt den PersistentVolumeClaim
 > `<release>-data` (10Gi, `/data`) mit **`ReadWriteMany`** an, weil alle API-Replikas
@@ -210,7 +281,10 @@ mit TLS, NetworkPolicy, ServiceMonitor, PrometheusRule). Vor dem Einsatz die
 > Claim `Pending` und die API-Pods starten nicht. Dann
 > `--set api.replicas=1 --set 'persistence.accessModes={ReadWriteOnce}'` setzen (mehr
 > Replikas mit ReadWriteOnce lehnt das Chart ab) oder mit `persistence.existingClaim`
-> einen eigenen Claim nutzen. Der Claim bleibt bei `helm uninstall` erhalten.
+> einen eigenen Claim nutzen. Der Claim bleibt bei `helm uninstall` erhalten. Oder die
+> Anhänge in einen S3-kompatiblen Speicher legen (`s3.enabled`, siehe
+> [`docs/SICHERUNG.md`](docs/SICHERUNG.md#anhänge-in-s3)); dann genügt
+> `persistence.enabled=false`.
 
 Das Chart legt außerdem an: den Collab-Prozess (`<release>-collab`, Live-Bearbeitung)
 mit genau einer Replika und `strategy: Recreate` (die Dokumente einer Live-Sitzung
@@ -230,7 +304,7 @@ Leerlauf-Timeouts und Größenlimits am Ingress siehe
 Seit M3 gehört dazu der Worker der Outbox: ein Deployment `<release>-worker`
 (`HERD_ROLE=worker`, nur Port 9090; `worker.replicas`, Standard 1, mehrere sind sicher;
 `worker.env` für eigene Variablen, `api.env` gilt dort nicht; `worker.resources`,
-voreingestellt Request 50m/192Mi, Limit 384Mi) mit einem headless Service
+voreingestellt Request 250m/256Mi, Limit 384Mi, gemessen im Lasttest) mit einem headless Service
 `<release>-worker`, über den der ServiceMonitor seine Metriken holt. Mit
 `worker.replicas: 0` kommt nichts mehr live an; das meldet der Alarm `HerdWorkerAbsent`.
 Die PrometheusRule hat vier neue Alarme: `HerdOutboxBacklog` (das älteste offene
@@ -264,6 +338,28 @@ JSON-Antworten). Vier Alarme kommen dazu: `HerdExternalToolsFailing`,
 Warnung; [`docs/MCP.md`](docs/MCP.md#betrieb)).
 Einzelheiten: [`docs/AGENTEN.md`](docs/AGENTEN.md#umgebungsvariablen).
 
+Seit M9 skaliert das Chart auf Wunsch selbst und hält Pods bei Wartungen: Mit
+`api.autoscaling.enabled` bzw. `worker.autoscaling.enabled` (Standard aus) legt es je
+einen HorizontalPodAutoscaler (`autoscaling/v2`) auf CPU an, Ziel 70 % des
+CPU-Requests, API 2 bis 6 Pods, Worker 1 bis 3; das Deployment nennt dann keine
+`replicas` mehr. Das braucht metrics-server und einen CPU-Request (sonst bricht das
+Chart ab; voreingestellt sind die im Lasttest gemessenen 500m für die API und 250m für
+den Worker, siehe [Steckbrief](docs/STECKBRIEF.md#empfehlung-request-und-limit)), mehr als ein API-Pod braucht die
+Anhänge-PVC mit ReadWriteMany. Herunter geht es behutsam (ein Pod je 2 Minuten nach 5
+ruhigen Minuten). Jeder Pod hält bis zu 16 Datenbankverbindungen; die Grenzen so
+wählen, dass `max_connections` der Datenbank reicht (Rechnung im
+[Steckbrief](docs/STECKBRIEF.md#clusterfähigkeit)). Der Alarm `HerdAutoscalerAtMax`
+meldet einen Autoscaler, der 30 Minuten am Maximum steht (braucht kube-state-metrics).
+`podDisruptionBudget` (Standard an, `maxUnavailable: 1`) legt für API und Worker je ein
+PodDisruptionBudget an, sobald sie mindestens zwei Pods haben (Replikas oder
+`minReplicas`); ein einzelner Pod und der Collab-Prozess (eine Replika) bekommen keins,
+damit ein Knoten-Drain nie hängt. Dazu kommen der Sicherungs-CronJob
+([`docs/SICHERUNG.md`](docs/SICHERUNG.md#betrieb-compose-und-helm)) und die Werte der
+Anmeldung über OIDC (`oidc.*`, mit `oidc.egress` für die NetworkPolicy der API-Pods;
+[`docs/ANMELDUNG.md`](docs/ANMELDUNG.md)). Geheimnisse kommen nur aus Secrets: Das
+Schema lehnt in `api.env`, `worker.env` und `collab.env` Namen mit `PASSWORD`, `SECRET`,
+`TOKEN`, `EGRESS_PROXY` oder `OFFSITE` ab.
+
 Drei Werte betreffen jeden Betrieb hinter einem Ingress:
 
 - `api.cookieSecure` (Standard `true`): Das Sitzungs-Cookie trägt `Secure`, der Browser
@@ -288,7 +384,7 @@ PostgreSQL 16 oder neuer. Die Standard-URLs erwarten die Rolle `herd` (Passwort
 ```bash
 cd backend && uv sync
 cd backend && HERD_BOOTSTRAP_ADMIN_EMAIL=admin@example.com \
-  HERD_BOOTSTRAP_ADMIN_PASSWORD=admin-password-123 HERD_LOG_FORMAT=text \
+  HERD_BOOTSTRAP_ADMIN_PASSWORD=lantern-orbit-73-q HERD_LOG_FORMAT=text \
   uv run python -m app.launch          # migriert, dann API auf :8080, Proben auf :9090
 
 cd frontend && npm ci && npm run dev   # Vite; leitet /api und /collab an http://localhost:8080 weiter
@@ -302,8 +398,22 @@ Live-Bearbeitungsprozess, `node collab/server.mjs`). `all` enthält den Worker. 
 `all` startet die API den Collab-Prozess als Kindprozess auf
 `127.0.0.1:${HERD_COLLAB_PORT}`, wenn `HERD_INTERNAL_TOKEN` gesetzt ist (dafür
 `cd collab && npm ci`); ohne Token bleibt die Live-Bearbeitung aus. Alle
-Einstellungen sind `HERD_*`-Variablen (`backend/app/core/config.py`). Nach Änderungen
-an der API `npm run generate:api` im Frontend ausführen.
+Einstellungen sind `HERD_*`-Variablen (`backend/app/core/config.py`); die meisten
+beschreiben die Dokumente ihres Bereichs (Sicherung, Anmeldung, KI, Agenten, MCP, Wiki,
+Nachrichten) und `deploy/compose/README.md`. Grundeinstellungen der Prozesse, die selten
+zu ändern sind:
+
+| Variable | Standard | Wirkung |
+|---|---|---|
+| `HERD_PUBLIC_PORT` | `8080` | Port der API und der Weboberfläche (`/api`, `/mcp`, `/collab`) |
+| `HERD_INTERNAL_PORT` | `9090` | Port für Proben (`/health`, `/ready`), Metriken (`/metrics`) und die Rückrufe des Collab-Prozesses (`/internal/*`); nie nach außen freigeben |
+| `HERD_BOOTSTRAP_ORG_NAME` | `Meine Organisation` | Name der Organisation, die der allererste Start anlegt (die Oberfläche ändert ihn nicht; `restore apply --replace` verlangt ihn als Bestätigung); ein Wort daraus darf nicht im Passwort der ersten Inhaberin stehen |
+| `HERD_SESSION_COOKIE_NAME` | `herd_session` | Name des Sitzungs-Cookies; über https mit dem Präfix `__Host-` ([`docs/ANMELDUNG.md`](docs/ANMELDUNG.md)) |
+| `HERD_COLLAB_API_URL` | `http://127.0.0.1:<HERD_INTERNAL_PORT>` | Wo der Collab-Prozess die API erreicht (ihren internen Port); nur für die Rolle `collab` in einem eigenen Container oder Pod nötig (Compose und Chart setzen sie) |
+| `HERD_COLLAB_SCRIPT` | `collab/server.mjs` des Quellstands (im Image `/app/collab/server.mjs`) | Das Skript, das `node` als Collab-Prozess startet; nur für eigene Pfade |
+| `HERD_COLLAB_ADVERTISE_URL` | in Rolle `all` `ws://127.0.0.1:<HERD_COLLAB_PORT>` | Wo die API eine Collab-Instanz erreicht (`ws://host:port`); Pflicht für die Rolle `collab` (ohne startet sie nicht; Chart: Pod-IP, Compose: Containername); in Rolle `all` setzt die App sie selbst ([`docs/WIKI.md`](docs/WIKI.md), „Mehrere Collab-Instanzen“) |
+
+Nach Änderungen an der API `npm run generate:api` im Frontend ausführen.
 
 Demodaten für eine frische Test-Installation (drei Personen, der Bereich „Team Nord“
 mit zwei Seiten, Kanäle mit Threads, Erwähnungen und Reaktionen, eine Direktnachricht,
@@ -314,7 +424,7 @@ drei Sprints: „Sprint 45“ abgeschlossen mit Bilanz, „Sprint 46“ laufend,
 geplant, und ein Vorrat; der Worker muss laufen):
 
 ```bash
-cd backend && HERD_DEMO_ADMIN_PASSWORD=admin-password-123 HERD_DEMO_PASSWORD=demo-password-123 \
+cd backend && HERD_DEMO_ADMIN_PASSWORD=lantern-orbit-73-q HERD_DEMO_PASSWORD=seed-people-pw-123 \
   uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
 ```
 
@@ -323,7 +433,17 @@ Mit einem Modell legt dasselbe Skript auch Agenten bei der Arbeit an (Hilda und 
 Gedächtnisseite und eine wartende Freigabe): `HERD_DEMO_AI_KIND` schaltet das ein
 (`local`, `openai` oder `openai_compatible`, dazu `HERD_DEMO_AI_URL`; mit dem Stub
 außerdem `HERD_DEMO_AI_STUB`, damit die Demo seine Antworten vorgibt). Einzelheiten in
-`backend/scripts/demo_ai.py` (das Modell: `demo_ai_model.py`).
+`backend/scripts/demo_ai.py` (das Modell: `demo_ai_model.py`). Mit `--mcp-stub <URL>`
+kommt ein MCP-Server auf dem MCP-Stub dazu, mit `--oidc-stub <Issuer>` ein
+Anmeldeanbieter „Demo-Anmeldung“ auf dem OIDC-Stub (`backend/tests/support/oidc_stub.py`;
+Selbstregistrierung für `demo.example`, Konten warten auf Freigabe). Dafür braucht die
+App `HERD_PUBLIC_URL`, den Host des Stubs in `HERD_OIDC_ALLOWED_HOSTS`, das Secret des
+Stubs als `HERD_OIDC_STUB_SECRET` und sein Zertifikat in `SSL_CERT_FILE`
+([Demo M9](docs/demo/m9.md)). Ohne diese Schalter erreicht die Demo kein fremdes Netz.
+Mit `--totp-file <Datei>` meldet sich Ben mit zweitem Faktor an: Das Skript richtet TOTP
+für ihn über die API ein und schreibt den Schlüssel (für eine Authenticator-App) und
+seine zehn Wiederherstellungscodes in die neue Datei (nur für ihre Besitzerin lesbar,
+Modus 0600; eine vorhandene Datei überschreibt es nie). Ausgegeben wird davon nichts.
 
 ### KI ausprobieren
 
@@ -360,7 +480,7 @@ und braucht dafür CREATEDB für die Rolle `herd` (einmal als Superuser:
 
 ```bash
 cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check . \
-  && uv run mypy app scripts
+  && uv run mypy app scripts && uv run python -m scripts.check_migrations
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build \
   && node scripts/check-i18n.mjs && npm run check:api
 cd collab && npm run lint && npm test && npm run test:integration   # Integration: echte API,
@@ -385,13 +505,66 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M8. Wer betreibt, sollte sie
-kennen.
+Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M9. Wer betreibt, sollte sie
+kennen. Was beim Update auf eine neue Version zu beachten ist, steht unter
+[Freigaben und Updates](#freigaben-und-updates).
 
+Die Prüfung gegen OWASP ASVS 5.0 Stufe 2, die Betriebsvoraussetzungen der Sicherheit
+(TLS am Ingress, eigener Hostname, Schutz der Protokolle) und die offenen Lücken stehen
+in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
+
+- **Sicherung** (M9): `python -m app.ops backup create|verify|list` schreibt und prüft
+  Archive des ganzen Datenstands (Datenbank und Anhänge aus einem Snapshot) nach
+  `HERD_BACKUP_DIR`; `backup run` dazu mit Aufbewahrung und restic-Kopie, nach Zeitplan
+  im Compose-Dienst `backup` bzw. im CronJob des Charts, mit Alarmen; `restore
+  check|apply` spielt in eine leere Installation ein, `restore apply --replace --confirm
+  "<Organisation>"` ersetzt eine laufende (Sicherheitsarchiv, Wartungsmodus mit 503,
+  `python -m app.ops maintenance status|off`). Format, Schlüssel, Fehlercodes und
+  Betrieb in [`docs/SICHERUNG.md`](docs/SICHERUNG.md). Archive sind unverschlüsselt: das
+  Volume schützen und `HERD_SECRET_KEY` getrennt aufbewahren.
+- **Autoskalierung und Datenbankverbindungen** (M9): Jeder API- und Worker-Prozess hat
+  einen Pool von 5 Verbindungen, der unter Last um bis zu 10 wächst, dazu eine für
+  LISTEN: höchstens 16 je Pod, und das erreicht ein API-Pod unter Last auch (gemessen im
+  Lasttest: 2 API und 1 Worker hielten bis 33 Verbindungen). Mit den Standardgrenzen der Autoscaler (API 6, Worker 3)
+  sind das im Ruhezustand 54, in der Spitze 144 Verbindungen, mit Backup-Job und
+  Migration rund 150. PostgreSQL hat ab Werk `max_connections = 100`: Für die vollen
+  Grenzen eine externe Datenbank auf mindestens 160 setzen oder `maxReplicas` senken.
+  Das mitgelieferte PostgreSQL des Charts startet mit `postgresql.maxConnections`
+  (Standard 200), und das Chart rendert nicht, wenn 16 × (höchste Zahl der API- und
+  Worker-Pods) + 10 darüber liegt. Einen Verbindungs-Pooler (PgBouncer) bringt das
+  Chart nicht mit.
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort
-  als Datei ein; Compose reicht `POSTGRES_PASSWORD` als `HERD_DATABASE_PASSWORD` durch.
+  als Datei ein. Compose verbindet die App nie als Superuser: Der Dienst `db-owner` legt
+  bei jedem Start die Rolle `herd_owner` an (Besitzerin der Datenbank und ihres Schemas,
+  kein Superuser) und erzeugt ihr Passwort einmal ins Volume `secrets`; `POSTGRES_PASSWORD`
+  braucht nur er ([`SICHERUNG.md`](docs/SICHERUNG.md#was-ein-archiv-ausführen-darf)).
+- **TLS zur Datenbank (seit M9b):** `HERD_DATABASE_SSLMODE` (libpq-Modi; empfohlen für
+  eine externe Datenbank `verify-full`) und `HERD_DATABASE_SSLROOTCERT` (CA-Datei; leer:
+  bei `verify-full` die CAs des Systems, für `pg_dump`/`pg_restore`/`psql` als
+  `PGSSLROOTCERT=system`, was PostgreSQL 16 oder neuer verlangt; das Image bringt 17;
+  `verify-ca` ohne CA-Datei ist ein Startfehler, weil libpq die CAs des Systems nur mit
+  `verify-full` nimmt) gelten für jede Verbindung der
+  App und für `pg_dump`/`pg_restore` der Sicherung; sie gewinnen über ein `ssl`/`sslmode`
+  in der URL. Scheitert ein Werkzeug, steht seine Verbindungsfehlerzeile im Log
+  (`backup.tool_failed`, Feld `reason`; ein SQL-Fehler nur als `query failed`). Chart
+  `database.sslMode` und `database.caSecret` (Secret mit `ca.crt`).
+- **Getrennte Datenbankrollen (seit M9b, optional):** `HERD_MIGRATE_DATABASE_URL`
+  (+ `HERD_MIGRATE_DATABASE_PASSWORD[_FILE]`) für Migration, Sicherung und
+  Wiederherstellung, `HERD_DATABASE_RUNTIME_ROLE` für die Rolle von
+  `HERD_DATABASE_URL`, die nur Datenrechte bekommt. Standard: eine Rolle. Compose
+  `compose.roles.yml`, Chart `database.migrate.*`; Einzelheiten:
+  [`SICHERUNG.md`](docs/SICHERUNG.md#getrennte-datenbankrollen-seit-m9b-optional).
+- **Geheimnisse als Dateien:** Ebenso lesen `HERD_SECRET_KEY_FILE`,
+  `HERD_INTERNAL_TOKEN_FILE`, `HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE` und
+  `HERD_S3_SECRET_ACCESS_KEY_FILE` den Wert aus einer Datei (ein Zeilenende am Schluss
+  zählt nicht). Wert und Datei zugleich, eine unlesbare oder (bei Schlüsseln und
+  Token) leere Datei sind Startfehler, die die Variable nennen, nie den Inhalt; ein
+  leerer Wert neben der Datei (Compose: `${HERD_…:-}`) zählt als nicht gesetzt; eine
+  leere Passwortdatei heißt „keine erste Person“. Die Regeln des Werts (Mindestlänge)
+  gelten auch für die Datei. Der Hostinger-Stack
+  ([`docs/HOSTINGER.md`](docs/HOSTINGER.md)) übergibt so jedes Geheimnis.
 - **KI-Schlüssel** (M5): Verbindungen speichern den API-Schlüssel nie im Klartext,
   sondern als Verweis `env:HERD_AI_<NAME>` (Umgebungsvariable mit diesem Präfix; die
   eigenen Einstellungen mit dem Präfix wie `HERD_AI_EGRESS_PROXY` sind ausgenommen) oder
@@ -475,6 +648,12 @@ kennen.
   Version hat vorab migriert). Nicht bereit ist er ohne Revision oder bei einer
   bekannten älteren. Deshalb müssen Migrationen mit der vorherigen Version verträglich
   sein: erst erweitern, frühestens eine Version später zurückbauen.
+  `backend/alembic/RELEASED` nennt die Revision der letzten Freigabe (seit 1.0.0
+  `9e4b6d2f8a17`; beim Taggen auf den Head setzen, `release.yml` prüft es). `scripts/check_migrations.py` (CI-Job
+  `backend`) lehnt in jeder späteren Revision Löschen, Umbenennen und Typwechsel ab
+  (`drop_*`, `rename_table`, `alter_column(type_=…/new_column_name=…)`, `op.execute`
+  mit `DROP`/`RENAME`), außer die Revision erklärt `contract_of = "<Revision>"` und
+  diese gehört schon zur Freigabe; außerdem genau ein Head.
 - **Alarm `HerdNotReady`** braucht kube-state-metrics (`kube_pod_status_ready`,
   `kube_pod_container_info`). Ohne kube-state-metrics feuert er nie.
 - **Port 9090** (`/health`, `/ready`, `/metrics`) hat keine Anmeldung; ihn schützt nur
@@ -488,8 +667,10 @@ kennen.
   `/collab/<seiten-id>?generation=<collab_generation>` am öffentlichen Port; die API
   prüft Origin (gleich dem von `HERD_PUBLIC_URL`, ohne diese gleich dem angefragten
   Host; sonst HTTP 403), Sitzungs-Cookie, Sichtbarkeit, `page.edit` und die Generation
-  wie die REST-API und reicht erst dann Frames an den Collab-Prozess
-  (`HERD_COLLAB_URL`, Standard `ws://127.0.0.1:1234`) weiter. Abgelehnt wird mit
+  wie die REST-API und reicht erst dann Frames an die Collab-Instanz weiter, an die die
+  Seite gebunden ist (jede meldet ihre Adresse `HERD_COLLAB_ADVERTISE_URL`; in Rolle
+  `all` der Kindprozess auf `127.0.0.1`; mehrere Instanzen: `docs/WIKI.md`, „Mehrere
+  Collab-Instanzen“). Abgelehnt wird mit
   Schließcodes, die der Browser lesen kann: 4401 (keine gültige Sitzung), 4403 (kein
   Recht, oder Recht entzogen), 4404 (Seite nicht sichtbar), 4409 (die Generation ist
   beendet: Seite neu laden), 4413 (Zustand oder Markdown zu groß für die
@@ -503,7 +684,7 @@ kennen.
   `HERD_COLLAB_MAX_PER_SESSION` und `HERD_COLLAB_MAX_PER_PERSON`), 4507 (der
   Collab-Prozess hält sein Speicherbudget: später erneut oder im Markdown-Editor; der
   Browser verbindet sich nicht selbst neu), 4502/4503
-  (Collab-Prozess nicht erreichbar bzw. aus), 4504 (Prüfen und Verbinden dauerten
+  (keine Collab-Instanz erreichbar, der Browser versucht es weiter, bzw. aus), 4504 (Prüfen und Verbinden dauerten
   länger als 10 s), 4408 (der Browser ist dem Dokument nicht binnen 10 s
   beigetreten, oder die Verbindung hat 15 Minuten lang nichts gesendet,
   `HERD_COLLAB_IDLE_MINUTES`; ein offener Editor meldet seine Anwesenheit alle 15 s), 1013 (später erneut versuchen); bei 4408, 4504 und 1013 verbindet
@@ -528,16 +709,21 @@ kennen.
   weiter. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
   `herd_collab_saves_total{result}` die Speicherungen (`unrepresentable`: ein Stand,
   der sich nicht als Markdown speichern ließ, siehe `docs/WIKI.md`).
-- **Genau ein Collab-Prozess.** Ein Live-Dokument liegt im Speicher dieses einen
-  Prozesses; zwei Prozesse würden die Bearbeitenden einer Seite aufteilen, und keiner
-  sähe die Änderungen des anderen. Das Chart setzt deshalb `replicas: 1` und
-  `strategy: Recreate` (beim Update erst den alten Pod beenden, der dabei speichert).
-  Fällt der Prozess aus, verbinden sich die Browser neu; Änderungen der letzten
-  Sekunden (höchstens 10 s), die noch nicht gespeichert waren, spielt ein noch offener
-  Browser beim Wiederverbinden erneut ein; ist er geschlossen, sind sie verloren. Mehrere Collab-Replikas (mit Redis/Valkey) sind für M9
-  geplant. In Compose (`HERD_ROLE=all`) ist der Collab-Prozess ein Kindprozess der API;
+- **Collab-Instanzen (seit M9b).** Ein Live-Dokument liegt im Speicher genau einer
+  Collab-Instanz: Jede Seite ist in PostgreSQL an eine gebunden (`collab_page_owner`,
+  ohne Redis), und das Relay der API schickt alle Verbindungen der Seite dorthin. Jede
+  Instanz meldet sich alle 5 s mit `HERD_COLLAB_ADVERTISE_URL` an und gilt nach 15 s
+  Schweigen als weg. Das Chart setzt `collab.replicas` (Standard 1, dann `Recreate`; ab
+  2 `RollingUpdate` mit `maxUnavailable: 0` und einem PodDisruptionBudget),
+  `compose.nodes.yml` startet `collab-a` und `collab-b`. Wird eine Instanz beendet
+  (SIGTERM), speichert sie, schließt mit 1012 und gibt ihre Seiten frei; die Browser
+  landen in rund einer Sekunde auf einer anderen. Stürzt sie ab, sind ihre Seiten nach
+  15 s frei (gemessen bis zur neuen Bindung: [`docs/demo/m9.md`](docs/demo/m9.md));
+  ungespeicherte Änderungen der letzten Sekunden (höchstens 10 s) spielt ein noch offener
+  Browser beim Wiederverbinden erneut ein, ist er geschlossen, sind sie verloren.
+  Einzelheiten: [`docs/WIKI.md`](docs/WIKI.md#mehrere-collab-instanzen-seit-m9b). In Compose (`HERD_ROLE=all`) ist der Collab-Prozess ein Kindprozess der API;
   er erbt von ihrer Umgebung nur `PATH`, `HOME`, `LANG`, `LC_ALL`, `TZ`, `NODE_*` und
-  `HERD_COLLAB_*` und bekommt dazu Token, öffentliche URL und Cookie-Namen, nie die
+  `HERD_COLLAB_*` und bekommt dazu Token und öffentliche URL, nie die
   Datenbank-Zugangsdaten oder andere Geheimnisse der API. Endet dieser Kindprozess (etwa
   weil der Kernel ihn wegen Speichermangels beendet), beendet sich die ganze App mit
   Code 3, und der Orchestrator (`restart: unless-stopped`, Kubernetes) startet sie neu;
@@ -591,7 +777,9 @@ kennen.
   `networkPolicy.internalFrom` niemanden an Port 9090 außer dem Collab-Prozess, also
   auch Prometheus nicht: Prometheus dort eintragen. Den Collab-Prozess (Port 1234)
   erreichen nur die API-Pods; er selbst darf nur zu DNS und Port 9090 der API. Mit externer Datenbank braucht es eine Egress-Regel zu
-  ihr (`networkPolicy.egress`).
+  ihr (`networkPolicy.egress`), für KI-Anbieter `networkPolicy.aiEgress` (API und
+  Worker), für OIDC-Anbieter `oidc.egress` (nur API), für die Offsite-Sicherung
+  `backup.offsite.egress` (nur der Backup-Job).
 - **Image nur für linux/amd64.** arm64 würde Cross-Builds der Node- und uv-Stufen
   brauchen.
 - **Trivy** prüft das Image mit `ignore-unfixed`: Nicht behebbare CVEs der
@@ -602,6 +790,14 @@ kennen.
   `<style>` mit Laufzeitwerten einfügt. Skripte bleiben auf `'self'` beschränkt. Die
   WebSocket-Verbindung der Live-Bearbeitung geht an denselben Host und fällt unter
   `default-src 'self'` (in Chromium ohne Verletzung geprüft); die CSP bleibt unverändert.
+  Jede andere Antwort (API, Fehler, Downloads) trägt eine eigene, strengere CSP
+  (`default-src 'none'`, `frame-ancestors 'none'`, Anhänge zusätzlich `sandbox`); nur
+  Swagger UI außerhalb der Produktion hat keine ([`SICHERHEIT.md`](docs/SICHERHEIT.md)).
+- **HSTS** (`max-age=31536000; includeSubDomains`) kommt nur auf Antworten über https
+  (direkt oder über `X-Forwarded-Proto` eines vertrauten Proxys) und gilt auch für
+  Subdomains des Hosts, unter dem die App läuft. Läuft sie direkt unter einer Domain,
+  deren Subdomains noch http brauchen, gehört sie auf eine eigene Subdomain
+  (`wiki.example.com`).
 - **Anmeldelast**: Die Passwortprüfung (argon2id, 64 MiB, 4 Lanes) läuft in
   Worker-Threads, höchstens `HERD_PASSWORD_HASH_CONCURRENCY` (Standard 2) gleichzeitig
   je Prozess; jede braucht 64 MiB. Höchstens `HERD_PASSWORD_HASH_QUEUE` (Standard 16)
@@ -619,7 +815,11 @@ kennen.
 - **Anhänge**: Dateien liegen unter `HERD_DATA_DIR` (Standard `/data`; für die lokale
   Entwicklung auf ein beschreibbares Verzeichnis setzen), je Organisation und Inhalt
   einmal (`attachments/<org_id>/<sha256>`). Mehrere API-Replikas brauchen dasselbe
-  Volume (Compose: `app-data`, Helm: `<release>-data`, siehe oben). Das Image legt
+  Volume (Compose: `app-data`, Helm: `<release>-data`, siehe oben). Mit
+  `HERD_STORAGE=s3` liegen sie stattdessen in einem S3-kompatiblen Bucket
+  (`HERD_S3_ENDPOINT`, `HERD_S3_REGION`, `HERD_S3_BUCKET`, `HERD_S3_PREFIX`,
+  `HERD_S3_ACCESS_KEY_ID`, `HERD_S3_SECRET_ACCESS_KEY[_FILE]`; Compose `compose.s3.yml`, Helm `s3.*`; Umzug mit `python -m app.ops
+  storage copy --to s3`, siehe [`docs/SICHERUNG.md`](docs/SICHERUNG.md#anhänge-in-s3)). Das Image legt
   `/data` mit dem Besitzer 10001 an, damit ein neues benanntes Volume dort beschreibbar
   ist; das Wurzeldateisystem bleibt nur lesbar. Ein Anhang hat
   höchstens `HERD_ATTACHMENT_MAX_BYTES` (Standard 26214400, 25 MiB); nur die
@@ -650,6 +850,26 @@ kennen.
   `HERD_DIFF_MAX_LINES` (Standard 20000) Zeilen, beide Versionen zusammen; darüber
   antwortet die API mit 422 (`page.diff_too_large`). Die Rechenzeit wächst mit den
   Zeilen und läuft in einem Worker-Thread.
+- **Sitzungen und zweiter Faktor (seit M9b):** Eine Sitzung gilt höchstens
+  `HERD_SESSION_TTL_HOURS` (168) und endet schon nach `HERD_SESSION_IDLE_HOURS` (24;
+  `0` = aus) ohne Nutzung; Anfragen, die ein Tab ohne Eingabe von selbst stellt, zählen
+  nicht (Chart `api.sessionIdleHours`). Jede Person sieht und beendet ihre Sitzungen im
+  Profil („Angemeldete Geräte“). TOTP ist freiwillig; für eine Person mit TOTP
+  antwortet `POST /api/auth/login` mit 202, die Sitzung öffnet erst
+  `POST /api/auth/login/second-factor`. 10 falsche Codes in 24 Stunden sperren den
+  zweiten Faktor für eine Stunde. TOTP braucht `HERD_SECRET_KEY`. Einzelheiten:
+  [`docs/ANMELDUNG.md`](docs/ANMELDUNG.md).
+- **Wartungsmodus (seit M9b):** Während eines Einspielens antworten `/api/*` und `/mcp`
+  mit 503 `maintenance.active` (`Retry-After: 30`), außer `GET /api/maintenance`; die
+  Oberfläche zeigt eine Wartungsseite, der Worker pausiert, die Live-Bearbeitung
+  schließt mit 4503. Hängt die Wartung nach einem Abbruch, beendet sie
+  `python -m app.ops maintenance off` ([`docs/SICHERUNG.md`](docs/SICHERUNG.md#einspielen-in-eine-laufende-installation-wartungsmodus)).
+  Sicherungen in der Verwaltung brauchen `HERD_BACKUP_DIR` auch in API und Worker;
+  hochgeladene Archive dürfen höchstens `HERD_BACKUP_UPLOAD_MAX_BYTES` (2 GiB) groß
+  sein, ein Proxy davor muss das durchlassen.
+- **Internes Token wechseln (seit M9b):** Die API nimmt während eines Wechsels auch
+  `HERD_INTERNAL_TOKEN_PREVIOUS` (oder `…_PREVIOUS_FILE`); Ablauf in
+  [`docs/WIKI.md`](docs/WIKI.md#internes-token-wechseln).
 - **Anmeldelimits**: je Client-Adresse `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard
   30) Versuche je Minute, gleich mit welcher E-Mail; je Adresse und E-Mail
   `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (Standard 5) fehlgeschlagene Versuche; es zählen
@@ -659,6 +879,23 @@ kennen.
   /64), eine IPv4-Adresse für sich; das Audit-Log hält die volle Adresse fest. Die
   Client-Adresse stimmt nur, wenn der Reverse Proxy in `HERD_FORWARDED_ALLOW_IPS`
   steht; sonst teilen sich alle Clients die Adresse des Proxys.
+- **Schreibgrenze je Person (seit M9b):** je Person und Minute höchstens
+  `HERD_WRITE_RATE_PER_MINUTE` (Standard 120) Schreibvorgänge an Inhalten (Seiten,
+  Nachrichten, Reaktionen, Tickets, Vorschläge, Schlagwörter, Kalender) und getrennt davon
+  `HERD_UPLOAD_RATE_PER_MINUTE` (Standard 30) Uploads (Anhänge, Importe); gezählt in
+  PostgreSQL über alle Knoten, darüber 429 `rate.limited` mit `Retry-After`. Ein Agent
+  hat seinen eigenen Zähler, ebenso groß; ein Werkzeug darüber schreibt nichts und
+  meldet `rate.limited`. Lesen, Lesemarken, Verwaltung und Einstellungen zählen nicht.
+  Die Lasttest-Mischung (200 Personen) bleibt weit darunter; Skripte, die in Massen
+  anlegen (Demo-Daten, `loadsetup.py`), warten bei 429 die genannte Zeit ab. Metrik
+  `herd_rate_limited_total{area}` (`write`, `upload`); Chart `writeLimit.perMinute`,
+  `writeLimit.uploadsPerMinute`. Einzelheiten: [`SICHERHEIT.md`](docs/SICHERHEIT.md).
+- **Virenscan (optional, seit M9b):** `HERD_CLAMAV_ADDRESS` (`host:port` eines eigenen
+  `clamd`, nicht mitgeliefert; Chart `virusScan.clamavAddress`, Freigabe im Netz
+  `virusScan.egress`) prüft Anhänge, Wiki- und Skill-Importe vor dem Speichern (nicht
+  hochgeladene Sicherungsarchive); Fund 422, Scanner
+  nicht verfügbar 503 (fail closed). Leer (Standard): kein Scan. Einzelheiten:
+  [`WIKI.md`](docs/WIKI.md).
 - **Worker und Outbox (seit M3):** Jede ändernde Aktion schreibt in ihrer Transaktion
   ein Ereignis (nur IDs) in `event_outbox`; der Worker verteilt es an Benachrichtigungen,
   Systemmeldungen der Seiten- und Ticket-Diskussionen und die Live-Zustellung. Bis M7 ohne DBOS (Plan
@@ -733,6 +970,64 @@ kennen.
 - **Nachrichteninhalte** und Titel oder Beschreibungen von Tickets stehen nie im Log, in
   `NOTIFY`-Nutzlasten, in Ereignissen der Outbox oder in Metrik-Labels; Live-Ereignisse
   tragen nur IDs.
+
+## Freigaben und Updates
+
+Eine Freigabe ist ein Tag `vX.Y.Z` (`.github/workflows/release.yml`); er veröffentlicht
+das Image `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y` und das Chart als OCI unter
+`ghcr.io/<owner>/charts`. Tag, Version in `backend/pyproject.toml` und `version` und
+`appVersion` des Charts müssen gleich sein (`deploy/helm/scripts/check-chart-version.sh`).
+Getaggt wird nur auf Jans Wort; die erste Freigabe ist `v1.0.0` nach dem Modul-Review
+von M9a und seiner Fix-Welle (Antwort J1), beschrieben in
+[`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md). Der Tag ist noch nicht veröffentlicht:
+Jan hat am 18.11.2026 entschieden, dass er erst kommt, wenn die ganze App fertig ist.
+Bis dahin gibt es kein Image und kein Chart in der Registry (also auch nicht für den
+Hostinger-Stack), und was nach dem Stand von 1.0.0 dazukam, sammelt
+[`docs/RELEASE-NEXT.md`](docs/RELEASE-NEXT.md).
+
+**Vor dem Taggen, von Hand:**
+
+1. `backend/alembic/RELEASED` auf die Head-Revision setzen
+   (`cd backend && uv run alembic heads`) und mit in den Commit nehmen, den der Tag
+   trägt. `release.yml` setzt es nicht, prüft es aber: Nennt die Datei am Tag nicht den
+   einen Head (`python -m scripts.check_migrations --require-released-head`), bricht die
+   Freigabe ab, bevor etwas veröffentlicht wird.
+2. Versionen anheben (pyproject, `Chart.yaml` `version` und `appVersion`), alle
+   Prüfbefehle grün, dann taggen.
+
+**Migrationsregel:** Ab einer Freigabe sind Migrationen nur erweiternd, damit ein Pod
+der vorigen Version mit dem neuen Schema weiterläuft (`/ready` bleibt bereit, wenn die
+Datenbank auf einer neueren, unbekannten Revision steht). `scripts/check_migrations.py`
+lehnt in jeder Revision nach `RELEASED` Löschen, Umbenennen und Typwechsel ab
+(`drop_*`, `rename_table`, `alter_column(type_=…/new_column_name=…)`, `op.execute` mit
+`DROP`/`RENAME`). Zurückbauen geht frühestens eine Freigabe später, in einer Revision mit
+`contract_of = "<Revision>"`, und nur für eine Revision, die schon zur Freigabe gehört.
+Genau ein Head.
+
+**Update einer Installation:**
+
+1. Vorher sichern: `python -m app.ops backup run` (Compose:
+   `docker compose exec backup python -m app.ops backup run`; Kubernetes: einen Job aus
+   dem CronJob erzeugen, `kubectl create job --from=cronjob/<release>-backup …`).
+2. Image bzw. Chart-Version wechseln. Compose: `docker compose pull && docker compose up
+   -d --wait` (der App-Container migriert beim Start). Helm: `helm upgrade` (der
+   Migrations-Job läuft vor den Pods bzw. als Job der Revision, siehe
+   [Betriebshinweise](#betriebshinweise)). Worker zuerst ersetzen, wenn sie getrennt
+   laufen.
+3. Zurück zur vorigen Version nur mit dem Archiv aus Schritt 1, in eine leere Datenbank
+   ([`docs/SICHERUNG.md`](docs/SICHERUNG.md#wiederherstellen-in-eine-leere-installation));
+   eine neuere Revision spielt die alte Version nicht ein (`restore.archive_newer`), und
+   `--replace` taugt dafür nicht (es hebt das Archiv auf den Head des laufenden Codes).
+
+**Einmal abgemeldet nach dem Update auf M9:** Über https heißen die Cookies seit M9
+`__Host-herd_session` und `__Host-herd_oidc` (ASVS V3.3.3). Das alte Cookie
+`herd_session` zählt dort nicht mehr; wer über https angemeldet war, wird nach dem
+Update einmal abgemeldet und meldet sich neu an. Über reines http (zum Ausprobieren)
+ändert sich nichts. Laufende Live-Bearbeitungen verbinden sich nach der neuen Anmeldung
+neu; ungespeicherte Änderungen der letzten Sekunden können dabei verloren gehen, also
+das Update nicht mitten in der Arbeitszeit einspielen. Ebenso neu seit M9: Ein Collab-
+Prozess der vorigen Version lehnt jede Verbindung der neuen API ab (keine
+Übergangsschicht); API und Collab-Prozess gehören zur selben Version.
 
 ## Lizenz
 

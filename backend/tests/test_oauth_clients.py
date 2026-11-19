@@ -100,7 +100,11 @@ async def test_updates_name_the_version_and_audit_field_names(
     removed = await ai_people.admin.patch(path, json={"client_secret": None, "version": 2})
     assert removed.json()["has_client_secret"] is False
     entries = (
-        await session.scalars(select(AuditLog).where(AuditLog.action == "oauth_client.updated"))
+        await session.scalars(
+            select(AuditLog)
+            .where(AuditLog.action == "oauth_client.updated")
+            .order_by(AuditLog.id)  # UUIDv7: in the order written
+        )
     ).all()
     assert sorted(entries[0].details["fields"]) == ["client_secret", "scopes"]
     assert "NEW-secret-9" not in json.dumps([e.details for e in entries])

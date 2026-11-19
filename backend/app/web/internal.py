@@ -43,11 +43,16 @@ class InternalDisabled(AppError):
 
 
 async def internal_token_guard(request: Request) -> None:
-    expected = get_settings().internal_token
+    settings = get_settings()
+    expected = settings.internal_token
     if expected is None:
         raise InternalDisabled()
-    given = request.headers.get(INTERNAL_TOKEN_HEADER, "")
-    if not hmac.compare_digest(given.encode("utf-8"), expected.get_secret_value().encode("utf-8")):
+    given = request.headers.get(INTERNAL_TOKEN_HEADER, "").encode("utf-8")
+    # The current token and, during a rotation, the previous one (J12 c); both compared
+    # in constant time, every time.
+    taken = [expected, settings.internal_token_previous]
+    matches = [hmac.compare_digest(given, t.get_secret_value().encode()) for t in taken if t]
+    if not any(matches):
         raise Unauthorized(code="internal.unauthorized")
 
 

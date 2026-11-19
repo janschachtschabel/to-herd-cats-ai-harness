@@ -16,6 +16,8 @@
 !collab/package.json
 !collab/package-lock.json
 !collab/*.mjs
+!deploy/restic/go.mod
+!deploy/restic/go.sum
 **/__pycache__
 **/*.pyc
 **/node_modules

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import utcnow
-from app.modules.audit.models import AuditLog
+from app.modules.audit.models import ADMIN_ACCESS, AuditLog
 from app.modules.audit.repository import AuditRepository
 from app.modules.groups.models import Group
 from app.modules.orgs.models import Organization
@@ -105,7 +105,8 @@ async def test_audit_is_not_written_when_change_fails(
     owner: AsyncClient, team_space: Space, member: User, session: AsyncSession, monkeypatch
 ) -> None:
     """The entry is part of the change's transaction: if the request fails after the
-    service wrote both, neither stays."""
+    service wrote both, neither stays. The owner's look into the team space (an admin
+    outside it) did happen and stays (`audit.kept`, review M10 task 3b R3b-5)."""
     from app.modules.spaces import router as spaces_router
 
     def _explode(*args: object, **kwargs: object) -> None:
@@ -115,7 +116,8 @@ async def test_audit_is_not_written_when_change_fails(
     entry = {"member_type": "user", "member_id": str(member.id), "role": "editor"}
     r = await owner.put(f"/api/spaces/{team_space.id}/members", json=entry)
     assert r.status_code == 500
-    assert await audit_rows(session, target_id=team_space.id) == []
+    rows = await audit_rows(session, target_id=team_space.id)
+    assert [row.action for row in rows] == [ADMIN_ACCESS]
     members = await owner.get(f"/api/spaces/{team_space.id}/members")
     assert members.json()["items"] == []
 

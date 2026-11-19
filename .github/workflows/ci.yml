@@ -28,7 +28,9 @@ env:
 jobs:
   backend:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # The suite (about 2,900 tests on one database) needs about 31 minutes on this
+    # runner (run 43825907942 reached 60 % after 18); the limit only catches a hang.
+    timeout-minutes: 50
     services:
       postgres:
         image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
@@ -53,17 +55,84 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
+      - name: PostgreSQL 17 client tools (pg_dump/pg_restore for backups, plan M9)
+        working-directory: .
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+      # The image's own restic: the Dockerfile's stage restic-bin (built from source,
+      # deploy/restic), exported as a file; tests/test_backup_offsite_restic.py runs it.
+      - name: restic 0.19.1 (the image's build; tests/test_backup_offsite_restic.py runs it for real)
+        working-directory: .
+        run: |
+          docker build --target restic-bin --output "type=local,dest=$RUNNER_TEMP/restic-bin" .
+          "$RUNNER_TEMP/restic-bin/restic" version
+          echo "$RUNNER_TEMP/restic-bin" >> "$GITHUB_PATH"
+          echo "HERD_TEST_RESTIC_REQUIRED=1" >> "$GITHUB_ENV"
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy app scripts
-      - run: uv run pytest -q
+      - name: Released migrations only expand (alembic/RELEASED)
+        run: uv run python -m scripts.check_migrations
+      - run: uv run pytest -q --durations=20
       - name: Catalogue entries (app/mcp/catalog)
         run: uv run python -m scripts.check_mcp_catalog
       - name: pip-audit (runtime dependencies, hashed from uv.lock)
         run: |
           uv export --frozen --no-dev --no-emit-project > "$RUNNER_TEMP/runtime.txt"
           uvx --from pip-audit==2.10.1 pip-audit --strict --disable-pip -r "$RUNNER_TEMP/runtime.txt"
+
+
+  restore:
+    # The restore rehearsal (plan M9 task 2): back up a running installation, restore
+    # it into an empty database, compare, sign in; against PostgreSQL 17 with the
+    # client tools 17 the image carries.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+        env:
+          POSTGRES_USER: herd
+          POSTGRES_PASSWORD: herd
+          POSTGRES_DB: herd_test
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U herd -d herd_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: "5433"
+      PGUSER: herd
+      PGPASSWORD: herd
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: PostgreSQL 17 client tools (pg_dump/pg_restore for backups, plan M9)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+      - run: uv sync --locked
+        working-directory: backend
+      - run: bash deploy/scripts/restore-rehearsal.sh
 
   frontend:
     runs-on: ubuntu-24.04
@@ -171,6 +240,16 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
+      - name: PostgreSQL 17 client tools (pg_dump/pg_restore for e2e/tests/backup, plan M9)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
       - run: uv sync --locked
         working-directory: backend
       - run: npm ci && npm run build
@@ -244,6 +323,22 @@ jobs:
         env:
           SMOKE_NODES: "1"
           SMOKE_SKIP_BUILD: "1"
+      # Attachments in SeaweedFS (compose.s3.yml): none reaches /data, `storage check`,
+      # a restore into the store under another prefix and the copy back to the volume.
+      - run: bash deploy/compose/smoke.sh
+        env:
+          SMOKE_S3: "1"
+          SMOKE_SKIP_BUILD: "1"
+      # The Hostinger stack (root docker-compose.yml, docs/HOSTINGER.md) with the image
+      # built above: `docker compose config -q` without .env and with .env.example, a
+      # first deploy with that empty .env, a refused https:// DOMAIN, then DOMAIN and the
+      # one-time admin through a Traefik in the host's network (secrets unchanged).
+      - name: Hostinger stack (config, empty first deploy, values, Traefik)
+        run: |
+          docker tag to-herd-cats-ai:local ghcr.io/janschachtschabel/to-herd-cats-ai:ci
+          bash deploy/scripts/hostinger-smoke.sh
+        env:
+          HOSTINGER_SMOKE_TAG: ci
       - name: Trivy (HIGH and CRITICAL with a fix available fail the job)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

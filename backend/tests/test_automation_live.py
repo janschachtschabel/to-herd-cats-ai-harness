@@ -15,7 +15,8 @@ from app.core.outbox import Event, EventOutbox
 from app.core.principal import Principal
 from app.modules.automations.firing import fire_next
 from app.modules.automations.live import CHANGED, LIVE, automation_live
-from app.modules.messaging.live_events import decode, of_event
+from app.modules.messaging.live_decode import decode
+from app.modules.messaging.live_publish import of_event
 from app.modules.spaces.repository import SpaceRepository
 from tests.factories_writing import Work
 from tests.live_helpers import LiveServer, drain

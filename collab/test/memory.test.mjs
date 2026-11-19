@@ -58,9 +58,9 @@ test("a page past the budget is refused as busy, alone, and opens once others le
     memoryBudgetBytes: 1, // only the first document fits
   });
   live.api.pages[other] = table(6, 799);
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await synced(anna);
-  const ben = live.open({ cookie: "herd_session=token-b", name: `page:${other}` }, { page: other });
+  const ben = live.open({ grant: "herd_cg_b", name: `page:${other}` }, { page: other });
   await until(() => ben.closes.length > 0);
   assert.equal(ben.closes[0], 4507);
   ben.destroy(); // a browser stops on 4507 (no reconnect loop; frontend liveSession)
@@ -82,9 +82,6 @@ test("a page past the budget is refused as busy, alone, and opens once others le
     await (await fetch(live.metricsUrl)).text(),
     /^herd_collab_memory_estimate_bytes 0$/m,
   );
-  const again = live.open(
-    { cookie: "herd_session=token-b", name: `page:${other}` },
-    { page: other },
-  );
+  const again = live.open({ grant: "herd_cg_b", name: `page:${other}` }, { page: other });
   await synced(again);
 });

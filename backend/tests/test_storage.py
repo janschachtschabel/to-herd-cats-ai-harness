@@ -1,13 +1,19 @@
 """`core/storage.py` (LocalStorage) and `core/uploads.py` (spooling a body)."""
 
 import asyncio
+import hashlib
 from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
 
 from app.core.config import get_settings
-from app.core.storage import LocalStorage, StorageKeyError, StoredFileMissing
+from app.core.storage import (
+    LocalStorage,
+    StorageKeyError,
+    StoredContentMismatch,
+    StoredFileMissing,
+)
 from app.core.uploads import BodyReadTimeout, PayloadTooLarge, spool
 
 
@@ -16,15 +22,22 @@ async def _stream(*chunks: bytes) -> AsyncIterator[bytes]:
         yield chunk
 
 
+def _put(storage: LocalStorage, key: str, *chunks: bytes):  # type: ignore[no-untyped-def]
+    data = b"".join(chunks)
+    return storage.put(
+        key, _stream(*chunks), size=len(data), sha256=hashlib.sha256(data).hexdigest()
+    )
+
+
 async def _read(storage: LocalStorage, key: str) -> bytes:
     return b"".join([c async for c in await storage.open(key)])
 
 
 async def test_put_open_delete_round_trip(tmp_path: Path) -> None:
     storage = LocalStorage(tmp_path)
-    assert await storage.put("attachments/org/abc", _stream(b"hello ", b"world")) == 11
+    assert await _put(storage, "attachments/org/abc", b"hello ", b"world") == 11
     assert await _read(storage, "attachments/org/abc") == b"hello world"
-    assert await storage.put("attachments/org/abc", _stream(b"again")) == 5
+    assert await _put(storage, "attachments/org/abc", b"again") == 5
     assert await _read(storage, "attachments/org/abc") == b"again"
     await storage.delete("attachments/org/abc")
     await storage.delete("attachments/org/abc")  # nothing there is fine
@@ -42,7 +55,7 @@ async def test_a_failed_write_leaves_nothing(tmp_path: Path) -> None:
         raise RuntimeError("client went away")
 
     with pytest.raises(RuntimeError):
-        await storage.put("a/b", broken())
+        await storage.put("a/b", broken(), size=4, sha256="0" * 64)
     assert list((tmp_path / "a").iterdir()) == []
 
 
@@ -66,7 +79,7 @@ async def test_a_failed_write_leaves_nothing(tmp_path: Path) -> None:
 async def test_local_storage_rejects_keys_outside_root(tmp_path: Path, key: str) -> None:
     storage = LocalStorage(tmp_path / "root")
     with pytest.raises(StorageKeyError):
-        await storage.put(key, _stream(b"x"))
+        await _put(storage, key, b"x")
     with pytest.raises(StorageKeyError):
         await storage.open(key)
     with pytest.raises(StorageKeyError):
@@ -80,8 +93,48 @@ async def test_local_storage_does_not_follow_a_symlink_out(tmp_path: Path) -> No
     (tmp_path / "elsewhere").mkdir()
     (root / "link").symlink_to(tmp_path / "elsewhere")
     with pytest.raises(StorageKeyError):
-        await LocalStorage(root).put("link/file", _stream(b"x"))
+        await _put(LocalStorage(root), "link/file", b"x")
     assert list((tmp_path / "elsewhere").iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "chunks",
+    [(b"hello", b" there"), (b"hello",), (b"hello there", b"!")],
+    ids=["other-bytes", "too-short", "too-long"],
+)
+async def test_a_write_that_does_not_match_its_size_and_sha256_leaves_nothing(
+    tmp_path: Path, chunks: tuple[bytes, ...]
+) -> None:
+    storage = LocalStorage(tmp_path)
+    declared = b"hello world"
+    await _put(storage, "attachments/org/abc", declared)
+    with pytest.raises(StoredContentMismatch):
+        await storage.put(
+            "attachments/org/abc",
+            _stream(*chunks),
+            size=len(declared),
+            sha256=hashlib.sha256(declared).hexdigest(),
+        )
+    assert await _read(storage, "attachments/org/abc") == declared
+    assert [p.name for p in (tmp_path / "attachments" / "org").iterdir()] == ["abc"]
+
+
+async def test_stat_and_entries(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path)
+    await _put(storage, "attachments/org/abc", b"hello")
+    await _put(storage, "attachments/org/def", b"hi")
+    await _put(storage, "other/x", b"o")
+    (tmp_path / "attachments" / "org" / ".abc.1234.part").write_bytes(b"left")
+    (tmp_path / "attachments" / "Upper").write_bytes(b"no key")
+    info = await storage.stat("attachments/org/abc")
+    assert info is not None
+    assert (info.size, info.sha256) == (5, hashlib.sha256(b"hello").hexdigest())
+    assert await storage.stat("attachments/org/none") is None
+    assert [e async for e in storage.entries("attachments")] == [
+        ("attachments/org/abc", 5),
+        ("attachments/org/def", 2),
+    ]
+    assert [e async for e in storage.entries("nothing")] == []
 
 
 async def test_spool_hashes_sizes_and_spills_to_disk() -> None:

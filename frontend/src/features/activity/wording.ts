@@ -12,3 +12,11 @@ export function automationText(t: TFunction, entry: ActivityEntry): string {
   const known = (PAUSE_REASONS as readonly string[]).includes(reason)
   return t(`activity.automation.${known ? reason : 'paused'}`, { agent })
 }
+
+/** A self-registered account (the entry's author) awaiting approval, or decided since. */
+export function signupText(t: TFunction, entry: ActivityEntry): string {
+  const name = entry.author?.name ?? t('messaging.message.unknownAuthor')
+  return t(entry.account?.awaiting ? 'activity.signup.waiting' : 'activity.signup.decided', {
+    name,
+  })
+}

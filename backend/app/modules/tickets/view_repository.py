@@ -1,4 +1,5 @@
-"""The SQL of the ticket views (plan M4 task 5): board, epic overview, counts. Scoped
+"""The SQL of the ticket views (plan M4 task 5): board, epic overview, counts, and the
+due dates the calendar overlays (plan M10 task 9). Scoped
 like `TicketRepository` (the actor's organisation, the spaces where it may read
 tickets), with the list's filters; each view is a fixed number of statements, however
 many tickets and statuses there are (no query per column or per epic).
@@ -13,9 +14,10 @@ from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy import ColumnElement, func, literal, select, tuple_
-from sqlalchemy.orm import defer
+from sqlalchemy.orm import defer, load_only
 
 from app.core.principal import PrincipalType
+from app.core.repository import DayKey, from_day
 from app.modules.tickets.listing import LAST_DAY, Filters
 from app.modules.tickets.models import (
     Priority,
@@ -144,3 +146,25 @@ class ViewRepository(TicketRepository):
             )
         )
         return int(await self.session.scalar(stmt) or 0)
+
+    async def due_between(
+        self, start: date, end: date, key: DayKey | None, limit: int
+    ) -> list[WorkItem]:
+        """The tickets not done or cancelled that are due on a day in `[start, end)`,
+        by (due day, id) from `key` on (the calendar's overlays): what showing one
+        needs, nothing more."""
+        stmt = (
+            select(WorkItem)
+            .join(TicketStatus, TicketStatus.id == WorkItem.status_id)
+            .where(
+                self._visible(),
+                WorkItem.due_on >= start,
+                WorkItem.due_on < end,
+                TicketStatus.category.in_(OPEN_CATEGORIES),
+                from_day(WorkItem.due_on, WorkItem.id, key),  # type: ignore[arg-type]
+            )
+            .options(load_only(WorkItem.space_id, WorkItem.number, WorkItem.title, WorkItem.due_on))
+            .order_by(WorkItem.due_on, WorkItem.id)
+            .limit(limit)
+        )
+        return list((await self.session.scalars(stmt)).all())

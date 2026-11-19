@@ -100,6 +100,7 @@ const boardRoute = createRoute({
   getParentRoute: () => spaceRoute,
   path: '/board',
   validateSearch: boardSearch,
+  loader: () => BoardView.preload?.(),
   component: function BoardRoute() {
     const search = boardRoute.useSearch()
     const navigate = boardRoute.useNavigate()
@@ -154,6 +155,7 @@ const skillsRoute = createRoute({
   getParentRoute: () => spaceRoute,
   path: '/skills',
   validateSearch: skillsSearch,
+  loader: () => SpaceSkillsView.preload?.(),
   component: function SkillsRoute() {
     const { view } = skillsRoute.useSearch()
     return <SpaceSkillsView view={view ?? 'skills'} />

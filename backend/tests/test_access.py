@@ -17,6 +17,7 @@ from app.core.access import (
     Actor,
     actor_for,
     can,
+    member_space_ids,
     require,
     space_ids_with,
     space_role,
@@ -109,6 +110,21 @@ async def test_visible_space_ids_matches_can(
             assert await can(session, actor, Action.SPACE_READ, sid) == readable, label
             assert await can(session, actor, Action.SPACE_MANAGE, sid) == manageable, label
             assert await space_role(session, actor, sid) == role, label
+
+
+async def test_member_space_ids_leave_out_what_only_admin_power_opens(
+    session: AsyncSession, actors_and_spaces: tuple[list[User], list[Case]]
+) -> None:
+    """The list rule of calendars (plan M10 decision 3, C1): the spaces where the
+    person holds a role of her own (directly, through a group, or the open floor);
+    admins and owners get no space from their admin power."""
+    people, cases = actors_and_spaces
+    for person in people:
+        actor = await actor_of(session, person)
+        ids: set[UUID] = set((await session.scalars(member_space_ids(actor))).all())
+        for case in cases:
+            label = (person.system_role, case.kind, case.mode, case.holder is person)
+            assert (case.space.id in ids) == (_expected_role(person, case) is not None), label
 
 
 async def test_space_ids_with_matches_can(

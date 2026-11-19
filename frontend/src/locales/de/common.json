@@ -47,10 +47,18 @@
       "required": "Bitte melde dich an.",
       "session_invalid": "Deine Sitzung ist abgelaufen. Bitte melde dich neu an.",
       "csrf": "Die Anfrage wurde aus Sicherheitsgründen abgelehnt.",
-      "wrong_password": "Das aktuelle Passwort stimmt nicht."
+      "wrong_password": "Das aktuelle Passwort stimmt nicht.",
+      "password_common": "Dieses Passwort ist aus Datenlecks bekannt und leicht zu erraten. Bitte wähle ein anderes.",
+      "password_context": "Das Passwort enthält einen naheliegenden Begriff (Name, E-Mail-Adresse, Organisation oder Produkt). Bitte wähle ein anderes."
     },
     "server": {
       "busy": "Der Server ist gerade ausgelastet. Bitte versuche es gleich noch einmal."
+    },
+    "storage": {
+      "unavailable": "Der Dateispeicher antwortet gerade nicht. Bitte versuche es gleich noch einmal."
+    },
+    "maintenance": {
+      "active": "Die Installation wird gerade gewartet (eine Sicherung wird eingespielt). Bitte versuche es in einer Minute noch einmal."
     },
     "users": {
       "email_taken": "Diese E-Mail-Adresse ist schon vergeben.",
@@ -116,7 +124,7 @@
       "title": "Passwort ändern",
       "current": "Aktuelles Passwort",
       "new": "Neues Passwort",
-      "hint": "Mindestens 10 Zeichen. Andere angemeldete Geräte werden abgemeldet.",
+      "hint": "Mindestens 10 Zeichen, nicht aus Datenlecks bekannt und ohne deinen Namen. Andere angemeldete Geräte werden abgemeldet.",
       "submit": "Passwort ändern",
       "changed": "Passwort geändert. Andere Sitzungen sind abgemeldet."
     }
@@ -256,6 +264,12 @@
       "openNamed": "{{name}} reaktivieren",
       "title": "Person reaktivieren?",
       "text": "{{name}} kann sich danach wieder anmelden."
+    },
+    "signOut": {
+      "action": "Abmelden",
+      "openNamed": "{{name}} überall abmelden",
+      "title": "Überall abmelden?",
+      "text": "Alle Sitzungen von {{name}} enden sofort auf jedem Gerät. {{name}} kann sich gleich wieder anmelden."
     }
   },
   "groups": {
@@ -348,6 +362,8 @@
         "created": "Person angelegt",
         "updated": "Person geändert",
         "password_changed": "Passwort geändert",
+        "signed_out": "Überall abgemeldet",
+        "session_ended": "Gerät abgemeldet",
         "deactivated": "Person deaktiviert",
         "reactivated": "Person reaktiviert"
       },

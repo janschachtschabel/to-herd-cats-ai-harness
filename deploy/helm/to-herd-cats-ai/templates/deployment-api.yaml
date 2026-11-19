@@ -6,7 +6,10 @@ metadata:
     {{- include "herd.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
 spec:
+  {{- if not .Values.api.autoscaling.enabled }}
+  # With api.autoscaling the autoscaler owns the count (hpa-api.yaml).
   replicas: {{ .Values.api.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "herd.selectorLabels" . | nindent 6 }}
@@ -34,20 +37,9 @@ spec:
           image: {{ include "herd.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            {{- include "herd.env" (dict "root" . "role" "api") | nindent 12 }}
-            {{- include "herd.aiApiEnv" . | nindent 12 }}
-            {{- include "herd.mcpApiEnv" . | nindent 12 }}
-            {{- if include "herd.publicUrl" . }}
-            {{- include "herd.publicUrlEnv" . | nindent 12 }}
-            {{- end }}
-            {{- if .Values.collab.enabled }}
-            # Live editing: /collab/ WebSockets are checked here and relayed to the
-            # collab process, which calls back on the internal port with the token.
-            {{- include "herd.internalTokenEnv" . | nindent 12 }}
-            - name: HERD_COLLAB_URL
-              value: {{ printf "ws://%s-collab:1234" (include "herd.fullname" .) | quote }}
-            {{- end }}
-          {{- if or .Values.secrets.existingSecret .Values.ai.existingSecret }}
+            {{- $own := include "herd.apiOwnEnv" . }}
+            {{- include "herd.withExtraEnv" (dict "own" $own "extra" .Values.api.env "where" "api.env") | nindent 12 }}
+          {{- if or .Values.secrets.existingSecret .Values.ai.existingSecret .Values.oidc.existingSecret }}
           envFrom:
             {{- with .Values.secrets.existingSecret }}
             - secretRef:
@@ -55,6 +47,11 @@ spec:
             {{- end }}
             {{- with .Values.ai.existingSecret }}
             # AI keys: HERD_SECRET_KEY(_PREVIOUS), HERD_AI_EGRESS_PROXY, HERD_AI_<NAME>.
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+            {{- with .Values.oidc.existingSecret }}
+            # OIDC client secrets: HERD_OIDC_<NAME>.
             - secretRef:
                 name: {{ . }}
             {{- end }}
@@ -98,6 +95,8 @@ spec:
             {{- include "herd.volumeMounts" . | nindent 12 }}
             - name: data
               mountPath: /data
+            {{- with include "herd.s3VolumeMount" . }}{{ . | nindent 12 }}{{- end }}
+            {{- with include "herd.backupsVolumeMount" . }}{{ . | nindent 12 }}{{- end }}
             {{- if .Values.mcp.catalogConfigMap }}
             # The operator's catalogue entries (HERD_MCP_CATALOG_DIR).
             - name: mcp-catalog
@@ -106,7 +105,10 @@ spec:
             {{- end }}
       volumes:
         {{- include "herd.volumes" . | nindent 8 }}
-        # The files (attachments); fsGroup 10001 makes the volume writable.
+        {{- with include "herd.s3Volume" . }}{{ . | nindent 8 }}{{- end }}
+        {{- with include "herd.backupsVolume" . }}{{ . | nindent 8 }}{{- end }}
+        # The files (attachments; with s3.enabled only temporary files of uploads and
+        # imports); fsGroup 10001 makes the volume writable.
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:

@@ -9,14 +9,14 @@ import { HILDA, makeApproval, makeRun } from '@/test/runs'
 const CHANNEL = '00000000-0000-7000-8000-0000000000c1'
 
 /** Her DM with one release card of a run under the personal mark. */
-function dmWith(approval: Approval, meId = 'asker') {
+function dmWith(approval: Approval, meId = 'asker', diff: object | null = null) {
   const me = makeMe(['directory.read', 'ai.use'], { id: meId })
   const space = makeSpace({ id: 'space-1', name: 'Handbuch', my_role: 'editor' })
   const dm = makeConversation({ kind: 'dm', space_id: null, name: null })
   const message = makeMessage({
     kind: 'approval',
     author: { type: 'agent', id: HILDA.id, name: HILDA.name },
-    body_md: approval.summary,
+    body_md: approval.tool,
     run_id: 'run-1',
     card: { type: 'approval', id: approval.id },
     conversation_id: dm.id,
@@ -28,6 +28,7 @@ function dmWith(approval: Approval, meId = 'asker') {
     'POST /api/conversations/:id/read': { status: 204 },
     'GET /api/runs/:id': makeRun({ id: 'run-1', state: 'waiting', stop_reason: null }),
     'GET /api/approvals/:id': approval,
+    'GET /api/approvals/:id/diff': { status: 200, body: diff },
   })
   return dm
 }
@@ -44,16 +45,76 @@ const release = (overrides: Partial<Approval> = {}) =>
   })
 
 describe('a release card under the personal mark (module review M8 2, G2)', () => {
-  test('says why it asks and shows exactly what would be written, open', async () => {
+  test('says why it asks and shows exactly what would be written, unfolded', async () => {
     const dm = dmWith(release())
     await renderApp(`/c/${dm.id}`)
     const shown = await screen.findByRole('region', { name: 'Freigabe' })
     expect(within(shown).getByText(/^Persönlich:/)).toHaveTextContent(
       /genau der folgende Inhalt geschrieben/,
     )
-    const args = within(shown).getByText('Angaben des Aufrufs').closest('details')
-    expect(args).toHaveAttribute('open')
+    expect(within(shown).getByText(/^Persönlich:/)).toHaveTextContent(
+      /kann jetzt oder später von anderen gelesen werden/,
+    )
+    expect(within(shown).queryByRole('group')).toBeNull() // nothing folded (no <details>)
+    const args = within(shown).getByRole('figure', { name: 'Angaben des Aufrufs' })
     expect(args).toHaveTextContent('Für alle: HC-1 ist erledigt.')
+  })
+
+  test('a read says it reads, not that others can read what is released', async () => {
+    const read = release({
+      tool: 'read_ticket',
+      summary: 'read_ticket: key=HC-1',
+      args: { key: 'HC-1' },
+      reads: true,
+    })
+    const dm = dmWith(read)
+    await renderApp(`/c/${dm.id}`)
+    const shown = await screen.findByRole('region', { name: 'Freigabe' })
+    const said = within(shown).getByText(/^Persönlich:/)
+    expect(said).toHaveTextContent(/möchte unter deiner persönlichen Markierung lesen/)
+    expect(said).not.toHaveTextContent(/von anderen gelesen werden/)
+    expect(within(shown).getByRole('figure', { name: 'Angaben des Aufrufs' })).toHaveTextContent(
+      'HC-1',
+    )
+  })
+
+  test('a page change shows its whole diff at once, no button to open it (review M8 3, H5)', async () => {
+    const page = release({
+      tool: 'update_page',
+      summary: 'update_page: page_id=p-1',
+      args: { page_id: 'p-1', content_md: 'eins\nGEHEIM\n', reason: 'neu', token: 't' },
+      diff_url: '/api/approvals/ap-p1/diff',
+    })
+    const hunks = [
+      { kind: 'equal', lines: ['eins'] },
+      { kind: 'insert', lines: ['GEHEIM'] },
+    ]
+    const dm = dmWith(page, 'asker', hunks)
+    await renderApp(`/c/${dm.id}`)
+    const shown = await screen.findByRole('region', { name: 'Freigabe' })
+    expect(await within(shown).findByText('GEHEIM')).toBeInTheDocument()
+    expect(within(shown).queryByRole('button', { name: 'Änderung ansehen' })).toBeNull()
+    expect(within(shown).getByRole('figure', { name: 'Angaben des Aufrufs' })).toHaveTextContent(
+      'neu',
+    )
+    expect(within(shown).getByRole('button', { name: 'Freigeben' })).toBeInTheDocument()
+  })
+
+  test('what cannot be shown in full cannot be released', async () => {
+    const page = release({
+      tool: 'update_page',
+      summary: 'update_page: page_id=p-1',
+      args: { page_id: 'p-1', content_md: 'x', reason: 'neu', token: 't' },
+      diff_url: '/api/approvals/ap-p1/diff',
+    })
+    const dm = dmWith(page, 'asker', null) // beyond the diff's limit
+    await renderApp(`/c/${dm.id}`)
+    const shown = await screen.findByRole('region', { name: 'Freigabe' })
+    expect(
+      await within(shown).findByText(/zu groß, um sie dir vollständig zu zeigen/),
+    ).toBeInTheDocument()
+    expect(within(shown).queryByRole('button', { name: 'Freigeben' })).toBeNull()
+    expect(within(shown).getByRole('button', { name: 'Ablehnen' })).toBeInTheDocument()
   })
 
   test('an ordinary release card keeps its arguments folded and says nothing of it', async () => {

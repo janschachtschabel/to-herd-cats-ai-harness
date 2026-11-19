@@ -1,6 +1,6 @@
 [project]
 name = "to-herd-cats-ai"
-version = "0.1.0"
+version = "1.0.0"
 description = "to-herd-cats-ai control API"
 requires-python = ">=3.13"
 license = "Apache-2.0"
@@ -29,6 +29,9 @@ dependencies = [
     "cronsim>=2.8",
     "tzdata>=2025.2",
     "mcp>=2.3",
+    "pyjwt[crypto]>=2.15",
+    "python-dateutil>=4.0,<5",
+    "icalendar>=7.3,<7.4",
 ]
 
 [dependency-groups]
@@ -37,6 +40,7 @@ dev = [
     "pytest-asyncio>=1.1",
     "ruff>=0.12",
     "mypy>=1.17",
+    "types-python-dateutil>=2.9.0.20261116",
 ]
 
 [build-system]

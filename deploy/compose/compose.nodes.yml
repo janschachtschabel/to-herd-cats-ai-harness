@@ -7,9 +7,14 @@
 # `app` (role all) is switched off. `migrate` migrates once and exits; `api-a` and
 # `api-b` serve (role api, published on HERD_HOST_PORT and HERD_HOST_PORT_B); `worker`
 # is the only outbox dispatcher (role worker: notifications, page timelines, live
-# updates) and works on the agent runs; `collab` runs live editing (role collab) and calls the API nodes' internal
-# port under the alias `api`. Both API nodes share the files volume (one host). Only the
-# two public ports are published; 9090 and the collab port stay inside.
+# updates) and works on the agent runs; `collab-a` and `collab-b` run live editing (role
+# collab, two instances: each announces its own address, HERD_COLLAB_ADVERTISE_URL, and
+# the API binds every page to one of them, docs/WIKI.md) and call the API nodes'
+# internal port under the alias `api`; `backup` (compose.yml) starts after the
+# migration. Both API nodes share the files volume (one host), or an S3 store with
+# HERD_STORAGE=s3 (set in .env, see compose.yml; the worker removes unused files after
+# their grace). Only the two public ports are published; 9090 and the collab port stay
+# inside.
 
 x-node: &node
   image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
@@ -25,33 +30,85 @@ x-node: &node
   restart: unless-stopped
 
 x-database: &database
-  # The password is kept out of the URL; the app merges it in (escaped).
-  HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
-  HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  # herd_owner, made by compose.yml's db-owner (no superuser, review M9b F2-1); its
+  # password from the volume secrets, never an env value.
+  HERD_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+  HERD_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
+  # TLS to an external database (libpq's sslmode, CA file); empty: the URL's own.
+  HERD_DATABASE_SSLMODE: ${HERD_DATABASE_SSLMODE:-}
+  HERD_DATABASE_SSLROOTCERT: ${HERD_DATABASE_SSLROOTCERT:-}
   HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
 
+# Where attachments live (see compose.yml): the API nodes and the worker.
+x-storage: &storage
+  HERD_STORAGE: ${HERD_STORAGE:-local}
+  HERD_S3_ENDPOINT: ${HERD_S3_ENDPOINT:-}
+  HERD_S3_REGION: ${HERD_S3_REGION:-us-east-1}
+  HERD_S3_BUCKET: ${HERD_S3_BUCKET:-}
+  HERD_S3_ACCESS_KEY_ID: ${HERD_S3_ACCESS_KEY_ID:-}
+  HERD_S3_SECRET_ACCESS_KEY: ${HERD_S3_SECRET_ACCESS_KEY:-}
+  HERD_S3_PREFIX: ${HERD_S3_PREFIX:-}
+
 x-api-env: &api-env
-  <<: *database
+  <<: [*database, *storage]
   HERD_ROLE: api
   HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
   HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
   HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}
-  HERD_COLLAB_URL: ws://collab:1234
+  # During a rotation: the old token, still accepted by the API (docs/WIKI.md).
+  HERD_INTERNAL_TOKEN_PREVIOUS: ${HERD_INTERNAL_TOKEN_PREVIOUS:-}
   HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
   HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
   HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
+  # Hours without a request after which a login session ends (0: none; docs/ANMELDUNG.md).
+  HERD_SESSION_IDLE_HOURS: ${HERD_SESSION_IDLE_HOURS:-24}
+  # Writes per person and minute, uploads apart (docs/SICHERHEIT.md); beyond: 429.
+  HERD_WRITE_RATE_PER_MINUTE: ${HERD_WRITE_RATE_PER_MINUTE:-120}
+  HERD_UPLOAD_RATE_PER_MINUTE: ${HERD_UPLOAD_RATE_PER_MINUTE:-30}
+  # Optional virus scan of uploads: a clamd of your own as host:port (compose.yml has an
+  # example service); empty: no scan; set: a scanner that cannot answer refuses uploads.
+  HERD_CLAMAV_ADDRESS: ${HERD_CLAMAV_ADDRESS:-}
   HERD_AI_CHECK_TIMEOUT_SECONDS: ${HERD_AI_CHECK_TIMEOUT_SECONDS:-20}
   HERD_AI_PERSONAL_AGENTS_MAX: ${HERD_AI_PERSONAL_AGENTS_MAX:-5}
   HERD_AI_AUTOMATIONS_MAX: ${HERD_AI_AUTOMATIONS_MAX:-20}
   HERD_MCP_RATE_PER_MINUTE: ${HERD_MCP_RATE_PER_MINUTE:-120}
   HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
   HERD_MCP_CATALOG_DIR: ${HERD_MCP_CATALOG_DIR:-}
+  # Sign-in through OIDC (docs/ANMELDUNG.md); client secrets env:HERD_OIDC_<NAME> in ai.env.
+  HERD_OIDC_ALLOWED_HOSTS: ${HERD_OIDC_ALLOWED_HOSTS:-}
+  HERD_OIDC_RATE_PER_MINUTE: ${HERD_OIDC_RATE_PER_MINUTE:-30}
+  # The administration's archive uploads (docs/SICHERUNG.md), in bytes.
+  HERD_BACKUP_UPLOAD_MAX_BYTES: ${HERD_BACKUP_UPLOAD_MAX_BYTES:-2147483648}
 
 # AI keys for the processes that call providers: the API nodes (connection tests, model
 # lists) and the worker (agent runs). See compose.yml.
 x-ai-keys: &ai-keys
   - path: ai.env
     required: false
+
+# A collab instance (role collab). Live documents live in this process's memory: it
+# loads no more than HERD_COLLAB_MEMORY_BUDGET_MB (400) by its estimate and refuses the
+# next page as "busy" (4507). The limit holds that, the process and one check worker
+# with a fifth to spare (docs/WIKI.md, sizing rule); a larger budget needs a larger
+# limit. On SIGTERM it drains: it saves, lets go of its pages and exits (the browsers
+# reconnect to the other instance).
+x-collab-env: &collab-env
+  HERD_ROLE: collab
+  HERD_COLLAB_API_URL: http://api:9090
+  HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN}
+  HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
+
+x-collab: &collab
+  <<: *node
+  mem_limit: 1g
+  # The image's health check asks port 9090, which the collab role does not serve.
+  healthcheck:
+    test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1234/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+    interval: 10s
+    timeout: 3s
+    start_period: 30s
+    retries: 3
+  stop_grace_period: 30s
 
 x-after-migrate: &after-migrate
   db:
@@ -68,9 +125,19 @@ services:
     environment:
       <<: *database
       HERD_ROLE: migrate
+      # Separate database roles (docs/SICHERUNG.md): the schema owner migrates and
+      # gives HERD_DATABASE_RUNTIME_ROLE (then the role of HERD_DATABASE_URL on the
+      # other nodes) data rights only. Empty: one role.
+      HERD_MIGRATE_DATABASE_URL: ${HERD_MIGRATE_DATABASE_URL:-}
+      HERD_MIGRATE_DATABASE_PASSWORD: ${HERD_MIGRATE_DATABASE_PASSWORD:-}
+      HERD_DATABASE_RUNTIME_ROLE: ${HERD_DATABASE_RUNTIME_ROLE:-}
     depends_on:
       db:
         condition: service_healthy
+      db-owner:
+        condition: service_completed_successfully
+    volumes:
+      - secrets:/secrets:ro
     healthcheck:
       disable: true
     restart: "no"
@@ -82,8 +149,11 @@ services:
     depends_on: *after-migrate
     ports:
       - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT:-8080}:8080"
+    # backups: the administration's archives (downloads, uploads, checks, restores).
     volumes:
       - app-data:/data
+      - backups:/backups
+      - secrets:/secrets:ro
     networks:
       default:
         aliases: [api]
@@ -96,8 +166,11 @@ services:
     depends_on: *after-migrate
     ports:
       - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT_B:-8081}:8080"
+    # backups: the administration's archives (downloads, uploads, checks, restores).
     volumes:
       - app-data:/data
+      - backups:/backups
+      - secrets:/secrets:ro
     networks:
       default:
         aliases: [api]
@@ -106,34 +179,40 @@ services:
   worker:
     <<: *node
     environment:
-      <<: *database
+      <<: [*database, *storage]
       HERD_ROLE: worker
       HERD_AI_APPROVAL_HOURS: ${HERD_AI_APPROVAL_HOURS:-72}
       HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
       HERD_RUN_LEASE_SECONDS: ${HERD_RUN_LEASE_SECONDS:-30}
       HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
       HERD_MCP_MAX_CALLS_PER_RUN: ${HERD_MCP_MAX_CALLS_PER_RUN:-20}
+      # An agent's writes count like a person's, on its own count.
+      HERD_WRITE_RATE_PER_MINUTE: ${HERD_WRITE_RATE_PER_MINUTE:-120}
+      # The worker exports the backups' gauges (docs/SICHERUNG.md).
+      HERD_BACKUP_ALERT_AFTER_HOURS: ${HERD_BACKUP_ALERT_AFTER_HOURS:-26}
     env_file: *ai-keys
     depends_on: *after-migrate
+    # The due loop removes the files of deleted attachments after their grace
+    # (core/storage_tombstones.py); with HERD_STORAGE=s3 it uses the store instead.
+    # backups: it makes the backups owners ask for in the administration.
+    volumes:
+      - app-data:/data
+      - backups:/backups
+      - secrets:/secrets:ro
     stop_grace_period: 30s
 
-  collab:
-    <<: *node
+  # The service backup of compose.yml (docs/SICHERUNG.md), here after the migration.
+  backup:
+    depends_on: *after-migrate
+
+  collab-a:
+    <<: *collab
     environment:
-      HERD_ROLE: collab
-      HERD_COLLAB_API_URL: http://api:9090
-      HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN}
-      HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
-    # Live documents live in this process's memory: it loads no more than
-    # HERD_COLLAB_MEMORY_BUDGET_MB (400) by its estimate and refuses the next page as
-    # "busy" (4507). The limit holds that, the process and one check worker with a fifth
-    # to spare (docs/WIKI.md, sizing rule); a larger budget needs a larger limit.
-    mem_limit: 1g
-    # The image's health check asks port 9090, which the collab role does not serve.
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1234/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-      interval: 10s
-      timeout: 3s
-      start_period: 30s
-      retries: 3
-    stop_grace_period: 30s
+      <<: *collab-env
+      HERD_COLLAB_ADVERTISE_URL: ws://collab-a:1234
+
+  collab-b:
+    <<: *collab
+    environment:
+      <<: *collab-env
+      HERD_COLLAB_ADVERTISE_URL: ws://collab-b:1234

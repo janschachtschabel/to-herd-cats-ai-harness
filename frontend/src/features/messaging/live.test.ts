@@ -1,9 +1,11 @@
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { LiveEvent } from '@/lib/live'
+import { userKeys } from '@/features/admin/users/queries'
 import { agentKeys } from '@/features/agents/keys'
 import { approvalKeys } from '@/features/approvals/queries'
 import { automationKeys } from '@/features/automations/queries'
+import { calendarKeys } from '@/features/calendars/keys'
 import { skillProposalKeys } from '@/features/skills/proposals/queries'
 import { skillKeys } from '@/features/skills/queries'
 import { ticketKeys } from '@/features/tickets/keys'
@@ -19,6 +21,7 @@ const KEYS = {
   messagesB: [...messagingKeys.messages('b'), { includeSystem: true }],
   repliesA: messagingKeys.replies('a', 'p'),
   messageA: messagingKeys.message('a', 'p'),
+  readPositionA: messagingKeys.readPosition('a'),
   pageThread: messagingKeys.pageThread('page'),
   activity: activityKeys.list(false),
   activityCount: activityKeys.count,
@@ -57,6 +60,10 @@ const KEYS = {
   firingsA: automationKeys.firings('au-a'),
   automationB: automationKeys.detail('au-b'),
   preview: automationKeys.preview(null),
+  pendingUsers: [...userKeys.all, 'pending'],
+  pendingCount: userKeys.pendingCount,
+  calendars: [...calendarKeys.all, 'list'],
+  calendarWindow: [...calendarKeys.all, 'window', {}],
 }
 
 /** What the ticket queries hold where the invalidation reads it (the ticket's id). */
@@ -116,6 +123,7 @@ describe('live invalidation', () => {
       'messagesB',
       'repliesA',
       'messageA',
+      'readPositionA',
       'pageThread',
       'activity',
       'activityCount',
@@ -132,6 +140,8 @@ describe('live invalidation', () => {
       'automationA',
       'firingsA',
       'automationB',
+      'calendars',
+      'calendarWindow',
     ])
   })
 
@@ -162,11 +172,14 @@ describe('live invalidation', () => {
       'question',
       'myApprovals',
     ])
-    // A new card's activity entry refreshes my list of releases (and its count).
+    // A new card's activity entry refreshes my list of releases (and its count); an
+    // account awaiting approval the people administration's lists and its count.
     expect(staleAfter({ type: 'notification.created' })).toEqual([
       'activity',
       'activityCount',
       'myApprovals',
+      'pendingUsers',
+      'pendingCount',
     ])
   })
 
@@ -195,6 +208,20 @@ describe('live invalidation', () => {
     const event = { conversationId: 'a', ticketId: 't', spaceId: 'space' }
     expect(staleAfter({ type: 'ticket.updated', ...event })).toEqual(affected)
     expect(staleAfter({ type: 'ticket.created', ...event })).toEqual(affected)
+  })
+
+  test('a calendar event refreshes the calendar views, nothing else (plan M10)', () => {
+    expect(staleAfter({ type: 'calendar.changed', spaceId: 'space' })).toEqual([
+      'calendars',
+      'calendarWindow',
+    ])
+  })
+
+  test('an invitation refreshes the calendar views too (plan M10 task 4)', () => {
+    expect(staleAfter({ type: 'event.invited', eventId: 'e1' })).toEqual([
+      'calendars',
+      'calendarWindow',
+    ])
   })
 
   test('a sprint event refreshes the sprints, boards and lists of its space (plan M4b)', () => {
@@ -232,7 +259,10 @@ describe('live invalidation', () => {
       'repliesA',
       'messageA',
     ])
-    expect(staleAfter({ type: 'conversation.read', conversationId: 'a' })).toEqual(['unread'])
+    expect(staleAfter({ type: 'conversation.read', conversationId: 'a' })).toEqual([
+      'unread',
+      'readPositionA',
+    ])
     expect(staleAfter({ type: 'channel.changed', conversationId: 'a' })).toEqual([
       'channels',
       'conversationA',
@@ -241,6 +271,8 @@ describe('live invalidation', () => {
       'activity',
       'activityCount',
       'myApprovals',
+      'pendingUsers',
+      'pendingCount',
     ])
     expect(staleAfter({ type: 'activity.changed' })).toEqual(['activity', 'activityCount'])
   })
@@ -286,6 +318,7 @@ describe('coalescing', () => {
       [
         messagingKeys.dms,
         messagingKeys.unread,
+        messagingKeys.readPosition('a'),
         messagingKeys.messages('a'),
         messagingKeys.message('a'),
         agentKeys.runs,

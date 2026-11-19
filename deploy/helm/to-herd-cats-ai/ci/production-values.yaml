@@ -1,14 +1,27 @@
 # A production-like configuration for CI (helm lint/template, kubeconform): external
 # database, secrets by reference, Ingress with TLS and the timeouts live updates need,
-# AI keys by reference and provider egress through a proxy, two workers, NetworkPolicy, ServiceMonitor, PrometheusRule, tracing and a
-# digest-pinned image.
+# AI keys by reference and provider egress through a proxy, the API autoscaled from 3
+# to 6 pods, two workers (both with a disruption budget), OIDC client secrets and the
+# providers' egress, backups with an offsite copy, NetworkPolicy, ServiceMonitor,
+# PrometheusRule, tracing and a digest-pinned image.
 image:
-  tag: "0.1.0"
+  tag: "1.0.0"
   digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
 imagePullSecrets:
   - name: regcred
 api:
   replicas: 3
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
   forwardedAllowIps: 10.0.0.0/8
   env:
     HERD_LOG_LEVEL: INFO
@@ -26,9 +39,33 @@ ai:
   approvalHours: 48
   runConcurrency: 8
   runLeaseSeconds: 30
+oidc:
+  existingSecret: herd-oidc
+  # Google's sign-in endpoints (accounts.google.com, oauth2.googleapis.com,
+  # www.googleapis.com) have no fixed ranges: public addresses on 443.
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports:
+        - port: 443
+          protocol: TCP
+backup:
+  offsite:
+    existingSecret: herd-offsite
+    egress:
+      - to:
+          - ipBlock:
+              cidr: 203.0.113.0/24
+        ports:
+          - port: 443
+            protocol: TCP
 database:
   url: postgresql+asyncpg://herd@db.example.internal:5432/herd
   existingSecret: herd-db
+  sslMode: verify-full
+  caSecret: herd-db-ca
 postgresql:
   enabled: false
 ingress:

@@ -79,6 +79,10 @@ class OAuthStubState:
     challenge: bool = False
     challenge_scope: str = "mcp"
     resource_override: str | None = None
+    # RFC 9207: the `iss` the authorization response carries (None: none), and whether
+    # the metadata promise it (`authorization_response_iss_parameter_supported`).
+    iss: str | None = None
+    iss_in_metadata: bool = False
     failures: deque[int] = field(default_factory=deque)
     log: list[LoggedRequest] = field(default_factory=list)
     codes: dict[str, Grant] = field(default_factory=dict)
@@ -117,7 +121,10 @@ class OAuthStubState:
                 query.get("scope", ""),
                 query.get("resource"),
             )
-        return {"code": code, "state": query["state"]}
+        answer = {"code": code, "state": query["state"]}
+        if self.iss is not None:
+            answer["iss"] = self.iss
+        return answer
 
     def _new_tokens(self, grant: Grant) -> dict[str, Any]:
         with self.lock:
@@ -225,6 +232,8 @@ def build_app(state: OAuthStubState) -> Starlette:
         }
         if state.pkce_in_metadata:
             body["code_challenge_methods_supported"] = ["S256"]
+        if state.iss_in_metadata:
+            body["authorization_response_iss_parameter_supported"] = True
         return JSONResponse(body)
 
     async def resource_metadata(request: Request) -> Response:

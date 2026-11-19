@@ -1,0 +1,43 @@
+{
+  "errors": {
+    "auth": {
+      "session_not_found": "Diese Sitzung gibt es nicht mehr.",
+      "reauth_required": "Bitte melde dich erneut an."
+    },
+    "rate": {
+      "limited": "Zu viele Änderungen in kurzer Zeit. Bitte warte einen Moment und versuche es dann noch einmal."
+    },
+    "attachment": {
+      "rejected_by_scan": "Die Datei wurde vom Virenscan abgelehnt.",
+      "scan_unavailable": "Der Virenscan ist gerade nicht erreichbar, daher wurde nichts gespeichert. Bitte versuche es später noch einmal."
+    }
+  },
+  "security": {
+    "sessions": {
+      "title": "Angemeldete Geräte",
+      "description": "Hier bist du gerade angemeldet. Eine Sitzung endet nach {{idle}} ohne Nutzung und spätestens nach {{ttl}}.",
+      "descriptionNoIdle": "Hier bist du gerade angemeldet. Eine Sitzung endet spätestens nach {{ttl}}.",
+      "hours_one": "{{count}} Stunde",
+      "hours_other": "{{count}} Stunden",
+      "days_one": "{{count}} Tag",
+      "days_other": "{{count}} Tagen",
+      "current": "Dieses Gerät",
+      "unknownDevice": "Unbekanntes Gerät",
+      "signedInAt": "Angemeldet am {{date}}",
+      "lastUsed": "Zuletzt genutzt {{date}}",
+      "end": "Abmelden",
+      "endNamed": "{{device}} abmelden",
+      "endOthers": "Alle anderen abmelden",
+      "endOthersTitle": "Alle anderen Geräte abmelden?",
+      "endOthersText": "Alle Sitzungen außer dieser enden sofort. Wer dort angemeldet war, muss sich neu anmelden."
+    },
+    "reauth": {
+      "title": "Erneut anmelden",
+      "hint": "Ein neues Konto bei {{name}} ist ein weiterer Weg in dein Konto. Bestätige deshalb erst, dass du es bist.",
+      "password": "Aktuelles Passwort",
+      "noPassword": "Ohne Passwort: Melde dich erneut über einen Anbieter an, mit dem du dich schon anmeldest; er fragt dann nach deinem Login. Danach kannst du 10 Minuten lang ohne Passwort verknüpfen.",
+      "submit": "Weiter zum Anbieter",
+      "viaProvider": "Erneut über {{name}} anmelden"
+    }
+  }
+}

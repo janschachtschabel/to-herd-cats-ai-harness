@@ -69,7 +69,7 @@ async def test_emit_is_part_of_the_callers_transaction(real_db: RealDb) -> None:
         assert row is not None
         assert (row.type, row.subject_id, row.payload) == ("test.created", subject, {"n": 2})
         assert row.org_id == real_db.org_id
-        assert (row.attempts, row.dispatched_at, row.failed_at) == (0, None, None)
+        assert (row.dispatched_at, row.failed_at) == (None, None)
     finally:
         await connection.close()
 

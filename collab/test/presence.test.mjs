@@ -34,9 +34,9 @@ const seen = (viewer, clientId) => viewer.provider.awareness.getStates().get(cli
 
 test("each entry is the authenticated person's; another's cannot be written", async () => {
   live = await liveFixture({ createCollabServer });
-  const anna = live.open({ cookie: "herd_session=token-a" });
-  const ben = live.open({ cookie: "herd_session=token-b" });
-  const third = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
+  const ben = live.open({ grant: "herd_cg_b" });
+  const third = live.open({ grant: "herd_cg_a" });
   await Promise.all([anna, ben, third].map(synced));
   anna.provider.setAwarenessField("cursor", null);
   ben.provider.setAwarenessField("user", { name: "Geschäftsführung", id: "x", admin: true });
@@ -58,9 +58,9 @@ test("each entry is the authenticated person's; another's cannot be written", as
 
 test("a client id stays its person's after the connection closes (review M2 S12)", async () => {
   live = await liveFixture({ createCollabServer });
-  const anna = live.open({ cookie: "herd_session=token-a" });
-  const ben = live.open({ cookie: "herd_session=token-b" });
-  const viewer = live.open({ cookie: "herd_session=token-b" });
+  const anna = live.open({ grant: "herd_cg_a" });
+  const ben = live.open({ grant: "herd_cg_b" });
+  const viewer = live.open({ grant: "herd_cg_b" });
   await Promise.all([anna, ben, viewer].map(synced));
   anna.provider.setAwarenessField("cursor", null);
   const annaId = anna.doc.clientID;
@@ -68,14 +68,14 @@ test("a client id stays its person's after the connection closes (review M2 S12)
   anna.destroy();
   await until(() => live.server.connections() === 2);
   // Ben's second socket claims the free id at once: refused, it is Anna's.
-  const claim = live.open({ cookie: "herd_session=token-b" });
+  const claim = live.open({ grant: "herd_cg_b" });
   claim.provider.awareness.setLocalState(null); // it owns no id of its own yet
   await synced(claim);
   sendAs(claim, annaId, { cursor: null });
   await new Promise((resolve) => setTimeout(resolve, 300));
   assert.equal(seen(viewer, annaId), undefined);
   // Anna comes back with the same id and is shown again.
-  const back = live.open({ cookie: "herd_session=token-a" });
+  const back = live.open({ grant: "herd_cg_a" });
   await synced(back);
   sendAs(back, annaId, { cursor: null });
   await until(() => seen(viewer, annaId)?.user?.name === "Anna");

@@ -94,7 +94,26 @@ zählt sie nicht mit.
   PDF, TXT, Markdown, CSV, JSON, DOCX, XLSX, PPTX, ZIP (als Download). SVG und HTML
   werden abgelehnt, auch umbenannt. Ein Upload sendet das Ereignis
   `attachment.uploaded` (nur IDs; seit M7, für Ereignis-Regeln von Agenten,
-  [`AGENTEN.md`](AGENTEN.md)); ein Import sendet keines.
+  [`AGENTEN.md`](AGENTEN.md)); ein Import sendet keines. Gleiche Inhalte liegen nur
+  einmal in der Ablage. Wird der letzte Anhang eines Inhalts gelöscht (auch mit dem
+  endgültigen Löschen einer Seite), bleibt die Datei noch 48 Stunden liegen (ein
+  Grabstein, `storage_tombstone`); danach entfernt sie der Worker, wenn sie nicht
+  wieder benutzt wird. So findet eine laufende Sicherung jede Datei ihres
+  Datenbank-Stands (M9).
+- **Virenscan (optional, seit M9b):** Mit `HERD_CLAMAV_ADDRESS` (`host:port` eines
+  `clamd`, den der Betrieb selbst betreibt; Chart `virusScan.clamavAddress`) prüft die
+  App jeden Anhang, jeden Wiki-Import (das ganze Archiv) und jeden Skill-Import vor dem
+  Speichern; während des Scans hält die Anfrage keine Datenbankverbindung. Hochgeladene
+  Sicherungsarchive prüft er nicht ([`SICHERUNG.md`](SICHERUNG.md)). Ein Fund lehnt
+  mit 422 `attachment.rejected_by_scan` ab („Die Datei wurde vom Virenscan
+  abgelehnt.“). Ist der Scanner nicht erreichbar, antwortet er mit einem Fehler oder
+  braucht er länger als 120 s, wird nichts gespeichert: 503
+  `attachment.scan_unavailable` (fail closed). `clamd`s `StreamMaxLength` muss
+  mindestens so groß sein wie die Import-Grenze (100 MiB), sonst lehnt er große Dateien
+  mit einem Fehler ab. Die Metrik `herd_virus_scans_total{outcome}` (`clean`, `found`,
+  `failed`) zählt die Ergebnisse; Namen oder Inhalte landen nie in Logs oder Metriken.
+  Leer (Standard) prüft nichts. Ein Beispiel-Dienst steht auskommentiert in
+  `deploy/compose/compose.yml`.
 - **Suche:** Strg+K (oder „Suche“ in der Seitenleiste) durchsucht Titel und Inhalt
   aller Seiten, die man lesen darf, optional nur im aktuellen Bereich. Entwürfe findet
   nur, wer sie sehen darf.
@@ -406,12 +425,143 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Person gespeichert. Sie hatte das Recht dazu (sonst wäre es ein Rechteentzug und
   würde verworfen); das ist so entschieden (Prüfung M2, S9).
 
+## Berechtigungen des Collab-Prozesses
+
+Das Sitzungs-Cookie verlässt die API nicht (seit M9, R14). Nach ihren Prüfungen stellt
+die API für jede Live-Verbindung eine eigene, kurzlebige Berechtigung aus
+(`herd_cg_…`, 256 Bit Zufall) und reicht nur sie dem Collab-Prozess weiter
+(`Authorization: Bearer`). Sie gilt für genau eine Seite und eine Generation:
+
+- **Was sie erlaubt:** Laden, Speichern und Prüfen dieser Seite in dieser Generation
+  über die interne API, als die Person, deren Anmeldung sie ausgestellt bekam, und nur,
+  solange diese die Seite bearbeiten darf. Für eine andere Seite oder eine andere
+  Generation wird sie nicht gefunden. Ein kompromittierter Collab-Prozess erreicht so
+  nur die Seiten, die gerade offen sind, und keine Anmeldung; mit einer erfundenen oder
+  fremden Berechtigung beendet er auch keine Generation.
+- **Ablauf:** zehn Minuten; jede Prüfung des offenen Dokuments (alle 5 s) verlängert
+  sie. Läuft sie ab (etwa weil die API länger als zehn Minuten nicht erreichbar war),
+  wird die Verbindung mit 4403 getrennt und der Editor verbindet sich nicht von selbst
+  neu („Neu laden“).
+- **Abmelden** ist weiterhin kein Rechteentzug: Neue Verbindungen nimmt die
+  Berechtigung nicht mehr an, aber was die Person getippt hat, wird unter ihrem Namen
+  gespeichert (bis die beendete Anmeldung nach einer Stunde aufgeräumt ist).
+- **Mit der Anmeldung:** Wird eine Anmeldung gelöscht (Abmeldung durch einen
+  Administrator, Deaktivierung, Passwortänderung, eine Stunde nach Abmeldung oder
+  Ablauf), verliert jede ihrer Berechtigungen sofort jede Wirkung. Die Zeile bleibt
+  noch bis eine Stunde nach dem Ablauf stehen, nur damit die Prüfung erkennt, dass
+  ungespeicherte Änderungen über sie kamen, und die Generation beendet. Abgelaufene
+  Berechtigungen räumt die API beim Ausstellen neuer in Stapeln auf.
+- **Nach einer Wiederherstellung** gilt keine Berechtigung mehr (der Schritt nach dem
+  Einspielen löscht sie mit den Sitzungen).
+- Gespeichert wird nur der SHA-256 (`collab_grant`). Die Berechtigung steht in keinem
+  Log, keiner URL, keinem Audit-Eintrag und keiner Fehlermeldung; die interne API
+  nimmt sie beim Laden im Kopf `X-Herd-Grant`, sonst im Rumpf.
+- Die Grenzen je Anmeldung (3 Verbindungen je Seite, 10 insgesamt) zählt der
+  Collab-Prozess über eine undurchsichtige Kennung der Anmeldung (`session_ref`), die
+  ihm die API zur Berechtigung nennt; mit ihr kann er nichts tun.
+- Es gibt keine Übergangsschicht für ältere Collab-Prozesse: API und Collab-Prozess
+  kommen aus demselben Image und werden zusammen ausgerollt; ein Collab-Prozess, der
+  noch Cookies erwartet, lehnt jede Verbindung mit 4401 ab, bis er ersetzt ist.
+
+### Internes Token wechseln
+
+Der Collab-Prozess weist sich bei der internen API zusätzlich mit `HERD_INTERNAL_TOKEN`
+aus. Es lässt sich ohne Ausfall wechseln (seit M9b): Die API nimmt während des Wechsels
+auch `HERD_INTERNAL_TOKEN_PREVIOUS`, der Collab-Prozess sendet immer nur
+`HERD_INTERNAL_TOKEN`.
+
+1. Neues Token erzeugen (`openssl rand -hex 32`). Bei der API das alte als
+   `HERD_INTERNAL_TOKEN_PREVIOUS` (oder `…_PREVIOUS_FILE`) und das neue als
+   `HERD_INTERNAL_TOKEN` setzen und die API-Prozesse neu starten; sie nehmen beide.
+2. Die Collab-Prozesse mit dem neuen `HERD_INTERNAL_TOKEN` neu starten.
+3. `HERD_INTERNAL_TOKEN_PREVIOUS` entfernen und die API-Prozesse noch einmal neu
+   starten; das alte Token gilt dann nicht mehr.
+
+Im Chart steht das Token im Secret `collab.internalToken.existingSecret` (oder dem
+erzeugten `<release>-internal-token`) unter `token`; für den Wechsel kommt das alte unter
+den Schlüssel `previous` (optional, nur die API-Pods lesen ihn), dann folgen ein Neustart
+der API- und der Collab-Pods (`kubectl rollout restart`) und das Entfernen von
+`previous`. In Rolle `all` (Compose) startet der eine Prozess beide Seiten zugleich neu;
+dort genügt es, das Token zu ersetzen.
+
+## Mehrere Collab-Instanzen (seit M9b)
+
+Der Collab-Prozess hält das Live-Dokument einer Seite im Speicher. Damit mehrere
+Collab-Prozesse nebeneinander laufen können (Chart `collab.replicas`, Compose
+`compose.nodes.yml` mit `collab-a` und `collab-b`), wird **jede Seite in PostgreSQL an
+genau eine Instanz gebunden** (Plan M9, Entscheidung 17; ohne Redis):
+
+- **Anmelden:** Jede Instanz wählt beim Start eine eigene Kennung und meldet sich alle
+  5 s bei der internen API (`POST /internal/collab/instances`) mit der Adresse, unter der
+  die API sie erreicht: `HERD_COLLAB_ADVERTISE_URL` (`ws://host:port`, ohne Pfad; Pflicht,
+  ohne sie startet der Prozess nicht). In Rolle `all` setzt die App selbst
+  `ws://127.0.0.1:<HERD_COLLAB_PORT>` (eine Instanz, der Kindprozess); das Chart nimmt
+  die Pod-IP (`ws://$(HERD_COLLAB_POD_IP):1234`, Downward-API); in Compose der Name des
+  Containers. Eine Instanz, die 15 s schweigt, gilt als weg (gemessen an der Uhr des
+  Datenbankservers, so dass API-Knoten mit abweichender Uhr sich einig sind); nach einer Stunde Schweigen
+  räumt die Fälligkeits-Schleife ihre Zeile auf (`collab_instance`).
+- **Binden:** Das Relay der API schickt jede Verbindung einer Seite an ihre Besitzerin
+  (`collab_page_owner`). Hat die Seite keine gültige Besitzerin (Bindung abgelaufen oder
+  Instanz weg), bindet es sie an die lebende, nicht auslaufende Instanz mit den
+  wenigsten Seiten und erhöht dabei die `epoch` der Seite atomar. Die Bindung gilt 30 s
+  und wird mit jedem Aufruf der Besitzerin verlängert (die Prüfung jedes offenen
+  Dokuments alle 5 s). So landen alle Bearbeitenden einer Seite in einer Instanz, und die
+  Speicherlogik (Generationen, Rechte je Sitzung, Zusammenfassen der Versionen) bleibt,
+  wie sie ist.
+- **Schutz vor zwei Schreibenden:** Laden, Speichern und Prüfen nennen die Instanz,
+  Speichern und Prüfen dazu die `epoch`, mit der sie die Seite geladen hat. Wer nicht
+  (mehr) Besitzerin ist, bekommt 409 `collab.not_owner`, verwirft das Dokument und
+  schließt seine Verbindungen mit 4409; die Browser holen die Seite neu und verbinden sich
+  über das Relay mit der neuen Besitzerin. Der gespeicherte Inhalt der neuen Besitzerin
+  bleibt; was in der alten Instanz seit ihrer letzten Speicherung getippt wurde (höchstens
+  etwa 10 s), geht verloren. Das passiert nur, wenn eine Instanz 30 s lang die API nicht
+  erreicht hat oder 15 s lang als tot galt, während sie noch lief.
+- **Auslaufen (SIGTERM):** Eine Instanz, die beendet wird (Rollout, Knoten leeren,
+  `docker compose stop`), meldet sich als auslaufend (keine neuen Seiten mehr), speichert
+  alle offenen Dokumente, schließt die Verbindungen mit 1012 und gibt dann ihre Seiten
+  frei (`DELETE /internal/collab/instances/<id>`). Die Browser verbinden sich von selbst
+  neu und landen auf einer anderen Instanz, ohne Verlust; bis zur Freigabe (meist unter
+  einer Sekunde) bekommen sie 4502 und versuchen es weiter. Das Chart rollt bei
+  `collab.replicas` ≥ 2 je einen Pod (`maxSurge` 1, `maxUnavailable` 0) und legt ein
+  PodDisruptionBudget an; mit einer Replika bleibt es bei `Recreate`. Wird eine Instanz
+  hart beendet (SIGKILL, Absturz), sind ihre Seiten frei, sobald ihr letzter Herzschlag
+  15 s alt ist, also 10 bis 15 s nach dem Absturz; dazu kommt die Wartezeit des
+  Browsers bis zum nächsten Verbindungsversuch. Was sie nicht mehr speichern konnte, ist
+  verloren (wie bisher beim einen Collab-Prozess). Vorgeführt ([`demo/m9.md`](demo/m9.md),
+  Abschluss M9b): nach SIGTERM die Seite nach 1,1 s auf der anderen Instanz, nach
+  SIGKILL nach 11,7 s und in einem Probelauf nach 17,7 s; Messung mit 40 Editoren im
+  [Steckbrief](STECKBRIEF.md).
+- **Keine Instanz:** Meldet sich keine lebende Instanz (etwa kurz nach dem Start, bevor
+  der Collab-Prozess sich angemeldet hat), schließt das Relay mit 4502
+  `collab.unavailable`; der Editor versucht es weiter.
+- **Wartungsmodus:** Während des Einspielens eines Archivs nimmt die interne API weder
+  Anmeldungen noch Freigaben von Instanzen an (503 `maintenance.active`; auch der
+  Herzschlag schreibt in die Datenbank, die gerade ersetzt wird). Die Instanzen laufen
+  weiter, gelten nach 15 s als weg und melden sich nach dem Wartungsmodus innerhalb von
+  5 s wieder an; bis dahin schließt das Relay mit 4502, und der Editor versucht es weiter.
+- **Bemessung:** Jede Instanz hat ihr eigenes Speicherbudget
+  (`HERD_COLLAB_MEMORY_BUDGET_MB`) und Limit (Faustregel oben). Die Instanzen teilen sich
+  die Seiten, nicht die Bearbeitenden einer Seite: Eine einzelne sehr gefragte Seite
+  liegt immer in einer Instanz.
+- **Aktualisieren von 1.0.0:** Ein Collab-Prozess von 1.0.0 nennt keine Instanz. Die
+  API bedient ihn wie bisher, solange keine Instanz die Seite besitzt (so gehen seine
+  letzten Speicherungen beim Beenden nicht verloren); sobald eine neue Instanz die Seite
+  besitzt, gilt er als veraltete Besitzerin (409). Er meldet sich nicht an, also leitet
+  das Relay keine neuen Verbindungen zu ihm: Bis der neue Collab-Prozess läuft, sehen
+  Browser kurz „Getrennt – neuer Versuch …“.
+- **Nur über IPv4 geprüft:** Die Adresse aus der Pod-IP ist eine IPv4-Adresse; ein
+  reiner IPv6-Cluster braucht eine Adresse in eckigen Klammern, die das Chart heute
+  nicht bildet.
+- Metrik: `herd_collab_saves_total{result="not_owner"}` zählt abgewiesene Speicherungen
+  einer veralteten Besitzerin; `herd_collab_documents` je Instanz zeigt die Verteilung.
+
 ## Betrieb hinter einem Reverse Proxy
 
 Die Live-Bearbeitung ist ein WebSocket auf `/collab/<seiten-id>?generation=<n>` am
 öffentlichen Port (8080) der API, also am selben Host und Service wie alles andere. Die
 API prüft Origin, Sitzungs-Cookie, Rechte und Generation und reicht erst dann an den
-Collab-Prozess weiter. Daraus folgt für Proxy und Ingress:
+Collab-Prozess weiter (siehe „Berechtigungen des Collab-Prozesses“). Daraus folgt für
+Proxy und Ingress:
 
 1. **Upgrade durchreichen** (`Upgrade`- und `Connection`-Header, HTTP/1.1 zum
    Backend). Ein eigener Pfad für `/collab` ist nicht nötig.
@@ -502,16 +652,21 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
 - Im Browser HTTP 403 beim WebSocket: Origin passt nicht zu `HERD_PUBLIC_URL` bzw. zum
   Host.
 - Close-Codes (in den Entwicklerwerkzeugen des Browsers): 4401 Sitzung ungültig, 4403
-  kein Schreibrecht, 4404 Seite nicht sichtbar, 4409 Generation beendet, 4413 Zustand
+  kein Schreibrecht (oder die Berechtigung der Verbindung ist abgelaufen), 4404 Seite nicht sichtbar, 4409 Generation beendet, 4413 Zustand
   zu groß, 4422 Seite nicht verlustfrei live bearbeitbar, 4429 zu viele Verbindungen
   (je Anmeldung 3 je Seite und 10 insgesamt, je Person 20 über alle Anmeldungen, nie
   mehr als ein Viertel aller), 4507 Live-Editor ausgelastet (Speicherbudget des
   Collab-Prozesses, siehe oben), 4408/4504 Verbindungsaufbau zu langsam oder 15 Minuten
   nichts gesendet (der Browser verbindet sich neu),
-  4502/4503 Collab-Prozess nicht erreichbar bzw. aus.
+  4502/4503 keine Collab-Instanz erreichbar (der Browser versucht es weiter) bzw.
+  Live-Bearbeitung aus; 4503 mit Grund `maintenance` bzw. `maintenance.active`: die
+  Installation ist im Wartungsmodus (Einspielen eines Archivs,
+  [`SICHERUNG.md`](SICHERUNG.md#einspielen-in-eine-laufende-installation-wartungsmodus)),
+  das Dokument wird ungespeichert verworfen. 4409 kommt auch, wenn eine andere
+  Collab-Instanz die Seite übernommen hat (siehe „Mehrere Collab-Instanzen“).
 - Metriken auf Port 9090: `herd_collab_connections` (offene Verbindungen),
   `herd_collab_saves_total{result}` (Speicherungen: `saved`, `generation_ended`,
-  `revoked`, `too_large`, `refused`, `unrepresentable`: ein Stand, der sich nicht als
+  `revoked`, `too_large`, `not_owner`, `refused`, `unrepresentable`: ein Stand, der sich nicht als
   Markdown speichern ließ), `herd_collab_load_mutations_total` (Editoren im Browser,
   die ein gerade geladenes Dokument von selbst geändert hätten und deshalb beendet
   wurden; jeder Wert über 0 ist ein Fehler im Editor). Am Port 1234 des

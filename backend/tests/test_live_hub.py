@@ -16,7 +16,8 @@ from app.core.listen import asyncpg_dsn
 from app.modules.messaging import live_connection as live_module
 from app.modules.messaging.live import LiveHub, TooManyStreams
 from app.modules.messaging.live_connection import Connection
-from app.modules.messaging.live_events import LIVE_CHANNEL, LiveEvent, decode
+from app.modules.messaging.live_decode import decode
+from app.modules.messaging.live_events import LIVE_CHANNEL, LiveEvent
 from app.web.public import create_public_app
 from tests.factories import login
 from tests.live_helpers import LiveServer, drain, open_stream

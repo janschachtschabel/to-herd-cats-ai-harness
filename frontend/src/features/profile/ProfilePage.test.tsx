@@ -4,11 +4,16 @@ import type { Me } from '@/lib/api'
 import { apiError, type Call, makeMe, mockApi, page } from '@/test/api'
 import { renderApp } from '@/test/render'
 
+/** Two-factor sign-in off (its own tests: `totp/Totp.test.tsx`). */
+const TOTP_OFF = { enabled_at: null, recovery_codes_left: 0, unavailable: null }
+
 /** The API side of the person's own settings: PATCH answers with the new `me`. */
 function profileApi(me: Me) {
   let current = me
   return mockApi({
     'GET /api/auth/me': () => current,
+    'GET /api/auth/me/totp': TOTP_OFF,
+    'GET /api/auth/me/sessions': page([]),
     'GET /api/spaces': page([]),
     'PATCH /api/auth/me': (call: Call) => {
       const body = call.body as { locale: 'de' | 'en'; version: number }
@@ -22,6 +27,8 @@ describe('profile', () => {
   test('the interface speaks the language stored for the person', async () => {
     mockApi({
       'GET /api/auth/me': makeMe(['space.create'], { locale: 'en' }),
+      'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
     })
     await renderApp('/spaces')
@@ -57,6 +64,8 @@ describe('profile', () => {
   test('the person changes their password with the current one', async () => {
     const api = mockApi({
       'GET /api/auth/me': makeMe(['space.create']),
+      'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
       'POST /api/auth/me/password': (call: Call) =>
         (call.body as { current_password: string }).current_password === 'altes-passwort-1'
@@ -83,12 +92,37 @@ describe('profile', () => {
     expect(within(form).getByLabelText('Neues Passwort')).toHaveValue('')
   })
 
+  test('a guessable new password is refused with the reason', async () => {
+    mockApi({
+      'GET /api/auth/me': makeMe(['space.create']),
+      'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
+      'GET /api/spaces': page([]),
+      'POST /api/auth/me/password': (call: Call) =>
+        (call.body as { new_password: string }).new_password === 'basketball'
+          ? apiError(422, 'auth.password_common')
+          : apiError(422, 'auth.password_context'),
+    })
+    const { user } = await renderApp('/profile')
+    const form = await screen.findByRole('form', { name: 'Passwort ändern' })
+    await user.type(within(form).getByLabelText('Aktuelles Passwort'), 'altes-passwort-1')
+    await user.type(within(form).getByLabelText('Neues Passwort'), 'basketball')
+    await user.click(within(form).getByRole('button', { name: 'Passwort ändern' }))
+    expect(await within(form).findByText(/leicht zu erraten/)).toBeInTheDocument()
+    await user.clear(within(form).getByLabelText('Neues Passwort'))
+    await user.type(within(form).getByLabelText('Neues Passwort'), 'mia-muster-2026')
+    await user.click(within(form).getByRole('button', { name: 'Passwort ändern' }))
+    expect(await within(form).findByText(/naheliegenden Begriff/)).toBeInTheDocument()
+  })
+
   test('after a password change the language is stored with the new version', async () => {
     let current = makeMe(['space.create'])
     const bump = () =>
       (current = { ...current, user: { ...current.user, version: current.user.version + 1 } })
     const api = mockApi({
       'GET /api/auth/me': () => current,
+      'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
       'POST /api/auth/me/password': () => (bump(), { status: 204 }),
       'PATCH /api/auth/me': (call: Call) => {
@@ -117,6 +151,8 @@ describe('profile', () => {
     let current = makeMe(['space.create'])
     const api = mockApi({
       'GET /api/auth/me': () => current,
+      'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
       'PATCH /api/auth/me': (call: Call) => {
         const body = call.body as { locale: 'de' | 'en'; version: number }
@@ -141,6 +177,8 @@ describe('profile', () => {
   test('if the language cannot be stored, it comes back and the person is told', async () => {
     mockApi({
       'GET /api/auth/me': makeMe(['space.create']),
+      'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
       'PATCH /api/auth/me': apiError(409, 'users.version_conflict'),
     })
@@ -155,7 +193,12 @@ describe('profile', () => {
   })
 
   test('a too short new password is refused before sending', async () => {
-    const api = mockApi({ 'GET /api/auth/me': makeMe([]), 'GET /api/spaces': page([]) })
+    const api = mockApi({
+      'GET /api/auth/me': makeMe([]),
+      'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
+      'GET /api/spaces': page([]),
+    })
     const { user } = await renderApp('/profile')
     const form = await screen.findByRole('form', { name: 'Passwort ändern' })
     await user.type(within(form).getByLabelText('Aktuelles Passwort'), 'altes-passwort-1')

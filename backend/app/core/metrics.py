@@ -20,6 +20,20 @@ HTTP_REQUESTS = Counter(
     ["method", "route", "status"],
     registry=REGISTRY,
 )
+# Writes and uploads refused by the limit per person or agent (J10, `write_limit.py`).
+RATE_LIMITED = Counter(
+    "herd_rate_limited_total",
+    "Writes refused by the write limit per person or agent and minute.",
+    ["area"],
+    registry=REGISTRY,
+)
+# Uploads scanned by the optional clamd (J11, `virus_scan.py`): clean, found, failed.
+VIRUS_SCANS = Counter(
+    "herd_virus_scans_total",
+    "Uploads scanned by the configured virus scanner, by outcome.",
+    ["outcome"],
+    registry=REGISTRY,
+)
 HTTP_REQUEST_DURATION = Histogram(
     "herd_http_request_duration_seconds",
     "Duration of HTTP requests on the public port.",

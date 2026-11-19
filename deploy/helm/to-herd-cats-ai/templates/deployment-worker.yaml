@@ -7,7 +7,17 @@
 # and runs (FOR NO KEY UPDATE SKIP LOCKED), every handler is idempotent, and a run's
 # effects are committed with its journal. On SIGTERM the batch in progress finishes and
 # runs in progress are dropped; another worker takes them up after their lease and
-# goes on from their journal.
+# goes on from their journal. The due loop also removes the files of deleted attachments
+# after their grace (core/storage_tombstones.py): with local storage the worker mounts the
+# files claim at /data (beside an API pod on a ReadWriteOnce claim; on ReadWriteOncePod,
+# which only the API pod can mount, those files stay); with s3.enabled it uses the store.
+{{- $files := and .Values.persistence.enabled (not .Values.s3.enabled) }}
+{{- $modes := .Values.persistence.accessModes }}
+{{- $created := not .Values.persistence.existingClaim }}
+{{- if and $files $created (has "ReadWriteOncePod" $modes) (not (has "ReadWriteMany" $modes)) }}
+{{- $files = false }}
+{{- end }}
+{{- $besideApi := and $files $created (not (has "ReadWriteMany" $modes)) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,7 +26,10 @@ metadata:
     {{- include "herd.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
 spec:
+  {{- if not .Values.worker.autoscaling.enabled }}
+  # With worker.autoscaling the autoscaler owns the count (hpa-worker.yaml).
   replicas: {{ .Values.worker.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "herd.selectorLabels" . | nindent 6 }}
@@ -34,6 +47,17 @@ spec:
       {{- end }}
       securityContext:
         {{- include "herd.podSecurityContext" . | nindent 8 }}
+      {{- if $besideApi }}
+      # The files claim is ReadWriteOnce: mountable only on the node of the API pod.
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  {{- include "herd.selectorLabels" . | nindent 18 }}
+                  app.kubernetes.io/component: api
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       terminationGracePeriodSeconds: 30
       containers:
         # The API's container name: the HerdNotReady alert covers the worker too.
@@ -41,17 +65,8 @@ spec:
           image: {{ include "herd.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            {{- include "herd.databaseEnv" (dict "root" . "role" "worker") | nindent 12 }}
-            {{- with .Values.tracing.otlpEndpoint }}
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: {{ . | quote }}
-            {{- end }}
-            {{- include "herd.aiWorkerEnv" . | nindent 12 }}
-            {{- include "herd.mcpWorkerEnv" . | nindent 12 }}
-            {{- range $name, $value := .Values.worker.env }}
-            - name: {{ $name }}
-              value: {{ $value | quote }}
-            {{- end }}
+            {{- $own := include "herd.workerOwnEnv" . }}
+            {{- include "herd.withExtraEnv" (dict "own" $own "extra" .Values.worker.env "where" "worker.env") | nindent 12 }}
           {{- with .Values.ai.existingSecret }}
           # AI keys: HERD_SECRET_KEY(_PREVIOUS), HERD_AI_EGRESS_PROXY, HERD_AI_<NAME>.
           envFrom:
@@ -90,8 +105,21 @@ spec:
             {{- include "herd.containerSecurityContext" . | nindent 12 }}
           volumeMounts:
             {{- include "herd.volumeMounts" . | nindent 12 }}
+            {{- if $files }}
+            - name: data
+              mountPath: /data
+            {{- end }}
+            {{- with include "herd.s3VolumeMount" . }}{{ . | nindent 12 }}{{- end }}
+            {{- with include "herd.backupsVolumeMount" . }}{{ . | nindent 12 }}{{- end }}
       volumes:
         {{- include "herd.volumes" . | nindent 8 }}
+        {{- with include "herd.s3Volume" . }}{{ . | nindent 8 }}{{- end }}
+        {{- with include "herd.backupsVolume" . }}{{ . | nindent 8 }}{{- end }}
+        {{- if $files }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }}
+        {{- end }}
 ---
 # The worker's internal port, for the metrics scrape only (headless: nothing else
 # connects to it). The ServiceMonitor selects it by app.kubernetes.io/endpoint.

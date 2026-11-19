@@ -35,6 +35,7 @@ async def test_well_known_metadata_proposes_a_client(
         "status": "ok",
         "resource": f"{oauth_ready.url}/mcp",
         "issuer": oauth_ready.url,
+        "issuer_in_response": False,
         "authorization_endpoint": f"{oauth_ready.url}/authorize",
         "token_endpoint": f"{oauth_ready.url}/token",
         "revocation_endpoint": f"{oauth_ready.url}/revoke",

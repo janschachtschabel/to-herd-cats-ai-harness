@@ -42,7 +42,7 @@ async def test_a_write_tool_is_offered_from_level_four_and_waits_for_a_release(
     tool = (await ext.tools())["create_issue"]
     assert approval["external"] == {"server_id": ext.server["id"], "tool_id": tool["id"]}
     (card,) = [m for m in await ext.bench.messages() if m["kind"] == "approval"]
-    assert card["body_md"] == "Tracker · create_issue" and "Login" not in card["body_md"]
+    assert card["body_md"] == name  # the tool only: the summary is Alice's (review M8 5, L1)
     r = await decide(ext, approval, "approve")
     assert r.status_code == 200, r.text
     assert await ext.bench.run_next() == StopReason.COMPLETED

@@ -10,6 +10,7 @@ import { formatDateTime } from '@/lib/format'
 import { useNow } from '@/lib/useNow'
 import { ApprovalDecision } from './ApprovalDecision'
 import { ApprovalSubject } from './ApprovalSubject'
+import { useReleasable } from './releasable'
 import { CardFrame, CardState, type Tone } from './CardFrame'
 import { approvalView, externalToolOf, mayDecide, type ApprovalView } from './display'
 import { useApproval, useDecideApproval, type Approval } from './queries'
@@ -44,7 +45,8 @@ function Decider({ approval, meId }: { approval: Approval; meId: string | undefi
  *  state (waiting, approved and run, stale because the object changed, rejected with
  *  its reason, expired), the decision for the person asked, and a link to the run.
  *  A rejection's reason is the asked person's to read (others: `redacted`). Under the
- *  personal mark (`personal`) it says so: she releases exactly what is shown. */
+ *  personal mark (`personal`) it says so: she releases exactly what is shown, which
+ *  others can read now or later; a read (`reads`) says that it reads and writes nothing. */
 export function ApprovalCardView({ approval }: { approval: Approval }) {
   const { t, i18n } = useTranslation()
   const me = useMe()
@@ -55,6 +57,7 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
   const view = approvalView(approval, now)
   const when = (iso: string | null) => (iso ? formatDateTime(iso, i18n.language) : '')
   const external = externalToolOf(approval)
+  const releasable = useReleasable(approval)
   return (
     <CardFrame
       icon={<ShieldCheck className="size-4" />}
@@ -66,18 +69,22 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
       }
       state={<CardState tone={TONE[view]}>{t(`approvals.state.${view}`)}</CardState>}
     >
-      <p
-        className={
-          external !== null
-            ? 'text-sm font-medium break-words'
-            : 'font-mono text-xs break-words text-muted-foreground'
-        }
-      >
-        {approval.summary}
-      </p>
+      {approval.summary !== null ? (
+        <p
+          className={
+            external !== null
+              ? 'text-sm font-medium break-words'
+              : 'font-mono text-xs break-words text-muted-foreground'
+          }
+        >
+          {approval.summary}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">{t('approvals.card.summaryRedacted')}</p>
+      )}
       {approval.personal && (
         <p className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-100">
-          {t('approvals.card.personal')}
+          {t(approval.reads ? 'approvals.card.personalRead' : 'approvals.card.personal')}
         </p>
       )}
       <ApprovalSubject approval={approval} />
@@ -101,7 +108,9 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
           )}
         </p>
       )}
-      {mayDecide(approval, meId, now) && <ApprovalDecision approval={approval} decide={decide} />}
+      {mayDecide(approval, meId, now) && (
+        <ApprovalDecision approval={approval} decide={decide} releasable={releasable} />
+      )}
       {decide.isError && (
         <p role="alert" className="text-xs text-destructive">
           {errorMessage(t, decide.error)}
@@ -113,8 +122,9 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
 }
 
 /** A release card by id (a message's card). Someone who may not see it (the API
- *  answers 404) sees what the message says and that only the person asked decides. */
-export function ApprovalCard({ approvalId, summary }: { approvalId: string; summary: string }) {
+ *  answers 404) sees the tool the message names and that only the person asked
+ *  decides. */
+export function ApprovalCard({ approvalId, tool }: { approvalId: string; tool: string }) {
   const { t } = useTranslation()
   const approval = useApproval(approvalId)
   if (approval.isPending) {
@@ -128,7 +138,7 @@ export function ApprovalCard({ approvalId, summary }: { approvalId: string; summ
       label={t('approvals.card.label')}
       title={t('approvals.card.titleUnknown')}
     >
-      <p className="font-mono text-xs break-words text-muted-foreground">{summary}</p>
+      <p className="text-xs break-words text-muted-foreground">{toolText(t, tool)}</p>
       {hidden ? (
         <p className="text-xs text-muted-foreground">{t('approvals.card.notYours')}</p>
       ) : (

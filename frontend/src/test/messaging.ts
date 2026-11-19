@@ -20,6 +20,7 @@ export function makeConversation(overrides: Partial<Conversation> = {}): Convers
     can_post: true,
     participants: [],
     inspections: [],
+    fresh_start_at: null,
     ...overrides,
   }
 }
@@ -80,6 +81,7 @@ export function shellRoutes(me: Me, spaces: Space[] = []) {
     'GET /api/channels': page([]),
     'GET /api/dms': page([]),
     'GET /api/conversations/unread': page([]),
+    'GET /api/conversations/:id/read': { last_read_message_id: null, last_read_message_at: null },
     'GET /api/activity/count': { open: 0, unread: 0 },
     'GET /api/tickets/counts': { assigned_open: 0 },
     'GET /api/approvals': page([]),

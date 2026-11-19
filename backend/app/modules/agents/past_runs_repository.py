@@ -58,9 +58,11 @@ class PastRunRepository:
         readable: Select[uuid.UUID],
         conversation_id: uuid.UUID | None,
         limit: int,
+        after: datetime | None = None,
     ) -> list[PastHit]:
         """Events of the agent's runs for the person (but `exclude`; with
-        `conversation_id`, only runs there) whose text holds `text`, newest first: a
+        `conversation_id`, only runs there; with `after`, only runs created after it)
+        whose text holds `text`, newest first: a
         tool result whose noted spaces are all `readable` (none noted: none), and the
         model's own words (and a final result) whose run read only `readable` spaces."""
         space = aliased(Space)  # `readable` is over `space` too: never correlated with it
@@ -107,6 +109,8 @@ class PastRunRepository:
         )
         if conversation_id is not None:
             stmt = stmt.where(Run.conversation_id == conversation_id)
+        if after is not None:
+            stmt = stmt.where(Run.created_at > after)
         rows = await self.session.execute(stmt)
         return [PastHit(r[0], r[1], r[2], EventKind(r[3]), r[4]) for r in rows]
 

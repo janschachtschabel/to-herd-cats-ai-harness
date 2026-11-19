@@ -251,6 +251,34 @@ describe('conversation', () => {
     expect(api.find('GET', `/api/conversations/${channel.id}`)).toHaveLength(1)
   })
 
+  test('the "new" marker follows the read position, not the counters', async () => {
+    const channel = makeConversation()
+    const at = (minute: number) => `2026-11-13T09:0${minute}:00Z`
+    const messages = [3, 2, 1].map((n) =>
+      makeMessage({ conversation_id: channel.id, body_md: `Nummer ${n}`, created_at: at(n) }),
+    )
+    conversationApi({
+      conversation: channel,
+      messages,
+      extra: {
+        // The counters (cached, say) still count three; the position says one was read.
+        'GET /api/conversations/unread': page([
+          { conversation_id: channel.id, unread: 3, mentions: 0 },
+        ]),
+        'GET /api/conversations/:id/read': {
+          last_read_message_id: messages[2]!.id,
+          last_read_message_at: at(1),
+        },
+      },
+    })
+    await renderApp(`/c/${channel.id}`)
+    await screen.findByText('Nummer 3')
+    const items = screen.getAllByRole('listitem').map((li) => li.textContent ?? '')
+    const marker = items.findIndex((text) => text === 'Neu')
+    expect(items[marker - 1]).toContain('Nummer 1')
+    expect(items[marker + 1]).toContain('Nummer 2')
+  })
+
   test('the "new" marker stands before the first unread message and the newest is read', async () => {
     const channel = makeConversation()
     const messages = [

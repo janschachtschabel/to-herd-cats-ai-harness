@@ -1,5 +1,6 @@
 import createClient, { type Middleware } from 'openapi-fetch'
 import type { components, paths } from './api-types'
+import { markRequest } from './attention'
 import { retryingOnConflict } from './retry'
 
 export type Schemas = components['schemas']
@@ -34,6 +35,7 @@ export type Reaction = Schemas['ReactionOut']
 export type Unread = Schemas['UnreadOut']
 export type SystemEntry = Schemas['SystemEntryOut']
 export type ActivityEntry = Schemas['ActivityOut']
+export type ActivityCalendarEvent = Schemas['ActivityCalendarEvent']
 export type ActivityCount = Schemas['ActivityCountOut']
 export type InspectableDm = Schemas['InspectableDmOut']
 export type Ticket = Schemas['TicketOut']
@@ -99,12 +101,40 @@ export function onUnauthorized(handler: (() => void) | null): void {
 }
 
 // A 401 from these is an answer, not a lost session.
-const SESSION_PATHS = ['/api/auth/login', '/api/auth/me', '/api/auth/logout']
+const SESSION_PATHS = [
+  '/api/auth/login',
+  '/api/auth/login/second-factor',
+  '/api/auth/me',
+  '/api/auth/logout',
+]
+
+// Who to tell when the installation is in maintenance (503 `maintenance.active`).
+let maintenanceHandler: (() => void) | null = null
+
+export function onMaintenance(handler: (() => void) | null): void {
+  maintenanceHandler = handler
+}
+
+async function inMaintenance(response: Response): Promise<boolean> {
+  try {
+    const body = (await response.clone().json()) as ErrorBody
+    return body.error?.code === 'maintenance.active'
+  } catch {
+    return false
+  }
+}
 
 const sessionGuard: Middleware = {
-  onResponse({ response, request }) {
+  // Requests nobody's input caused do not keep the session alive (`attention.ts`).
+  onRequest({ request }) {
+    return markRequest(request)
+  },
+  async onResponse({ response, request }) {
     const path = new URL(request.url).pathname
     if (response.status === 401 && !SESSION_PATHS.includes(path)) unauthorizedHandler?.()
+    if (response.status === 503 && maintenanceHandler && (await inMaintenance(response))) {
+      maintenanceHandler()
+    }
     return undefined
   },
 }

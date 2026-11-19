@@ -120,7 +120,8 @@ def test_csp_starts_from_self_and_forbids_framing() -> None:
     )
     assert directives["default-src"] == "'self'"
     assert directives["frame-ancestors"] == "'none'"
-    assert directives["base-uri"] == "'self'"
+    assert directives["base-uri"] == "'none'"
+    assert directives["object-src"] == "'none'"
     assert directives["form-action"] == "'self'"
     assert "script-src" not in directives  # scripts: 'self' only, never inline
     assert "*" not in CONTENT_SECURITY_POLICY
@@ -200,3 +201,11 @@ async def test_without_static_dir_nothing_is_served_outside_api(client: AsyncCli
     response = await client.get("/spaces")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
+
+
+async def test_trace_is_not_supported(client_with_static: AsyncClient) -> None:
+    """ASVS 5.0 V13.4.4: TRACE echoes nothing anywhere (SPA, API, unknown paths)."""
+    for path in ("/", "/spaces", "/api/auth/me", "/api/openapi.json", "/api/nope", "/mcp"):
+        response = await client_with_static.request("TRACE", path, headers={"X-Probe": "echo-me"})
+        assert response.status_code in (404, 405), (path, response.status_code)
+        assert "echo-me" not in response.text

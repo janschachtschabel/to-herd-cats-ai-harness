@@ -25,7 +25,9 @@ from tests.support.mcp_stub import McpStub
 from tests.support.oauth_stub import OAuthStub
 
 CLIENTS = "/api/ai/oauth-clients"
-CALLBACK = "/api/ai/oauth/callback"
+# The shared callback of releases before M9b task 18 (J13): it answers only for flows
+# started with it; every flow since names its app's own (`callback_for`).
+LEGACY_CALLBACK = "/api/ai/oauth/callback"
 PUBLIC_URL = "https://herd.example"
 
 
@@ -113,6 +115,11 @@ async def authorize(client: AsyncClient, base: str, connector_id: object) -> str
     return url
 
 
+def callback_for(url: str) -> str:
+    """The path of the callback an authorization request names (its app's own)."""
+    return urlsplit(dict(parse_qsl(urlsplit(url).query))["redirect_uri"]).path
+
+
 def query_of(location: str) -> dict[str, str]:
     return dict(parse_qsl(urlsplit(location).query))
 
@@ -123,6 +130,6 @@ async def connect(
     """Start the flow, let the stub approve, come back to the callback; the query of
     the page the callback sends the browser to."""
     url = await authorize(client, base, connector_id)
-    response = await client.get(CALLBACK, params=stub.state.authorize(url))
+    response = await client.get(callback_for(url), params=stub.state.authorize(url))
     assert response.status_code == 303, response.text
     return query_of(response.headers["location"])

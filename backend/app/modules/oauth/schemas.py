@@ -42,6 +42,17 @@ Scopes = Annotated[
     ),
 ]
 
+# An issuer is an https URL without query or fragment (RFC 8414 2); http only for a
+# server on this machine (development).
+Issuer = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        max_length=MAX_URL_CHARS,
+        pattern=r"^(https://[^\s?#]+|http://(localhost|127\.0\.0\.1)(:\d+)?(/[^\s?#]*)?)$",
+    ),
+]
+
 URL_FIELDS = ("authorization_endpoint", "token_endpoint", "revocation_endpoint", "resource")
 
 
@@ -59,6 +70,10 @@ class ClientCreate(BaseModel):
     scopes: Scopes = ""
     # RFC 8707: the resource (MCP server) the tokens are for; sent when set.
     resource: Url | None = None
+    # RFC 8414/9207: the authorization server's issuer, compared with a response's
+    # `iss`; `issuer_in_response`: the server always sends `iss` (needs the issuer).
+    issuer: Issuer | None = None
+    issuer_in_response: bool = False
 
 
 class ClientUpdate(BaseModel):
@@ -77,6 +92,8 @@ class ClientUpdate(BaseModel):
     token_auth: TokenAuth | None = None
     scopes: Scopes | None = None
     resource: Url | None = None
+    issuer: Issuer | None = None
+    issuer_in_response: bool | None = None
     # A new authorization, token or revocation endpoint disconnects every connector
     # through the client; a shared one keeps its tokens only with this set.
     keep_shared_connectors: bool = False
@@ -84,7 +101,7 @@ class ClientUpdate(BaseModel):
     @model_validator(mode="after")
     def _shape(self) -> Self:
         required = ("name", "authorization_endpoint", "token_endpoint", "client_id")
-        for name in (*required, "token_auth", "scopes"):
+        for name in (*required, "token_auth", "scopes", "issuer_in_response"):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValueError(f"{name} cannot be removed")
         return self
@@ -102,12 +119,17 @@ class ClientOut(BaseModel):
     token_auth: TokenAuth
     scopes: str
     resource: str | None
+    issuer: str | None
+    issuer_in_response: bool
+    # What to register at the provider as the redirect URI (J13): this app's own
+    # callback; None without a usable HERD_PUBLIC_URL.
+    callback_url: str | None
     version: int
     created_at: datetime
     updated_at: datetime
 
     @classmethod
-    def of(cls, client: OAuthClient) -> "ClientOut":
+    def of(cls, client: OAuthClient, callback_url: str | None) -> "ClientOut":
         ref = client.client_secret_ref
         return cls(
             id=client.id,
@@ -121,6 +143,9 @@ class ClientOut(BaseModel):
             token_auth=client.token_auth,
             scopes=client.scopes,
             resource=client.resource,
+            issuer=client.issuer,
+            issuer_in_response=client.issuer_in_response,
+            callback_url=callback_url,
             version=client.version,
             created_at=client.created_at,
             updated_at=client.updated_at,
@@ -146,6 +171,7 @@ class DiscoveryOut(BaseModel):
     status: DiscoveryStatus
     resource: str | None
     issuer: str | None
+    issuer_in_response: bool
     authorization_endpoint: str | None
     token_endpoint: str | None
     revocation_endpoint: str | None

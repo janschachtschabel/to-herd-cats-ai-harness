@@ -1,0 +1,112 @@
+{
+  "calendars": {
+    "default": {
+      "personal": "Mein Kalender",
+      "general": "Allgemein",
+      "unknown": "Standardkalender"
+    }
+  },
+  "errors": {
+    "calendar": {
+      "window_out_of_range": "Der Kalender reicht von 1900 bis 2399.",
+      "cursor_time_zone": "Die Ansicht hat die Zeitzone gewechselt; bitte von vorn laden.",
+      "window_too_dense": "In diesem Zeitraum liegen zu viele Termine (mehr als 2.000). Wähle eine kürzere Ansicht (Woche oder Tag) oder nur einen Bereich."
+    },
+    "event": {
+      "too_long": "Ein Termin dauert höchstens ein Jahr und einen Tag.",
+      "series_overlaps": "Jeder Termin der Serie muss enden, bevor der nächste beginnt.",
+      "private": "Diesen Termin siehst du nur als belegt; ändern kann ihn nur, wer seinen Inhalt sieht.",
+      "visibility_organiser_only": "Die Sichtbarkeit ändert nur die Organisatorin oder ein Admin.",
+      "version_conflict": "Der Termin wurde inzwischen geändert; bitte neu laden.",
+      "occurrence_overridden": "Dieses Vorkommen wurde schon einzeln geändert; bitte dort ändern.",
+      "occurrence_required": "Welches Vorkommen? Bitte eines der Serie wählen.",
+      "occurrence_unknown": "Dieses Vorkommen gibt es in der Serie nicht (mehr).",
+      "scope_invalid": "Das passt nicht zu diesem Termin: einzelne Termine und einzeln geänderte Vorkommen sind keine Serie.",
+      "too_many_dates": "Eine Serie hat höchstens 500 gelöschte Vorkommen.",
+      "not_invited": "Du bist zu diesem Termin nicht eingeladen.",
+      "attendee_unknown": "Unter den Eingeladenen ist jemand, den du nicht einladen kannst.",
+      "attendee_duplicate": "Jemand steht doppelt auf der Liste der Eingeladenen.",
+      "too_many_attendees": "Ein Termin hat höchstens 100 Eingeladene."
+    }
+  },
+  "activity": {
+    "reasons": {
+      "invitation": "Einladung",
+      "invite_reply": "Antwort auf eine Einladung"
+    },
+    "invitation": {
+      "invited": "Du bist zu „{{title}}“ eingeladen.",
+      "cancelled": "„{{title}}“ wurde abgesagt.",
+      "replied": "Für „{{title}}“ hat jemand abgesagt oder „vielleicht“ geantwortet.",
+      "answer": "Deine Antwort: {{answer}}",
+      "answers": {
+        "needs_action": "noch offen",
+        "accepted": "zugesagt",
+        "tentative": "vielleicht",
+        "declined": "abgesagt"
+      }
+    }
+  },
+  "nav": {
+    "calendar": "Kalender"
+  },
+  "calendar": {
+    "title": "Kalender",
+    "named": "Kalender im Bereich {{space}}",
+    "showAll": "Alle meine Kalender",
+    "views": {
+      "label": "Ansicht",
+      "month": "Monat",
+      "week": "Woche",
+      "day": "Tag",
+      "agenda": "Agenda"
+    },
+    "toolbar": {
+      "label": "Zeitraum",
+      "today": "Heute",
+      "previous": "Voriger Zeitraum",
+      "next": "Nächster Zeitraum",
+      "search": "Termine suchen"
+    },
+    "list": {
+      "title": "Kalender",
+      "readOnly": "nur lesen",
+      "empty": "Noch keine Kalender.",
+      "unknownSpace": "Weiterer Bereich",
+      "spaceNotLoaded": "Bereich (Name nicht geladen)"
+    },
+    "event": {
+      "busy": "Belegt",
+      "untitled": "Ohne Titel",
+      "allDay": "ganztägig",
+      "cancelled": "abgesagt",
+      "details": "{{time}}, {{calendar}}",
+      "series": "Teil einer Serie",
+      "location": "Ort",
+      "calendar": "Kalender",
+      "redacted": "Du siehst diesen Termin nur als belegt.",
+      "cancelledNote": "Dieser Termin ist abgesagt.",
+      "otherCalendar": "Kalender",
+      "until": "bis {{time}}",
+      "continued": "Fortsetzung"
+    },
+    "month": {
+      "more_one": "+{{count}} weiterer",
+      "more_other": "+{{count}} weitere",
+      "hint": "Pfeiltasten wählen einen Tag, die Eingabetaste öffnet ihn."
+    },
+    "week": {
+      "allDay": "Ganztägig",
+      "allDayOf": "Ganztägig, {{day}}",
+      "openDay": "{{day}} öffnen"
+    },
+    "window": {
+      "empty": "Keine Termine in diesem Zeitraum.",
+      "loadingMore": "Weitere Termine werden geladen …",
+      "hidden": "Alle Kalender sind ausgeblendet."
+    },
+    "agenda": {
+      "more": "Weitere Termine laden"
+    }
+  }
+}

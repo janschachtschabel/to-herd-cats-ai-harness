@@ -33,8 +33,12 @@ from app.core import secrets
 from app.core.db import get_database
 from app.core.errors import ValidationFailed
 from app.core.models_base import utcnow
-from app.modules.connectors.credentials import CredentialUnavailable, NotAuthorized
-from app.modules.connectors.models import AuthKind, Connector
+from app.modules.connectors.credentials import (
+    CredentialUnavailable,
+    NotAuthorized,
+    check_purpose,
+)
+from app.modules.connectors.models import AuthKind, Connector, Purpose
 from app.modules.connectors.repository import lock_for_renewal
 from app.modules.oauth import protocol
 from app.modules.oauth.metrics import OAUTH_REFRESHES
@@ -67,22 +71,32 @@ def expiring(expires_at: datetime | None, now: datetime) -> bool:
     return expires_at is not None and expires_at - now <= EXPIRY_MARGIN
 
 
-async def bearer_headers(connector: Connector) -> dict[str, str]:
-    """The headers for a call with `connector` (kind `oauth`), renewed first when the
-    token is about to expire and a refresh token is there."""
+async def bearer_headers(connector: Connector, purpose: Purpose = Purpose.MCP) -> dict[str, str]:
+    """The headers for a call with `connector` (kind `oauth`, of `purpose`), renewed
+    first when the token is about to expire and a refresh token is there."""
+    check_purpose(connector, purpose)
     assert connector.auth_kind == AuthKind.OAUTH
     if connector.secret_ref is None:
         raise NotAuthorized()
     if connector.refresh_token_ref is not None and expiring(connector.token_expires_at, utcnow()):
-        return await renew(connector.org_id, connector.id, used=None)
+        return await renew(connector.org_id, connector.id, used=None, purpose=purpose)
     return bearer(_plain(connector.secret_ref))
 
 
-async def renew(org_id: uuid.UUID, connector_id: uuid.UUID, *, used: str | None) -> dict[str, str]:
+async def renew(
+    org_id: uuid.UUID,
+    connector_id: uuid.UUID,
+    *,
+    used: str | None,
+    purpose: Purpose = Purpose.MCP,
+) -> dict[str, str]:
     """Renew the connector's token unless someone did meanwhile. `used` is the token a
-    server refused (None: renew because it is about to expire)."""
+    server refused (None: renew because it is about to expire). A connector of another
+    purpose than the caller's is refused before anything is asked (`WrongPurpose`)."""
     async with open_unit() as session:
         connector = await lock_for_renewal(session, org_id, connector_id, LOCK_TIMEOUT)
+        if connector is not None:
+            check_purpose(connector, purpose)
         if connector is None or connector.secret_ref is None:
             raise NotAuthorized()
         current = _plain(connector.secret_ref)
@@ -93,7 +107,8 @@ async def renew(org_id: uuid.UUID, connector_id: uuid.UUID, *, used: str | None)
         if not stale or connector.refresh_token_ref is None:
             return bearer(current)
         assert connector.oauth_client_id is not None
-        client = await ClientRepository(session, org_id).get(connector.oauth_client_id)
+        clients = ClientRepository(session, org_id, Purpose(connector.purpose))
+        client = await clients.get(connector.oauth_client_id)
         assert client is not None
         refresh = protocol.refresh(credentials_of(client), _plain(connector.refresh_token_ref))
         try:

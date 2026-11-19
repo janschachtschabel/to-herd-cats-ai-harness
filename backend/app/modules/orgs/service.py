@@ -1,10 +1,17 @@
-"""Installation bootstrap: the organisation and its first owner."""
+"""Installation bootstrap: the organisation and its first owner.
+
+The owner's password passes the checks every password passes (`core/password_check.py`,
+module review M9a, N6): a breached one or one holding a context word (product,
+organisation, the address) refuses the bootstrap (`BootstrapRefused`, nothing created)
+and the start fails (`launch.bootstrap`)."""
 
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
+from app.core.errors import ValidationFailed
+from app.core.password_check import context_words, refuse_guessable
 from app.core.principal import SystemRole
 from app.core.repository import advisory_xact_lock
 from app.core.security import hash_password_async
@@ -16,6 +23,15 @@ from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 
 logger = logging.getLogger(__name__)
+
+
+class BootstrapRefused(Exception):  # noqa: N818 (a verdict)
+    """HERD_BOOTSTRAP_ADMIN_PASSWORD is easy to guess; `code` says why (never the
+    password)."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 async def ensure_bootstrap(session: AsyncSession, settings: Settings) -> None:
@@ -39,14 +55,20 @@ async def ensure_bootstrap(session: AsyncSession, settings: Settings) -> None:
         return
     orgs = OrganizationRepository(session)
     org = await orgs.get_default()
+    name = email.split("@")[0]
+    org_name = org.name if org is not None else settings.bootstrap_org_name
+    try:
+        await refuse_guessable(password, context_words(org_name=org_name, email=email, name=name))
+    except ValidationFailed as refused:
+        logger.error("bootstrap.refused", extra={"reason": refused.code})
+        raise BootstrapRefused(refused.code) from None
     if org is None:
-        name = settings.bootstrap_org_name
-        org = await orgs.add(Organization(name=name))
+        org = await orgs.add(Organization(name=org_name))
     owner = await users.add(
         User(
             org_id=org.id,
             email=email.lower(),
-            name=email.split("@")[0],
+            name=name,
             system_role=SystemRole.OWNER,
             password_hash=await hash_password_async(password),
         )

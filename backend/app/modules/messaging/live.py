@@ -38,7 +38,8 @@ from app.core.errors import AppError, RateLimited
 from app.core.listen import Listener
 from app.modules.messaging.live_batch import BATCH_SIZE, Received, deliver_batch
 from app.modules.messaging.live_connection import RESYNC, Connection
-from app.modules.messaging.live_events import LIVE_CHANNEL, LiveEvent, decode
+from app.modules.messaging.live_decode import decode
+from app.modules.messaging.live_events import LIVE_CHANNEL, LiveEvent
 from app.modules.messaging.live_repository import valid_sessions
 from app.modules.messaging.metrics import (
     LIVE_EVENTS,

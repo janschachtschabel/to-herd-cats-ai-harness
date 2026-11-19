@@ -1,0 +1,53 @@
+# Separate database roles over compose.yml (plan M9 task 18, J14; docs/SICHERUNG.md,
+# "Getrennte Datenbankrollen"):
+#   docker compose -f compose.yml -f compose.roles.yml up -d
+# The role herd_owner (compose.yml's db-owner: owner of the database and its schema, no
+# superuser) runs migrations (at the app's start), backups and restores. The app serves
+# requests as `herd_app`, which gets data rights only (SELECT, INSERT, UPDATE, DELETE;
+# no ALTER, CREATE, DROP). The service db-roles makes that role once and sets its
+# password from .env on every start; the superuser `herd` serves neither.
+# Needs HERD_APP_DB_PASSWORD in .env (`openssl rand -hex 24`). Restoring into the running
+# installation from the administration is refused with separate roles
+# (restore.not_schema_owner); use `docker compose exec app python -m app.ops restore
+# apply --replace ...`, which connects as the owner.
+# What it protects and what not: `app` runs in role all and migrates at its start, so it
+# reads the owner's password (the file /secrets/db_owner_password) for as long as it
+# runs. Requests use the runtime role's connections, so an SQL injection cannot alter or
+# drop the schema or rewrite alembic_version; code running inside the app container can
+# read the owner's password file. Only the chart and compose.nodes.yml keep
+# the owner's credentials out of the serving processes.
+
+services:
+  db-roles:
+    image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: herd
+      PGDATABASE: herd
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      HERD_APP_DB_PASSWORD: ${HERD_APP_DB_PASSWORD:?set HERD_APP_DB_PASSWORD in .env}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        psql -v ON_ERROR_STOP=1 -v pw="$$HERD_APP_DB_PASSWORD" <<'SQL'
+        SELECT 'CREATE ROLE herd_app LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'herd_app')\gexec
+        ALTER ROLE herd_app PASSWORD :'pw';
+        SQL
+    restart: "no"
+
+  app:
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+    environment:
+      HERD_DATABASE_URL: postgresql+asyncpg://herd_app@db:5432/herd
+      # The runtime role's password from .env; "" clears compose.yml's file setting.
+      HERD_DATABASE_PASSWORD_FILE: ""
+      HERD_DATABASE_PASSWORD: ${HERD_APP_DB_PASSWORD:?set HERD_APP_DB_PASSWORD in .env}
+      HERD_MIGRATE_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+      HERD_MIGRATE_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
+      HERD_DATABASE_RUNTIME_ROLE: herd_app

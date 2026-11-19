@@ -17,6 +17,7 @@ from app.modules.agents.approvals.schemas import (
 )
 from app.modules.agents.approvals.service import ApprovalService, QuestionService
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.auth.write_limits import COUNTED
 from app.modules.wiki.version_schemas import HunkOut
 
 approvals = APIRouter(prefix="/approvals", tags=["approvals"])
@@ -67,7 +68,7 @@ async def get_question(question_id: uuid.UUID, actor: ActorDep, session: Session
     return QuestionOut.of(await QuestionService(session).get(actor, question_id))
 
 
-@questions.post("/{question_id}/answer", response_model=QuestionOut)
+@questions.post("/{question_id}/answer", response_model=QuestionOut, dependencies=COUNTED)
 async def answer_question(
     question_id: uuid.UUID, body: QuestionAnswer, actor: ActorDep, session: SessionDep
 ) -> QuestionOut:

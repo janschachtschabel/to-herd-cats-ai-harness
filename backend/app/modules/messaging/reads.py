@@ -11,6 +11,7 @@ has a read position in it (has opened it): every page has a thread.
 """
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,6 +51,14 @@ class ReadService:
                 "user_id": str(actor.principal.id),
             },
         )
+
+    async def position(
+        self, actor: Actor, conversation_id: uuid.UUID
+    ) -> tuple[uuid.UUID, datetime] | None:
+        """The actor's read position in a conversation she may read (else 404)."""
+        reader = self.messages.reader
+        conversation = await reader.readable(actor, conversation_id)
+        return await ReadRepository(self.session, reader.scope(actor)).position(conversation.id)
 
     async def unread(self, actor: Actor, params: PageParams) -> Page[Unread]:
         """The actor's visible conversations with unread messages or mentions, by id."""

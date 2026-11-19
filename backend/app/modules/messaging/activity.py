@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Actor
+from app.core.access import Action, Actor, can
 from app.core.errors import NotFound
 from app.core.outbox import emit
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
@@ -41,7 +41,14 @@ class ActivityService:
     async def _repo(self, actor: Actor) -> ActivityRepository:
         skills = await sight_of(self.session, actor)
         automations = await automation_sight_of(self.session, actor)
-        return ActivityRepository(self.session, self.reader.scope(actor), skills, automations)
+        manages_users = await can(self.session, actor, Action.USER_MANAGE)
+        return ActivityRepository(
+            self.session,
+            self.reader.scope(actor),
+            skills,
+            automations,
+            manages_users=manages_users,
+        )
 
     async def list(
         self, actor: Actor, params: PageParams, only_open: bool = True

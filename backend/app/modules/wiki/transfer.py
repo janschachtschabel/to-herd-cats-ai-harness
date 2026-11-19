@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import virus_scan
 from app.core.access import Action, Actor, require
 from app.core.access_repository import remembered_facts
 from app.core.config import get_settings
@@ -78,8 +79,8 @@ class PageImport:
         self, actor: Actor, space_id: uuid.UUID, stream: AsyncIterator[bytes]
     ) -> ImportResult:
         """Rights first: nothing is read from someone who may not import. The body is
-        read with no transaction open (no pooled connection held); the rights are
-        checked again afterwards."""
+        read and scanned with no transaction open (no pooled connection held); the
+        rights are checked again afterwards."""
         await require(self.session, actor, Action.SPACE_MANAGE, space_id)
         await self.session.commit()
         self.actor, self.space_id = actor, space_id
@@ -91,6 +92,9 @@ class PageImport:
         self.new_ids: dict[uuid.UUID, uuid.UUID] = {}  # that attachment → the new one
         limit = get_settings().import_max_bytes
         with await spool(stream, limit, code="import.too_large") as body:
+            # The whole archive, once, before the rights are read again: no transaction
+            # and so no pooled connection waits while clamd works (R18-6).
+            await virus_scan.scan(get_settings(), body.chunks())
             await require(self.session, actor, Action.SPACE_MANAGE, space_id)
             zipped = await asyncio.to_thread(archive.open_archive, body.file)
             # One operation in one transaction: rights as checked just now, slugs and
@@ -210,7 +214,7 @@ class PageImport:
             return
         try:
             attachment = await self.attachments.add(
-                self.actor, page.id, parts[-1], _entry(zipped, info)
+                self.actor, page.id, parts[-1], _entry(zipped, info), scanned=True
             )
         except archive.UNREADABLE:
             self._skip(info, "unreadable")

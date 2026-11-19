@@ -73,8 +73,9 @@ export function makeConnector(overrides: Partial<Connector> = {}): Connector {
 }
 
 export function makeClient(overrides: Partial<Client> = {}): Client {
+  const clientId = overrides.id ?? id()
   return {
-    id: id(),
+    id: clientId,
     name: 'GitLab-App',
     authorization_endpoint: 'https://gitlab.com/oauth/authorize',
     token_endpoint: 'https://gitlab.com/oauth/token',
@@ -85,6 +86,9 @@ export function makeClient(overrides: Partial<Client> = {}): Client {
     token_auth: 'client_secret_post',
     scopes: 'mcp',
     resource: 'https://gitlab.com/api/v4/mcp',
+    issuer: null,
+    issuer_in_response: false,
+    callback_url: `https://herd.example/api/ai/oauth/${clientId}/callback`,
     version: 1,
     created_at: AT,
     updated_at: AT,

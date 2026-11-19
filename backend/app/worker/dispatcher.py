@@ -30,6 +30,10 @@ lane row are committed together or not at all.
   ends its batch there: its other events stay due for the next batch, without an
   attempt counted. No other lane waits for it.
 
+Maintenance (plan M9 decision 9): while the process's cache says the installation is
+in maintenance (`paused`), routing, the lanes and the cleanup do nothing; the events
+wait where they are.
+
 Order: one worker hands a lane's events over in the order of their ids (the order
 they were written in), as before; after a retry, or with several workers, there is
 no order. Handlers of one event no longer run one after the other, and different
@@ -38,11 +42,13 @@ handlers may be at different events; no handler relies on either.
 
 import time
 from asyncio import TaskGroup
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import app.models_registry  # noqa: F401 -- every model: handlers write to any table
 from app.core.db import Database, run_after_commit
+from app.modules.maintenance.cache import in_maintenance
 from app.worker import registry as handler_registry
 from app.worker.lane import MAX_ATTEMPTS, Claimed, LaneBatch, count_failure, log_failure
 from app.worker.metrics import worker_metrics
@@ -75,8 +81,10 @@ class Dispatcher:
         route_batch: int = ROUTE_BATCH,
         cleanup_batch: int = CLEANUP_BATCH,
         handler_timeout: float = HANDLER_TIMEOUT_SECONDS,
+        paused: Callable[[], bool] = in_maintenance,
     ) -> None:
         self.database = database
+        self.paused = paused
         self.registry = registry if registry is not None else handler_registry.REGISTRY
         self.batch_size = batch_size
         self.route_batch = route_batch
@@ -90,6 +98,8 @@ class Dispatcher:
 
     async def route(self) -> Routed:
         """Route one batch of new events into their lanes."""
+        if self.paused():
+            return Routed(0, frozenset())
         async with self.database.session_factory() as session, session.begin():
             repo = OutboxRepository(session)
             rows = await repo.unrouted(self.route_batch)
@@ -110,6 +120,8 @@ class Dispatcher:
 
     async def dispatch_lane(self, handler: Handler) -> int:
         """One batch of the handler's lane; how many events it held."""
+        if self.paused():
+            return 0
         broken: list[Claimed] = []  # the call during which the transaction broke
         try:
             async with self.database.session_factory() as session:
@@ -157,6 +169,8 @@ class Dispatcher:
                 return removed
 
     async def cleanup_if_due(self) -> None:
+        if self.paused():
+            return
         now = time.monotonic()
         if self._last_cleanup is None or now - self._last_cleanup >= CLEANUP_EVERY_SECONDS:
             self._last_cleanup = now

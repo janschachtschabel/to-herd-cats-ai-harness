@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,15 +24,42 @@ import type { User } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { CreateUserDialog } from './CreateUserDialog'
 import { EditUserDialog } from './EditUserDialog'
-import { useSetUserActive, useUsers } from './queries'
+import {
+  usePendingCount,
+  usePendingUsers,
+  useSetUserActive,
+  useSignUserOut,
+  useUsers,
+} from './queries'
+import { SignupDecisionDialog, type SignupDecision } from './SignupDecisionDialog'
+import { TotpResetDialog } from './TotpResetDialog'
+import { UsersViewTabs, type UsersFilter } from './UsersViewTabs'
 
-export function UsersPage() {
+function StatusBadge({ user }: { user: User }) {
+  const { t } = useTranslation()
+  if (user.awaiting_approval_since) return <Badge>{t('users.status.pending')}</Badge>
+  return (
+    <Badge variant={user.is_active ? 'secondary' : 'outline'}>
+      {user.is_active ? t('users.status.active') : t('users.status.inactive')}
+    </Badge>
+  )
+}
+
+/** Everyone (`all`) or the self-registered accounts awaiting approval (`pending`). */
+export function UsersPage({ filter = 'all' }: { filter?: UsersFilter }) {
   const { t, i18n } = useTranslation()
-  const users = useUsers()
+  const everyone = useUsers(filter === 'all')
+  const waiting = usePendingUsers(filter === 'pending')
+  const users = filter === 'pending' ? waiting : everyone
+  const pendingCount = usePendingCount(true)
+  const [deciding, setDeciding] = useState<SignupDecision | null>(null)
   const setActive = useSetUserActive()
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [toggling, setToggling] = useState<User | null>(null)
+  const signOut = useSignUserOut()
+  const [signingOut, setSigningOut] = useState<User | null>(null)
+  const [resetting, setResetting] = useState<User | null>(null)
 
   const confirmToggle = () => {
     if (!toggling) return
@@ -53,12 +81,18 @@ export function UsersPage() {
           </Button>
         }
       />
+      <UsersViewTabs filter={filter} pending={pendingCount} />
+      {filter === 'pending' && (
+        <Alert className="mb-4">
+          <AlertDescription>{t('users.pending.hint')}</AlertDescription>
+        </Alert>
+      )}
       {users.isPending ? (
         <LoadingState />
       ) : users.isError ? (
         <ErrorState error={users.error} onRetry={() => void users.refetch()} />
       ) : users.items.length === 0 ? (
-        <EmptyState text={t('users.empty')} />
+        <EmptyState text={filter === 'pending' ? t('users.pending.empty') : t('users.empty')} />
       ) : (
         <Table>
           <TableHeader>
@@ -81,9 +115,14 @@ export function UsersPage() {
                 </TableCell>
                 <TableCell>{t(`systemRoles.${user.system_role}`)}</TableCell>
                 <TableCell>
-                  <Badge variant={user.is_active ? 'secondary' : 'outline'}>
-                    {user.is_active ? t('users.status.active') : t('users.status.inactive')}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <StatusBadge user={user} />
+                    {user.totp_enabled && (
+                      <Badge variant="outline" aria-label={t('totp.admin.badgeLabel')}>
+                        {t('totp.admin.badge')}
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {user.last_login_at
@@ -100,22 +139,70 @@ export function UsersPage() {
                     >
                       {t('actions.edit')}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={t(
-                        user.is_active
-                          ? 'users.deactivate.openNamed'
-                          : 'users.reactivate.openNamed',
-                        { name: user.name },
-                      )}
-                      onClick={() => {
-                        setActive.reset()
-                        setToggling(user)
-                      }}
-                    >
-                      {user.is_active ? t('users.deactivate.action') : t('users.reactivate.action')}
-                    </Button>
+                    {user.awaiting_approval_since ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={t('users.pending.approve.openNamed', { name: user.name })}
+                          onClick={() => setDeciding({ user, approve: true })}
+                        >
+                          {t('users.pending.approve.action')}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={t('users.pending.reject.openNamed', { name: user.name })}
+                          onClick={() => setDeciding({ user, approve: false })}
+                        >
+                          {t('users.pending.reject.action')}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        {user.totp_enabled && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={t('totp.admin.resetNamed', { name: user.name })}
+                            onClick={() => setResetting(user)}
+                          >
+                            {t('totp.admin.reset')}
+                          </Button>
+                        )}
+                        {user.is_active && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={t('users.signOut.openNamed', { name: user.name })}
+                            onClick={() => {
+                              signOut.reset()
+                              setSigningOut(user)
+                            }}
+                          >
+                            {t('users.signOut.action')}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={t(
+                            user.is_active
+                              ? 'users.deactivate.openNamed'
+                              : 'users.reactivate.openNamed',
+                            { name: user.name },
+                          )}
+                          onClick={() => {
+                            setActive.reset()
+                            setToggling(user)
+                          }}
+                        >
+                          {user.is_active
+                            ? t('users.deactivate.action')
+                            : t('users.reactivate.action')}
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -126,6 +213,8 @@ export function UsersPage() {
       <LoadMore hasMore={users.hasMore} loading={users.loadingMore} onLoad={users.loadMore} />
       <CreateUserDialog open={creating} onOpenChange={setCreating} />
       <EditUserDialog user={editing} onClose={() => setEditing(null)} />
+      <SignupDecisionDialog decision={deciding} onClose={() => setDeciding(null)} />
+      <TotpResetDialog person={resetting} onClose={() => setResetting(null)} />
       <ConfirmDialog
         open={toggling !== null}
         title={toggling?.is_active ? t('users.deactivate.title') : t('users.reactivate.title')}
@@ -140,6 +229,19 @@ export function UsersPage() {
         error={setActive.error}
         onConfirm={confirmToggle}
         onOpenChange={(open) => !open && setToggling(null)}
+      />
+      <ConfirmDialog
+        open={signingOut !== null}
+        title={t('users.signOut.title')}
+        text={t('users.signOut.text', { name: signingOut?.name ?? '' })}
+        confirmLabel={t('users.signOut.action')}
+        destructive
+        pending={signOut.isPending}
+        error={signOut.error}
+        onConfirm={() =>
+          signingOut && signOut.mutate(signingOut.id, { onSuccess: () => setSigningOut(null) })
+        }
+        onOpenChange={(open) => !open && setSigningOut(null)}
       />
     </div>
   )

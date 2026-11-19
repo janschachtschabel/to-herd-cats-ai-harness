@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query
 
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.auth.write_limits import COUNTED
 from app.modules.automations.control import AutomationControl
 from app.modules.automations.schemas import (
     AutomationCreate,
@@ -102,7 +103,7 @@ async def resume_automation(
     return automation_out(view)
 
 
-@automations.post("/{automation_id}/run", response_model=AutomationOut)
+@automations.post("/{automation_id}/run", response_model=AutomationOut, dependencies=COUNTED)
 async def run_automation_now(
     automation_id: uuid.UUID, actor: ActorDep, session: SessionDep
 ) -> AutomationOut:

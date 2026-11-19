@@ -1,6 +1,6 @@
 {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
-{{- if and (gt (int .Values.api.replicas) 1) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
-{{- fail "api.replicas > 1 needs persistence.accessModes [ReadWriteMany]: every API pod reads and writes the files on /data (or set api.replicas=1)" }}
+{{- if and (gt (int (include "herd.maxReplicas" (dict "root" . "component" "api"))) 1) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
+{{- fail "api.replicas (or api.autoscaling.maxReplicas) > 1 needs persistence.accessModes [ReadWriteMany]: every API pod reads and writes the files on /data (or set api.replicas=1)" }}
 {{- end }}
 # The files (attachments) on /data, shared by every API pod. Kept on uninstall.
 apiVersion: v1

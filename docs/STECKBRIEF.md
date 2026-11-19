@@ -1,7 +1,12 @@
 # Steckbrief to-herd-cats-ai
 
-Stand: Meilenstein 8 (Öffnung: MCP) auf M7 (Automatisierung), M6 (Agenten als
-Mitarbeiter) und M5 Tasks 1 bis 7 (KI-Grundlage), 15.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem Meilenstein aktualisiert
+Stand: M9 (Produktion) ganz: M9a (Sicherung und Wiederherstellung, Anmeldung über
+OIDC mit Freigabe, Collab-Berechtigungen, volles Chart, ASVS-Prüfung, Lasttest) und M9b
+(Einspielen im Betrieb und in der Verwaltung, S3, mehrere Collab-Instanzen, TOTP, die
+ASVS-Lücken J7–J14, Hostinger-Stack), auf Meilenstein 8 (Öffnung: MCP), M7
+(Automatisierung), M6 (Agenten als Mitarbeiter) und M5 Tasks 1 bis 7 (KI-Grundlage),
+19.11.2026, Version 1.0.0 (nicht veröffentlicht; was seitdem dazukam:
+[`RELEASE-NEXT.md`](RELEASE-NEXT.md)). Der Steckbrief wird mit jedem Meilenstein aktualisiert
 (Spezifikation 12.7). Die Messwerte aus M2 (Image, Compose, `docker stats`) bleiben
 stehen. Ohne Docker, an Prozessen auf der Maschine, sind gemessen: die Nachrichten aus
 M3, die Tickets aus M4, die Sprints und Boards aus M4b, die Agenten aus M6, die
@@ -9,7 +14,17 @@ Automatisierung aus M7 und der Endpunkt `/mcp` aus M8 (Abschnitte
 [Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker),
 [Tickets (M4)](#tickets-m4), [Sprints und Boards (M4b)](#sprints-und-boards-m4b),
 [Agenten (M6)](#agenten-m6), [Automatisierung (M7)](#automatisierung-m7) und
-[MCP (M8)](#mcp-m8)). Was nicht gemessen ist, steht unter
+[MCP (M8)](#mcp-m8)), dazu aus M9 (Task 10, 16.11.2026) der Lasttest mit 200
+Personen auf zwei API-Prozessen, die tatsächlich genutzten Datenbankverbindungen,
+Sicherung und Wiederherstellung von 10.000 Seiten mit 1 GiB Anhängen und die
+Schreibgrenze durch `NOTIFY` ([Lasttest](#gemessen-lasttest-mit-200-personen-m9),
+[Sicherung](#gemessen-sicherung-und-wiederherstellung-m9),
+[NOTIFY](#gemessen-schreibgrenze-durch-notify-m9)), aus M9b die Live-Bearbeitung
+mit zwei Collab-Instanzen und Sicherung und Wiederherstellung mit S3
+([zwei Instanzen](#gemessen-live-bearbeitung-mit-40-editoren-und-zwei-instanzen-m9b),
+[S3](#gemessen-sicherung-und-wiederherstellung-mit-s3-m9b)) und aus M10 (Task 3c,
+19.11.2026) die Entfaltung der Kalenderserien beim Lesen
+([Kalender](#kalender-m10-entfaltung)). Was nicht gemessen ist, steht unter
 [Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
 
 ## Kurzbeschreibung
@@ -51,16 +66,35 @@ Person und der KI-Richtlinie; externe Agenten mit Agenten-Token und Ticket-Abhol
 externe MCP-Server als Werkzeugquelle der eigenen Agenten mit Freigabe je Werkzeug und
 Fingerabdruck (schreibende Werkzeuge auf Stufe 4, immer mit Freigabe der fragenden
 Person), Konnektoren (Token oder OAuth mit PKCE, geteilt oder persönlich) und ein
-Katalog mit GitHub und GitLab. Hybride Suche und Embeddings (M5 Tasks 8 bis 11) folgen.
+Katalog mit GitHub und GitLab. **Vorhanden (M9a):** Sicherung des ganzen Datenstands
+(Datenbank und Anhänge aus einem Snapshot) über die Kommandozeile, nach Zeitplan mit
+Aufbewahrung, Offsite-Kopie mit restic und Alarmen; Wiederherstellung in eine leere
+Installation mit Probe ([`SICHERUNG.md`](SICHERUNG.md)); Anmeldung über OpenID Connect
+(Google als Vorlage, jeder andere Anbieter mit Discovery), Selbstregistrierung für
+erlaubte Domains nur mit Freigabe durch einen Admin ([`ANMELDUNG.md`](ANMELDUNG.md));
+der Collab-Prozess bekommt kurzlebige, seitengebundene Berechtigungen statt des
+Sitzungs-Cookies; Autoskalierung und PodDisruptionBudgets im Chart; Aufbewahrungsregel
+für jede Tabelle; Prüfung gegen OWASP ASVS 5.0 Stufe 2 ([`SICHERHEIT.md`](SICHERHEIT.md)).
+**Vorhanden (M9b):** Wartungsmodus und Ersetzen einer laufenden Installation aus einem
+Archiv, über die Kommandozeile und in der Verwaltung (Sicherungen dort auch anlegen,
+herunter- und hochladen, prüfen; [`SICHERUNG.md`](SICHERUNG.md)); Anhänge in
+S3-kompatiblem Speicher mit eigenem Client und Kopie zwischen den Speichern; mehrere
+Collab-Instanzen, jede Seite in PostgreSQL an eine gebunden (ohne Redis,
+[`WIKI.md`](WIKI.md)); optional TOTP für jedes Passwortkonto, eigene Sitzungen,
+Leerlaufgrenze, erneute Anmeldung vor dem Verknüpfen ([`ANMELDUNG.md`](ANMELDUNG.md));
+Schreibgrenzen je Person, optionaler Virenscan, TLS zur Datenbank, Wechsel des internen
+Tokens, getrennte Datenbankrollen ([`SICHERHEIT.md`](SICHERHEIT.md)); der Stack für den
+Hostinger-VPS ([`HOSTINGER.md`](HOSTINGER.md)). Hybride Suche und Embeddings (M5 Tasks 8
+bis 11) folgen; M10 (Kalender) hat begonnen und ist hier nicht beschrieben.
 
 | | |
 |---|---|
 | Dienst-ID | `to-herd-cats-ai` (Log-Feld `service`, `OTEL_SERVICE_NAME`, Image, Chart) |
 | Image | `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y`, ein Image für alle Rollen (`HERD_ROLE=api\|migrate\|all\|worker\|collab`) |
 | Chart | `oci://ghcr.io/<owner>/charts/to-herd-cats-ai`, `version` = `appVersion` = Dienstversion |
-| Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, genau eine Replika). Worker (Python, Verteiler der Outbox und seit M5 die Läufe der Agenten, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
-| Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`, MCP `/mcp`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar) |
-| Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export |
+| Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, `collab.replicas`, Standard 1, mehrere seit M9b: jede Seite an eine Instanz gebunden). Worker (Python, Verteiler der Outbox und seit M5 die Läufe der Agenten, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
+| Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`, MCP `/mcp`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar; mit mehreren Instanzen meldet jede ihre Adresse in `HERD_COLLAB_ADVERTISE_URL`) |
+| Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export; seit M9 ein Volume für Sicherungsarchive (`HERD_BACKUP_DIR`, Standard `/backups`; seit M9b auch an API und Worker für die Verwaltung); seit M9b statt `/data` für Anhänge wahlweise ein S3-kompatibler Speicher (`HERD_STORAGE=s3`, `HERD_S3_*`) |
 | Lizenz | Apache-2.0 |
 
 ## Funktionen mit Laufzeit und Kosten
@@ -78,7 +112,7 @@ ist die Antwortzeit am Client, inklusive Docker-Portweiterleitung; alle Antworte
 | Seite lesen | `GET /api/spaces/{id}/pages/by-path` | 19 / 25 ms | 171 / 219 ms | 112/s |
 | Volltextsuche (100 Seiten à 2 KB, Wort in allen) | `GET /api/search?q=…&limit=20` | 23 / 31 ms | 174 / 224 ms | 109/s |
 | Seite lesen, während 10 Personen live tippen | `GET /api/pages/{id}` (4/s, sequenziell) | 14 / 18 ms | – | – |
-| Live-Bearbeitung: Änderung erscheint bei den anderen | WebSocket `/collab/` | 10 Editoren: 5 / 9 ms (P99 12 ms) | – | 20 Änderungen/s gesamt |
+| Live-Bearbeitung: Änderung erscheint bei den anderen | WebSocket `/collab/` | 10 Editoren: 5 / 9 ms (P99 12 ms); 40 Editoren auf 8 Seiten, zwei Instanzen (M9b, ohne Docker): 24 / 38 ms (P90), P99 54 ms | – | 20 bzw. 79 Änderungen/s gesamt |
 | Speichern im Markdown-Modus beendet die Live-Sitzung | `PATCH /api/pages/{id}` → Close-Code 4409 | 10 Editoren: 0,3 s und 4,4 s (zwei Läufe) | – | – |
 
 Die Lastzeilen der Wiki-Endpunkte liefen einzeln (je 20 s, nur dieser Endpunkt); der
@@ -555,7 +589,12 @@ mitbenutzt; das Lastmittel steht bei jedem Lauf. Zwei Läufe.
 | PostgreSQL ≥ 16 | ja | Zustandsablage (Daten, Sitzungen, Ratenlimits, Sperren, Volltextindex, Yjs-Stände der Live-Bearbeitung). Compose und Chart nutzen `pgvector/pgvector:pg17` per Digest; M2 braucht pgvector noch nicht |
 | Volume für `/data` | ja (mit Anhängen) | Anhänge und temporäre Dateien von Upload, Import und Export. Compose: Volume `app-data`; Chart: PVC `<release>-data`, voreingestellt **ReadWriteMany** (alle API-Replikas schreiben); ohne RWX-Speicherklasse `api.replicas=1` und `persistence.accessModes={ReadWriteOnce}` |
 | Worker | für Live-Zustellung, Benachrichtigungen, Systemmeldungen | im selben Image (`HERD_ROLE=worker`, in `all` enthalten); nur Datenbank, keine eingehenden Anfragen außer 9090. Ohne Worker gehen keine Nachrichten verloren, aber nichts kommt live an, bis einer läuft |
-| Collab-Prozess | für Live-Bearbeitung | im selben Image (Node 22, Hocuspocus); spricht nur mit der API (`/internal/collab/*` auf 9090, Token `HERD_INTERNAL_TOKEN`), speichert nie selbst in die Datenbank. Ohne Token ist die Live-Bearbeitung aus, der Markdown-Editor geht weiter |
+| Collab-Prozess | für Live-Bearbeitung | im selben Image (Node 22, Hocuspocus); spricht nur mit der API (`/internal/collab/*` auf 9090, Token `HERD_INTERNAL_TOKEN` und seit M9 je Verbindung eine kurzlebige Berechtigung `herd_cg_…` für genau eine Seite und Generation statt des Sitzungs-Cookies), speichert nie selbst in die Datenbank. Ohne Token ist die Live-Bearbeitung aus, der Markdown-Editor geht weiter |
+| Volume für Sicherungen (seit M9) | für Sicherungen | Archive von `python -m app.ops backup …`; Compose: Volume `backups` des Dienstes `backup`; Chart: PVC `<release>-backups` des CronJobs (`backup.persistence.*`, bleibt beim Deinstallieren). Archive sind unverschlüsselt: wie die Datenbank schützen |
+| restic-Repository (seit M9) | nein | Offsite-Kopie der Archive (`HERD_BACKUP_OFFSITE_REPOSITORY`, S3, B2, SFTP …), clientseitig verschlüsselt; ausgehend nur vom Sicherungsdienst bzw. -Job; Chart: `backup.offsite.egress` |
+| OIDC-Anbieter (seit M9) | nein | Anmeldung über Google oder einen eigenen Anbieter (Keycloak, Entra ID …); ausgehend nur von der API (Discovery, Token-Endpunkt, JWKS) über die SSRF-Sperre, nie über den KI-Proxy; private Hosts nur aus `HERD_OIDC_ALLOWED_HOSTS`; Chart: `oidc.egress`. Ohne Anbieter gilt die Anmeldung mit Passwort |
+| S3-kompatibler Speicher (seit M9b) | nein | Anhänge statt auf `/data` (`HERD_STORAGE=s3`, Endpunkt, Bucket, Präfix, Schlüssel; eigener Client mit SigV4, Pfad-Adressen). Ausgehend von API, Worker und Sicherung, durch die SSRF-Sperre mit dem Host des Endpunkts als einziger privater Ausnahme; Chart: `s3.*` mit eigener Egress-Regel. Fällt er aus, antworten Anhänge 503 `storage.unavailable`. Erprobt mit SeaweedFS (Apache-2.0; `compose.s3.yml`, `SMOKE_S3=1`) |
+| clamd (seit M9b) | nein | Virenscan von Anhängen und Importen vor dem Speichern (`HERD_CLAMAV_ADDRESS`, nur API; Chart: `virusScan.*`). Nicht erreichbar: 503 `attachment.scan_unavailable` (schließt ab). Ohne Adresse kein Scan |
 | OTLP-Collector | nein | Tracing nur, wenn `OTEL_EXPORTER_OTLP_ENDPOINT` gesetzt ist (Chart: `tracing.otlpEndpoint`) |
 | Prometheus | nein | scrapt `/metrics` auf 9090; ServiceMonitor und PrometheusRule im Chart |
 | kube-state-metrics | nur für Alarm | `HerdNotReady` braucht es |
@@ -576,14 +615,45 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   Replika kann jede Anfrage bedienen. Chart-Standard: 2 API-Replikas. Anhänge liegen
   auf einem Volume (`/data`), das alle API-Replikas teilen (Chart: PVC mit
   `ReadWriteMany`).
-- **Collab-Prozess (Live-Bearbeitung):** genau eine Replika mit `strategy: Recreate`
-  (Spezifikation 12.4, Stufe 1). Ein Live-Dokument liegt im Speicher dieses Prozesses;
-  zwei Prozesse würden die Bearbeitenden einer Seite aufteilen. Der Zustand wird über
-  die API in PostgreSQL gespeichert (spätestens 10 s nach einer Änderung und beim
-  Beenden); nach einem Neustart verbinden sich die Browser selbst neu. Ungespeicherte
-  Änderungen der letzten Sekunden (höchstens 10 s) im Speicher des Prozesses gehen dabei
-  verloren, sofern kein Browser sie wieder einspielt. Mehrere Collab-Replikas
-  (Spezifikation 12.4, Stufe 2 mit Redis/Valkey) kommen mit M9.
+- **Autoskalierung und Wartungen (M9):** Auf Wunsch je ein HorizontalPodAutoscaler
+  (`autoscaling/v2`, CPU-Ziel 70 % des Requests) für API (2 bis 6 Pods) und Worker
+  (1 bis 3), Standard aus; herunter höchstens ein Pod je 2 Minuten. PodDisruptionBudgets
+  (`maxUnavailable: 1`, nicht bereite Pods dürfen immer gehen) für API und Worker ab
+  zwei Pods, für den Collab-Prozess ab zwei Replikas (seit M9b). Die Grenzen (API 2 bis 6,
+  Worker 1 bis 3) bleiben nach dem Lasttest: Zwei API-Prozesse tragen die Referenz
+  (200 Personen, 95 Anfragen/s) an der Grenze der Ziele, sechs also rund das Dreifache
+  (im Cluster nicht gemessen). **Datenbankverbindungen (gemessen, M9):** je API- oder
+  Worker-Prozess ein Pool von 5, unter Last bis 15 (SQLAlchemy: `pool_size` 5,
+  `max_overflow` 10), dazu eine für LISTEN, also höchstens 16. Gemessen in
+  `pg_stat_activity` mit 2 API und 1 Worker ([Lasttest](#gemessen-lasttest-mit-200-personen-m9)):
+  10 nach dem Start (API je 2, Worker 6), 18 mit 200 angemeldeten Personen und offenen
+  Streams (API je 6), unter Last bis 33 (API je 16: der Pool war in Spitzen ausgeschöpft;
+  Worker 6, ohne Agenten-Läufe). Die 16 je API-Pod werden also wirklich erreicht. Mit den
+  Obergrenzen 6 API + 3 Worker: in Ruhe rund 54, in der Spitze bis 144, mit Backup-Job
+  (Engine und `pg_dump`) und Migrations-Job rund 150. PostgreSQL erlaubt ab Werk 100:
+  Für die vollen Grenzen `max_connections` ≥ 160 oder kleinere `maxReplicas`. Das
+  mitgelieferte PostgreSQL des Charts läuft mit `postgresql.maxConnections` (Standard
+  200, als Serverargument); das Chart rendert nicht, wenn 16 × (höchste Zahl der API-
+  und Worker-Pods) + 10 darüber liegt (Chart-Regel in `chart-rules-scaling.sh`). Bei
+  einer externen Datenbank kennt das Chart die Grenze nicht. Kein
+  PgBouncer im Chart (`HERD_DB_PGBOUNCER` aus 12.4 entsteht erst mit einem Leser).
+- **Collab-Prozess (Live-Bearbeitung, seit M9b mehrere Instanzen):** `collab.replicas`
+  (Standard 1 mit `strategy: Recreate`; ab 2 `RollingUpdate` mit `maxUnavailable: 0`
+  und ein PodDisruptionBudget). Ein Live-Dokument liegt im Speicher genau einer
+  Instanz: Jede Instanz meldet sich alle 5 s bei der API (`HERD_COLLAB_ADVERTISE_URL`,
+  im Chart die Pod-IP), die API bindet jede Seite in PostgreSQL an eine lebende Instanz
+  (die mit den wenigsten Seiten; `collab_page_owner`, mit Epoche) und leitet jede
+  Verbindung der Seite dorthin; ohne Redis/Valkey (Plan M9, Entscheidung 17; Abweichung
+  von Spezifikation 12.4). Speichern und Prüfen nennen Instanz und Epoche; eine
+  abgelöste Instanz wird mit 409 `collab.not_owner` abgewiesen und verwirft ihr Dokument
+  (Close-Code 4409). Beim Beenden (SIGTERM) nimmt eine Instanz keine neuen Seiten mehr,
+  speichert alles, schließt mit 1012 und gibt ihre Seiten frei; die Browser verbinden
+  sich selbst neu, zu einer anderen Instanz (gemessen: 1,5 s, nichts verloren, siehe
+  [Messung](#gemessen-live-bearbeitung-mit-40-editoren-und-zwei-instanzen-m9b)). Stürzt
+  eine Instanz ab, gehen ihre Seiten nach 15 s ohne Lebenszeichen an andere;
+  Ungespeichertes der letzten Sekunden (höchstens 10 s) geht dann verloren, sofern kein
+  Browser es wieder einspielt. Der Zustand wird über die API in PostgreSQL gespeichert
+  (spätestens 10 s nach einer Änderung und beim Beenden).
 - **Mehrere API-Knoten und Live-Zustellung (M3):** Eine Nachricht, die an einem Knoten
   geschrieben wird, kommt an den SSE-Verbindungen jedes Knotens an (`NOTIFY herd_live`,
   jeder API-Prozess lauscht mit einer eigenen Datenbankverbindung außerhalb des Pools);
@@ -628,7 +698,8 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 
 ## Zeitpläne
 
-Keine Cronjobs. Die **Fälligkeits-Schleife** jedes Workers (M7) schaut alle 5 s nach
+Ein CronJob im Chart: die Sicherung (M9, `backup.schedule`, Standard 02:30 UTC; in
+Compose der Dienst `backup`, [`SICHERUNG.md`](SICHERUNG.md)). Die **Fälligkeits-Schleife** jedes Workers (M7) schaut alle 5 s nach
 fälligen Terminen der Aufgaben (bis 50 je Durchlauf, ohne Pause weiter, solange es mehr
 gibt), geht in jeder Runde bis zu 20 Schritte des täglichen Prüfdurchlaufs der
 Wiki-Seiten (ein Bereich je Schritt, höchstens einmal je UTC-Tag) und löscht einmal je
@@ -647,9 +718,12 @@ prüft alle 5 s für jedes offene Dokument Generation und Rechte über die API (
 Zeitplan, nur solange jemand live bearbeitet). Beim Start entfernt die API liegen
 gebliebene temporäre Dateien unter `HERD_DATA_DIR/tmp`, die älter als 24 Stunden sind. Abgelaufene und beendete Sitzungen (jeder
 Person), die seit mehr als einer Stunde abgelaufen sind, löscht jede Anmeldung mit, höchstens 500 auf einmal. Alte Ratenlimit-Einträge (jedes
-Schlüssels) löscht jede Anmeldeprüfung mit, höchstens 500 auf einmal. Der Sicherungs-CronJob (Spezifikation 12.6) ist
-noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
-`deploy/compose/README.md`).
+Schlüssels) löscht jede Anmeldeprüfung mit, höchstens 500 auf einmal. Seit M9 räumt die
+Fälligkeits-Schleife einmal je Minute außerdem alles Abgelaufene nach dem
+Aufbewahrungskatalog (`backend/app/core/retention.py`) auf: Sitzungen, OAuth- und
+OIDC-Abläufe, Collab-Berechtigungen, Ratenlimit-Einträge, KI-Ratenfenster, Grabsteine
+gelöschter Dateien (nach 48 h) und Sicherungsläufe, deren Prozess starb
+([`SICHERUNG.md`](SICHERUNG.md#aufbewahrung-je-tabelle)).
 
 ## Ressourcen
 
@@ -711,6 +785,27 @@ noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
   [Agenten (M6)](#agenten-m6)). RSS aus `/proc/<pid>/status` (`VmRSS`) während der
   Durchläufe, Zeiten des Servers aus `run.created_at`, `started_at` und `finished_at`,
   Größen mit `pg_column_size` und `pg_total_relation_size`.
+- **Lasttest 200 Personen (M9), ohne Docker:** eine Wegwerf-Datenbank auf dem lokalen
+  PostgreSQL 16 (`max_connections` 100, `shared_buffers` 128 MB, `fsync` an), daran
+  `HERD_ROLE=migrate`, dann zwei API-Prozesse (`api`, A und B, mit dem gebauten SPA über
+  `HERD_STATIC_DIR`), ein Worker und ein Collab-Prozess (`collab`), Code-Stand
+  `709d006`. Das Login-Ratenlimit ist nur in dieser Wegwerf-Installation hochgesetzt.
+  Daten über die öffentliche API (`deploy/compose/loadsetup.py`): 200 Personen in 4
+  Team-Bereichen zu je 50 (Rolle `editor`), je Bereich 250 veröffentlichte Seiten (rund
+  2 KB), ein Kanal und 250 Tickets. Szenario `deploy/compose/loadmix.py`: Jede Person
+  meldet sich an Knoten A oder B an (abwechselnd), öffnet dort `/api/stream`; nach 20 s
+  Ruhe wiederholt sie 180 s lang ihre Tätigkeit mit einer Pause von 2 s × 0,5…1,5
+  (Läufe 1 und 2) bzw. 4 s (Lauf 3). Mischung nach Entscheidung 20 (je Person): Seite
+  lesen 40 %, Suchen 10 %, Nachricht schreiben 15 %, Ticket in den nächsten Status
+  ziehen 10 %, Board und „meine Tickets“ im Wechsel 15 %, eigene Seite speichern 10 %;
+  SSE offen 100 %. Live-Zustellung: vom Absenden einer Nachricht bis `message.created`
+  mit ihrer ID in jedem der 50 Streams ihres Bereichs. Ausgewertet mit
+  `deploy/compose/loadreport.py` (P95 je Endpunkt gegen sein Ziel, getestet in
+  `backend/tests/test_loadgen_report.py`). Alle 2 s `deploy/scripts/measure-processes.sh`:
+  CPU und RSS je Prozess aus `/proc`, seine TCP-Verbindungen zur Datenbank, die
+  Backends der Datenbank aus `pg_stat_activity` (Zahl, CPU, Pss) und die Auslastung der
+  Maschine. Lastgenerator (ein Python-Prozess mit httpx), Datenbank und App teilten sich
+  die 4 vCPU; das Lastmittel steht bei jedem Lauf.
 - **Live-Bearbeitung:** eigenes Compose-Projekt, eine Seite, 10 Personen (Rolle
   `editor`, je eigene Sitzung). Statt 10 Browsern 10 Yjs-Clients
   (`@hocuspocus/provider` wie im Browser, Node-Skript auf derselben Maschine) über
@@ -772,6 +867,54 @@ argon2-Prüfungen (je 64 MiB) gleichzeitig laufen.
   Im Cluster läuft der Collab-Prozess als eigener Pod; ihn allein hat hier niemand
   gemessen, sein RSS ist der beste Anhaltspunkt.
 
+### Gemessen: Live-Bearbeitung mit 40 Editoren und zwei Instanzen (M9b)
+
+Ohne Docker auf der Maschine der übrigen Messungen (4 vCPU, Lastmittel vorher 0,2–0,6):
+ein API-Prozess (`HERD_ROLE=api`), ein Worker, zwei Collab-Prozesse (`HERD_ROLE=collab`,
+je mit eigener `HERD_COLLAB_ADVERTISE_URL`) und das lokale PostgreSQL 16, Code-Stand
+`a5b7727` (Branch `m9b-task15`). Daten mit `deploy/compose/loadsetup.py --people 40
+--teams 1 --pages 8 --tickets 0`; Last mit `collab/scripts/live-load.mjs`: 40 Personen
+mit eigener Sitzung, je 5 auf einer der 8 Seiten, verbunden wie der Browser
+(`@hocuspocus/provider` über die Weiterleitung `/collab/` der API); jede tippt alle
+500 ms ein Wort, 60 s lang. Gemessen wird die Zeit vom Tippen bis zur Ankunft bei jeder
+anderen Person derselben Seite. CPU und Speicher mit `deploy/scripts/measure-processes.sh`
+(100 % = ein Kern).
+
+| Lauf | Wörter (Ankünfte) | Zustellung P50 / P90 / P99 / max | verloren | gespeichert nach dem Tippen | Dokumente gleich |
+|---|---|---|---|---|---|
+| 1: beide Instanzen laufen | 4.760 (19.040) | 24 / 38 / 54 / 63 ms | 0 | 2,0 s | ja |
+| 2: eine Instanz nach 31 s beendet (SIGTERM) | 4.760 (19.040) | 25 / 43 / 464 / 1.497 ms | 0 | 0,1 s | ja |
+
+- **Verteilung:** Die 8 Seiten lagen je zur Hälfte auf den zwei Instanzen (4 und 4,
+  Epoche 1), alle 5 Personen einer Seite auf derselben Instanz. Verbunden und
+  synchronisiert waren alle 40 nach 1,2–1,4 s.
+- **Beenden einer Instanz (Lauf 2):** Die 20 Personen ihrer 4 Seiten bekamen Close-Code
+  1012 und waren nach 1,47 s (P50; höchstens 1,49 s) über die Weiterleitung bei der
+  anderen Instanz wieder verbunden; die 4 Seiten trugen danach Epoche 2, alle 8 lagen
+  auf der verbliebenen Instanz. Was in der Lücke getippt wurde, kam nach dem
+  Wiederverbinden an (daher P99 464 ms und max 1,5 s); kein Wort ging verloren, und jedes
+  stand danach im Markdown der Seite. Die Lücke ist im Wesentlichen die Wartezeit des
+  Providers vor dem nächsten Versuch.
+- **Prozesse** (Ø / max CPU, RSS max):
+
+| Phase | API | Worker | Collab A | Collab B | Datenbank | Lastgenerator |
+|---|---|---|---|---|---|---|
+| Leerlauf | 0,3 / 0,5 %, 215 MiB | 2,6 / 3,4 %, 202 MiB | 0,3 / 1,2 %, 126 MiB | 0,3 / 1,2 %, 107 MiB | 0,5 / 0,7 %, 81 MiB (Pss), 11 Verb. | – |
+| Lauf 1 | 9,7 / 19 %, 232 MiB | 2,9 / 8,1 %, 203 MiB | 3,6 / 8,7 %, 150 MiB | 3,4 / 8,5 %, 149 MiB | 1,5 / 2,6 %, 92 MiB, 12 Verb. | 11 / 15 %, 124 MiB |
+| Lauf 2 | 10,7 / 25 %, 237 MiB | 2,6 / 3,3 %, 203 MiB | beendet | 4,8 / 13 %, 189 MiB | 1,7 / 3,1 %, 86 MiB, 12 Verb. | 14 / 23 %, 135 MiB |
+
+- **Ergebnis:** Zwei Instanzen teilen sich die Seiten gleichmäßig; die Zustellung bleibt
+  bei 79 Änderungen/s weit unter dem Ziel (2 s), und die meiste CPU kostet die
+  Weiterleitung in der API (rund 0,1 Kerne), nicht der Collab-Prozess (unter 0,04 Kernen
+  je Instanz). Absturz einer Instanz ohne Last (Demo `docs/demo/m9.md`, Abschluss M9b,
+  19.11.2026): SIGKILL 3,9 s nach dem letzten Herzschlag, die Seite war 11,7 s später
+  an die andere Instanz gebunden (15,6 s nach dem Herzschlag; Grenze 15 s plus die
+  Wartezeit des Browsers bis zum nächsten Versuch), der Tab nach 11,7 s synchron, nichts
+  Gespeichertes verloren; ein Probelauf brauchte 17,7 s. Nach einem Absturz dauert der
+  Umzug also je nach Zeitpunkt rund 10 bis 18 s. In derselben Demo nach SIGTERM: Prozess
+  nach 76 ms fertig, Seite nach 1,1 s neu gebunden. Nicht gemessen: Absturz unter Last,
+  Pods im Cluster.
+
 ### Gemessen: Nachrichten (M3, ohne Docker)
 
 Lauf 3 (Schreiben an Knoten A, Lastmittel der Maschine 3):
@@ -825,14 +968,287 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   sie ist mit der Speicherprüfung nicht wiederholt (`docker build` geht in dieser
   Sandbox nicht).
 
+### Gemessen: Lasttest mit 200 Personen (M9)
+
+Je Lauf 200 Personen mit offenem Stream; Antwortzeiten am Client in ms (P50 / P95 /
+P99), Ziele nach Entscheidung 20: Lesen P95 ≤ 300 ms, Schreiben ≤ 500 ms, Live-Zustellung
+≤ 2 s, keine 5xx.
+
+| Endpunkt | Ziel P95 | Lauf 1: Pause 2 s | Lauf 2: Pause 2 s | Lauf 3: Pause 4 s |
+|---|---|---|---|---|
+| Seite lesen `GET /api/pages/{id}` | 300 | 26 / **228** / 430 | 31 / **307** / 545 | 13 / **34** / 123 |
+| Suchen `GET /api/search` | 300 | 66 / **277** / 507 | 76 / **361** / 553 | 51 / **80** / 256 |
+| Board `GET /api/spaces/{id}/board` | 300 | 43 / **292** / 493 | 53 / **401** / 586 | 25 / **51** / 352 |
+| Meine Tickets `GET /api/tickets?assignee=me` | 300 | 29 / **192** / 407 | 34 / **285** / 451 | 16 / **32** / 216 |
+| Nachricht schreiben `POST …/messages` | 500 | 43 / **300** / 585 | 54 / **441** / 704 | 24 / **62** / 307 |
+| Ticket ziehen `PATCH /api/tickets/{n}` | 500 | 38 / **282** / 483 | 45 / **392** / 597 | 21 / **53** / 226 |
+| Seite speichern `PATCH /api/pages/{id}` | 500 | 38 / **301** / 512 | 47 / **381** / 615 | 21 / **55** / 356 |
+| Live-Zustellung an 50 Streams | 2.000 | 98 / **456** / 749 | 122 / **643** / 964 | 62 / **144** / 415 |
+| Anfragen/s (alle Endpunkte) | | 95 | 94 | 48 |
+| Zustellungen (verloren) | | 129.150 (0) | 127.050 (0) | 66.600 (0) |
+| Fehler (5xx, Abbrüche) | 0 | 0 | 0 | 0 |
+| Ergebnis | | alle Ziele erreicht | Lesen verfehlt (307, 361, 401) | alle Ziele erreicht |
+| Lastmittel vor / während | | 0,5 / 3,1 | 1,7 / 3,0 | 1,6 / 1,7 |
+
+**Ergebnis:** Bei 95 Anfragen/s auf zwei API-Prozessen (jede Person alle 2 s eine
+Aktion, weit mehr als im Alltag) liegen die Ziele an der Grenze: Lauf 1 erreichte alle,
+Lauf 2 verfehlte drei Leseziele um 7 bis 101 ms; Schreiben, Live-Zustellung und
+Fehlerfreiheit hielten in beiden. Bei 48 Anfragen/s (Pause 4 s) liegt jedes P95 unter
+100 ms. **Engpass:** die CPU der Maschine, nicht ein einzelner Prozess. Die 4 vCPU
+trugen alles zugleich (zwei API-Prozesse je 0,6 Kerne, Datenbank 0,5, Worker 0,3,
+Lastgenerator 0,16, Messung) und waren zu 65–95 % belegt; jeder API-Prozess blieb unter
+0,9 Kernen. Dazu war der Pool jedes API-Prozesses in Spitzen ausgeschöpft (16
+Verbindungen), Anfragen warteten dann auf eine Verbindung. **Folgeaufgabe:** der
+Lasttest im Cluster (Pods mit eigenen Kernen, Ingress, Autoscaler; `load.sh` mit
+`docker stats` bzw. `loadmix.py` gegen den Ingress). Erst wenn dort das Lese-P95 bei
+95 Anfragen/s auf zwei Pods über 300 ms bleibt: die Poolgröße als Einstellung und ein
+Profil der Leseendpunkte. Bis dahin hält der Autoscaler mit dem gemessenen Request
+(siehe [Empfehlung](#empfehlung-request-und-limit)) die Last je Pod im Bereich von
+Lauf 3.
+
+Prozesse (Lauf 1; 100 % CPU = ein Kern; Datenbank: alle Backends der Datenbank, Pss
+statt RSS, die Verbindungen aus `pg_stat_activity`):
+
+| Phase | Prozess | CPU Ø | CPU max | RSS Ø | RSS max | DB-Verbindungen Ø / max |
+|---|---|---|---|---|---|---|
+| Leerlauf (nach dem Start) | API A / API B | 0,2 % / 0,2 % | 0,5 % | 203 / 198 MiB | 203 / 198 MiB | 2 / 2 |
+| Leerlauf | Worker | 2,4 % | 3,7 % | 200 MiB | 201 MiB | 6 / 6 |
+| Leerlauf | Collab | 0,1 % | 0,5 % | 98 MiB | 98 MiB | 0 |
+| Leerlauf | Datenbank | 0,6 % | 2,0 % | 51 MiB | 53 MiB | 10 / 10 |
+| warm (200 angemeldet, 200 Streams, Ruhe) | API A / API B | 0,2 % / 0,3 % | 0,9 % | 221 / 218 MiB | 221 / 218 MiB | 6 / 6 |
+| warm | Worker | 1,9 % | 3,0 % | 201 MiB | 201 MiB | 6 / 6 |
+| warm | Datenbank | 0,5 % | 1,5 % | 87 MiB | 87 MiB | 18 / 18 |
+| Last (180 s) | API A | 61 % | 75 % | 240 MiB | 242 MiB | 6,7 / 16 |
+| Last | API B | 61 % | 74 % | 238 MiB | 242 MiB | 6,9 / 16 |
+| Last | Worker | 32 % | 45 % | 209 MiB | 213 MiB | 6 / 6 |
+| Last | Collab | 0 % | 0 % | 98 MiB | 98 MiB | 0 |
+| Last | Datenbank | 51 % | 68 % | 165 MiB | 222 MiB | 20 / 32 |
+| Last | Lastgenerator | 16 % | 19 % | 332 MiB | 336 MiB | – |
+
+- **Lauf 2** (Pause 2 s): API 61 % Ø, 77 % / 86 % max, RSS 245 MiB; Worker 31 % Ø,
+  39 % max; Datenbank 48 % Ø, 67 % max, bis 33 Verbindungen. **Lauf 3** (Pause 4 s):
+  API je 33 % Ø, 52–54 % max, RSS 249 MiB, höchstens 7 Verbindungen je Prozess; Worker
+  18 % Ø, 25 % max, 217 MiB; Datenbank 32 % Ø, 54 % max, 184 MiB, 18–19 Verbindungen.
+- **Höchster Speicher** (`VmHWM`): API 340–377 MiB, erreicht beim Anmelden der 200
+  Personen vor dem Lauf (zwei argon2-Prüfungen zugleich, je 64 MiB) und nach dem Lauf
+  nicht wieder freigegeben (RSS im nächsten Leerlauf 242–249 MiB); Worker 213–217 MiB;
+  Collab 131 MiB (beim Start).
+- **Leerlauf je Rolle** ist seit M3 um rund 90 MiB gewachsen (API 107 → 198–203 MiB,
+  Worker 104 → 200 MiB): Seither laden die Prozesse die Module von KI, Agenten, MCP,
+  OIDC und Sicherung.
+- Der Collab-Prozess war im Szenario unbeteiligt (keine Live-Bearbeitung; Messung mit
+  10 Editoren siehe oben).
+
+### Gemessen: Sicherung und Wiederherstellung (M9)
+
+Wegwerf-Datenbank mit 10.000 Seiten (über die API angelegt, Datenbank 67 MB) und 64
+Anhängen zu 16 MiB (zufällige Bytes, nicht komprimierbar; zusammen 1.073.736.320 Bytes =
+1 GiB) auf dem lokalen Datenträger, ohne laufende App, mit `python -m app.ops` aus dem
+Code-Stand `709d006`; Lastmittel 0,7–0,9. Spitze RSS: der größte Prozess (Python oder
+`pg_dump`/`pg_restore`).
+
+| Schritt | Dauer | Spitze RSS |
+|---|---|---|
+| `backup create` | 10,1–11,3 s (vier Läufe; der erste nach einem Neustart der VM 33,1 s) | 119 MiB |
+| `backup verify` | 2,8–2,9 s | 100 MiB |
+| `restore check` (leere Datenbank, leere Ablage) | 2,8 s | 108 MiB |
+| `restore apply` (69 Tabellen, 64 Dateien) | 8,4–8,7 s (einmal nach dem Leeren des Seitencaches der VM) | 121 MiB |
+
+- **Archivgröße:** 1.081.149.440 Bytes (1,007 GiB): die Anhänge unverändert (das Archiv
+  komprimiert nicht) plus 7,4 MB für Datenbank-Dump und Manifest; das Manifest daneben
+  18 KB. Der Dump ist hier 11 % der Datenbankgröße (Indizes werden nicht gesichert,
+  Seitentext komprimiert gut).
+- Die Dauer hängt am Lesen der Anhänge: Der erste Lauf nach dem Neustart las von einem
+  kalten Datenträger (rund 32 MB/s), die übrigen aus dem Cache des Hosts. Auf
+  Netzspeicher ist mit der Lesegeschwindigkeit des Volumes zu rechnen.
+
+### Gemessen: Sicherung und Wiederherstellung mit S3 (M9b)
+
+Ohne Docker, Code-Stand `c5d287b` (Branch `m9b-task17`), 19.11.2026: eine
+Wegwerf-Datenbank A mit einer Seite und 32 Anhängen zu 16 MiB (je eine ZIP-Datei mit
+zufälligen, nicht komprimierbaren Bytes; zusammen 536.874.688 Bytes = 512 MiB), über die
+API einer App in Rolle `all` hochgeladen, die vor dem Messen beendet wurde. S3 ist ein
+SeaweedFS 4.53 (aus den Quellen gebaut, `weed server -s3`) **auf derselben Maschine**
+über Loopback, also ohne Netz dazwischen. Gemessen mit `python -m app.ops` ohne
+laufende App, je Schritt ein Lauf; Spitze RSS des größten Prozesses (Python oder
+`pg_dump`/`pg_restore`). Die Maschine war von anderen Läufen belegt (Lastmittel 3,3–3,7
+bei 4 vCPU), die Zeiten sind also eher zu hoch.
+
+| Schritt | Dauer | Spitze RSS | Ausgabe |
+|---|---|---|---|
+| `backup create` (lokal) | 5,9 s | 115 MiB | Archiv |
+| `backup verify` (lokales Archiv) | 2,0 s | 101 MiB | `ok` |
+| `storage copy --to s3` | 6,7 s | 108 MiB | `copied 32, present 0, gone 0, 536874688 bytes` |
+| `storage copy --to s3` (zweites Mal) | 1,0 s | 103 MiB | `copied 0, present 32, gone 0, 0 bytes` |
+| `storage check` (S3) | 1,1 s | 103 MiB | `ok s3` |
+| `backup create` (aus S3) | 6,6 s | 117 MiB | Archiv |
+| `backup verify` (S3-Archiv) | 2,0 s | 101 MiB | `ok` |
+| `restore check` (leere Datenbank B, leeres S3-Präfix) | 2,2 s | 110 MiB | `ok` |
+| `restore apply` (nach S3, 77 Tabellen, 32 Dateien) | 6,9 s | 116 MiB | `restored …` |
+| `restore apply` (lokal in leeres C, 77 Tabellen, 32 Dateien) | 4,5 s | 112 MiB | `restored …` |
+
+- **Archivgröße:** beide Archive 537.251.840 Bytes: Das Archiv aus S3 ist so groß wie das
+  lokale; der Speicher ändert am Format nichts.
+- **Durchsatz:** Kopieren nach S3 rund 80 MB/s, Sichern aus S3 rund 81 MB/s,
+  Einspielen nach S3 rund 78 MB/s, lokal rund 120 MB/s. Der Speicher bleibt flach
+  (unter 120 MiB): Dateien gehen als Strom durch, nicht als Ganzes in den Speicher.
+- Die Kopie ist idempotent: Der zweite Lauf vergleicht nur die Listen beider Seiten
+  (Schlüssel und Größe; die Schlüssel folgen dem Inhalt) und schreibt nichts.
+- Messskript: nicht eingecheckt (Wegwerf-Datenbanken, eigene Ports); es startet
+  SeaweedFS, lädt über die API hoch und misst je Schritt einen eigenen Kindprozess.
+
+### Gemessen: Schreibgrenze durch NOTIFY (M9)
+
+Ein Python-Skript (asyncpg, nicht eingecheckt) an einer eigenen Datenbank desselben
+PostgreSQL 16: N Verbindungen schreiben je 10 s in einer Schleife eine Transaktion aus
+einem `INSERT` (100 Bytes) und, im zweiten Fall, einem `pg_notify` mit eigener Nutzlast
+(rund 180 Bytes, wie ein Live-Ereignis), während eine Verbindung lauscht (sie bekam
+jedes). Lastmittel vorher 0,7.
+
+| Verbindungen | Commits/s ohne NOTIFY | Commits/s mit NOTIFY |
+|---|---|---|
+| 1 | 2.487 | 1.749 |
+| 4 | 5.865 | 4.138 |
+| 16 | 8.487 | 4.686 |
+| 32 | 7.724 | 4.487 |
+
+PostgreSQL reiht die Commits mit `NOTIFY` hintereinander (eine Sperre auf die
+Benachrichtigungswarteschlange beim Commit); ab etwa vier Verbindungen bleibt es hier bei
+4.100–4.700 je Sekunde. In der App schickt jede schreibende Transaktion mit Ereignissen
+ein `NOTIFY herd_outbox` (in einer Transaktion zusammengefasst); der Worker schickt je
+Live-Ereignis ein `NOTIFY herd_live`, committet aber einen Stapel einer Bahn (bis 100
+Ereignisse) auf einmal. Jede schreibende Aktion kostet also einen solchen Commit an der
+API und einen Anteil an einem Stapel des Workers: **Schreibgrenze** auf dieser
+Datenbank rund 2.000 bis 4.000 schreibende Aktionen je Sekunde. Der Lasttest schrieb
+33 je Sekunde (Seiten, Nachrichten, Tickets), mehr als 60-mal weniger; vorher ist die
+CPU der API-Prozesse die Grenze.
+
+### Kalender (M10), Entfaltung
+
+Tor für M10 Tasks 4 bis 9 (Plan M10, Task 3c, Entscheidung 6: Serien werden beim Lesen
+entfaltet, keine Vorkommen-Tabelle). Gemessen am 19.11.2026 mit
+`backend/scripts/measure_calendar.py window` als Prozess gegen eine eigene Datenbank
+(PostgreSQL 16.15, Python 3.13), ausgewertet mit `measure_calendar_report.py`. Bestand
+(direkt geschrieben, jeder Termin durch `event_times.check` wie über die API): 20
+Kalender in vier Team-Bereichen mit 500 Serien (gemischte Regeln von werktäglich bis
+jährlich, ein Drittel endlos, ein Drittel mit `UNTIL`, ein Drittel mit `COUNT`, Beginn
+bis fünf Jahre zurück, einige `EXDATE`s und verschobene Vorkommen) und 5.000
+Einzelterminen (ein Jahr um den Stichtag, 8 % ganztägig, 10 % privat, einige vorläufig
+oder abgesagt); dazu 20 persönliche Kalender mit derselben Mischung (zusammen noch
+einmal 500 und 5.000), 4.001 Geburtstage und 12.000 Jahresserien für die Sonderfälle;
+27.030 Zeilen. Die Betrachterin ist Mitglied der vier Team-Bereiche (Zone
+Europe/Berlin). Je Fall 10 Aufwärmaufrufe, dann 200 Aufrufe (Monatsraster mit allen
+Seiten und Sonderfälle: 50), reihum über zehn Fenster um Montag, 23.11.2026.
+**Abfragen** zählt der Engine-Zähler (jedes SQL-Statement); **Arbeit** ist die gezählte
+Arbeit der Entfaltung (`expansion.Budget`: Zeilen × 40 plus erzeugte Kandidaten der
+Regeln). Die Maschine (4 vCPU) teilten andere Arbeiten mit Testläufen; darum je drei
+Läufe hintereinander, angegeben ist die Spanne über die drei Läufe.
+
+**Nach den Abhilfen** (Code-Stand `4c4e3c0`): (a) eine spätere Seite lädt und entfaltet
+nur ab dem Anfang ihres Cursors, nicht das ganze Fenster neu; (b) Serien mit `COUNT`
+springen vor, wo jede Periode gleich viele Vorkommen hat (`recurrence_count.per_block`),
+und zählen die übersprungenen; sonst laufen sie weiter ab ihrem Beginn. Lastmittel
+vor/nach den Läufen 0,8/1,4, 1,3/4,0 und 4,2/2,9.
+
+| Fall | p50 ms | p95 ms | Abfragen je Aufruf | Zeilen / Kandidaten / Arbeit je Aufruf | Vorkommen |
+|---|---|---|---|---|---|
+| (1) Woche, `list_window`, eine Seite (100) | 41–46 | **53–58** | 2 | 415 / 755 / 17.371 | – |
+| (1) Woche, echte Route `GET /api/calendar/events` | 47–51 | 58–71 | 5 | (wie oben) | – |
+| (1) Woche, alle Seiten (3–4 Aufrufe) | 158–174 | **216–259** | 7,8 Ø | 1.541 / 2.305 / 63.941 | 327 Ø, 360 max |
+| (2) Monatsraster (42 Tage), eine Seite | 59–61 | 89–141 | 2 | 654 / 2.089 / 28.241 | – |
+| (2) Monatsraster, echte Route | 70–71 | 106–243 | 5 | (wie oben) | – |
+| (2) Monatsraster, alle Seiten (rund 20 Aufrufe) | 1.075–1.188 | 1.260–1.377 | 39,2 Ø | 10.035 / 23.926 / 425.322 | 1.908 Ø, 1.965 max |
+| (3) Verfügbarkeit, 20 Personen, 14 Tage | 31,5–32,8 | **35–40** | 2 | 387 / 781 / 16.261 | 448 |
+| (3) Verfügbarkeit, 20 Personen, 62 Tage | 48–51 | 69–72 | 2 | 673 / 2.269 / 29.169 | 1.982 |
+| 4.001 ruhende Jahresserien (März), Novemberwoche | 355–371 | 616–654 | 2 | 4.001 / 4.001 / 164.041 | 0 |
+| Kalender nahe der Arbeitsgrenze (12.000 Serien) | 1.219–1.352 | 1.323–1.543 | 2 | 12.000 / 12.000 / 492.000 | 0 |
+
+Ein vierter Lauf unter starker fremder Last (Lastmittel 8,3/6,4, nur die drei Ziele):
+Woche eine Seite p95 71 ms, ganze Woche p50 181 ms und p95 262 ms, Verfügbarkeit 14
+Tage p95 47 ms. Zum Vergleich der Code-Stand vor den Abhilfen (`0f846d1`) direkt davor
+gemessen (Lastmittel 2,6/9,5): Woche eine Seite p95 73 ms, ganze Woche p50 222 ms und
+p95 317 ms, Monatsraster alle Seiten p50 1.789 ms, Verfügbarkeit 14 Tage p95 76 ms.
+
+**Vor den Abhilfen** (Code-Stand `2717bce`, erste Messung; Lastmittel 6,3/7,2, 7,3/5,3
+und 5,3/4,4; „alle Seiten“ mit 50 Aufrufen):
+
+| Fall | p50 ms | p95 ms | Abfragen je Aufruf | Zeilen / Kandidaten / Arbeit je Aufruf | Vorkommen |
+|---|---|---|---|---|---|
+| (1) Woche, `list_window`, eine Seite (100) | 58–68 | 79–107 | 2 | 415 / 4.837 / 21.453 | – |
+| (1) Woche, echte Route | 63–73 | 78–101 | 5 | (wie oben) | – |
+| (1) Woche, alle Seiten (3–4 Aufrufe) | 217–271 | 259–505 | 7,8 Ø | 1.621 / 18.833 / 83.673 | 327 Ø, 360 max |
+| (2) Monatsraster (42 Tage), eine Seite | 72–82 | 104–144 | 2 | 654 / 6.142 / 32.294 | – |
+| (2) Monatsraster, echte Route | 83–92 | 111–314 | 5 | (wie oben) | – |
+| (2) Monatsraster, alle Seiten (rund 20 Aufrufe) | 1.717–1.940 | 1.998–2.316 | 39,2 Ø | 12.824 / 120.350 / 633.290 | 1.908 Ø, 1.965 max |
+| (3) Verfügbarkeit, 20 Personen, 14 Tage | 47–57 | 62–79 | 2 | 387 / 5.644 / 21.124 | 448 |
+| (3) Verfügbarkeit, 20 Personen, 62 Tage | 63–77 | 83–106 | 2 | 673 / 7.132 / 34.032 | 1.982 |
+| 4.001 ruhende Jahresserien (März), Novemberwoche | 373–458 | 673–837 | 2 | 4.001 / 4.001 / 164.041 | 0 |
+| Kalender nahe der Arbeitsgrenze (12.000 Serien) | 1.311–1.575 | 1.481–1.748 | 2 | 12.000 / 12.000 / 492.000 | 0 |
+
+Kein Aufruf antwortete anders als 200. Einzelne Aufrufe bis rund 450 ms (max) kommen
+in jedem Fall mit einer Seite vor, auch bei 32 ms Median; sie gehen auf die fremde Last
+zurück.
+
+- **Urteil: Tor erfüllt, auch das Ziel für die ganze Woche.** Wochenansicht p95
+  53–58 ms je Aufruf, Verfügbarkeit über 14 Tage p95 35–40 ms (Tor: je unter 300 ms);
+  die ganze Woche mit allen Seiten p95 216–259 ms (Ziel unter 300 ms; unter starker Last
+  262 ms), in jedem Lauf. Schon vor den Abhilfen hielt das Tor je Aufruf (p95 79–107 und
+  62–79 ms); die ganze Woche lag damals bei p95 259–505 ms.
+- **Wirkung der Abhilfen:** (b) senkt die Kandidaten einer Wochenseite von 4.837 auf
+  755 (−84 %) und der Verfügbarkeit über 14 Tage von 5.644 auf 781; (a) dazu die der
+  ganzen Woche auf 2.305 statt rund 3.000 (vier Seiten zu je 755) und ihre Zeilen von
+  1.621 auf 1.541. Die Arbeit der ganzen Woche sinkt von 83.673 auf 63.941 (−24 %), die
+  des Monatsrasters mit allen Seiten von 633.290 auf 425.322; dessen Zeit von rund 1,9 s
+  auf rund 1,1 s. **Das ist der günstigste Fall für (b):** Jede Regel der Mischung
+  (`measure_calendar_events.RULES`) ist eine, mit der eine Serie mit `COUNT` vorspringt;
+  Regeln mit schwankender Zahl je Periode (etwa monatlich am 31.) enthält der Bestand
+  nicht. Sie laufen ab ihrem Beginn und kosten je Aufruf ihre Kandidaten seit dem Beginn
+  (monatlich am 31. über fünf Jahre rund 60, eine Zeile kostet 40); im Alltag sind sie
+  selten und dünn. Für die Messung in Task 23 ist eine solche Art in der Mischung
+  vorgemerkt.
+- **Wofür die Zeit jetzt geht:** vor allem die Zeilen. Jede noch laufende Serie wird auf
+  jeder Seite geladen und angesetzt (vor den Abhilfen gemessen: Laden der rund 400
+  Zeilen samt Ausnahmen 24 ms, Entfalten 38 ms, rund 95 µs je Zeile), denn (a) spart nur
+  Zeilen, die vor dem Cursor enden. Die Regel wird schon gecacht geparst (`parse_rule`,
+  `lru_cache`). Serien mit `COUNT`, deren Zahl je Periode schwankt (der 31., jeder
+  Montag eines Monats, der 20. Montag eines Jahres, `BYSETPOS` in Wochen, ein Tag, den
+  nicht jeder Monat hat), laufen weiter ab ihrem Beginn.
+- **Seiten:** höchstens 100 Vorkommen je Seite; eine Woche mit rund 330 Vorkommen
+  braucht vier Aufrufe, das Monatsraster mit 20 Kalendern und rund 1.900 Vorkommen
+  braucht 20 (zusammen rund 1,1 s). Die erste Seite steht nach unter 60 ms (p95).
+- **Grenze von 2.000 Vorkommen:** Das Monatsraster dieses Bestands kommt mit bis zu
+  1.965 Vorkommen nahe an die Grenze (darüber 422 `calendar.window_too_dense`); ein
+  dichterer Monat mit 20 Kalendern bekäme die Antwort. Die Verfügbarkeit entfaltet je
+  Person mit eigenem Budget (62 Tage: rund 100 Vorkommen je Person); mit einem Budget für
+  alle 20 Personen läge sie mit 1.998 knapp unter der Grenze.
+- **Sonderfälle der Prüfung (R3a-2):** 4.001 endlose Geburtstage im März lesen sich in
+  einer Novemberwoche leer, kosten aber jeden Aufruf 0,35–0,37 s (p50; p95 bis 0,65 s),
+  weil jede Zeile geladen und angesetzt wird. Ein Kalender mit 12.000 solcher Serien
+  (Arbeit 492.000 von 500.000, `expansion.MAX_WORK`) braucht 1,2–1,4 s je Aufruf (p50;
+  max 1,7 s): So lange dauert ein Aufruf an der Arbeitsgrenze auf dieser Maschine,
+  darüber bricht er mit 422 ab. Beide ändern die Abhilfen nicht (endlose Serien sprangen
+  schon, die Kosten sind die der Zeilen).
+- **Arbeitsgrenze neu angesetzt (Prüfung M10 Task 4, R4-6):** Seit `502089a` zählt die
+  Entfaltung auch den Kandidaten, an dem eine Regel hinter dem Fenster endet (der
+  nächste März; vorher erzeugte `dateutil` ihn ungezählt). Jede dieser Serien kostet in
+  der Novemberwoche damit 42 statt 41: 12.000 ergäben 504.000 und antworten 422
+  `calendar.window_too_dense`, höchstens 11.904 passen. Der Bestand hat darum
+  11.500 solcher Serien (`BOUND_SERIES`, Arbeit 483.000; insgesamt 26.530 Zeilen),
+  `MAX_WORK` bleibt. Gemessen am 19.11.2026 (`b29d055` mit 11.500, nur dieser Fall, 50
+  Aufrufe, Lastmittel 1,0): p50 1.037 ms, p95 1.098 ms, max 1.182 ms, alle 200.
+- **Abfragen:** `list_window` stellt zwei Statements (Termine, Ausnahmen), die Route
+  fünf (dazu Sitzung, Person und Mitgliedschaften); unabhängig von der Zahl der Kalender
+  und Zeilen.
+
 ### Nicht gemessen (hier nicht möglich oder nicht gemacht)
 
 - Echte Browser als Editoren in dieser Zahl (Last und Darstellung im Browser); die
   Demo (`docs/demo/m2.md`) lief mit zwei echten Chromium-Instanzen, ohne Zeitmessung.
 - Betrieb hinter einem echten Ingress-Controller (WebSocket-Upgrade, Leerlauf-Timeouts),
-  mehrere API-Replikas, der Collab-Prozess als eigener Pod, Neustart des
-  Collab-Prozesses unter Last. Kein Kubernetes in der Sandbox.
-- Mehr als eine Seite mit Live-Bearbeitung gleichzeitig, große Seiten (nahe 200.000
+  mehrere API-Replikas, Collab-Instanzen als eigene Pods (ohne Cluster gemessen: zwei
+  Instanzen, eine unter Last mit SIGTERM beendet, M9b), Absturz einer Instanz unter
+  Last. Kein Kubernetes in der Sandbox.
+- Große Seiten unter Live-Last (nahe 200.000
   Zeichen oder 5 MiB Yjs-Zustand), Uploads und Importe unter Last. Die Dauer eines
   großen Imports ist nur ohne Image gemessen (Review M2 R19, im Prozess gegen das lokale
   PostgreSQL, 2.000 Seiten in einem Ordner mit Tags): vorher 80 s, jetzt 11 s
@@ -860,11 +1276,30 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   zugleich; zwei Worker beim Abschluss; „Mein Board“ einer Person mit Tickets in vielen
   Bereichen (gemessen ist ein Bereich); eine Daily-Ansicht, in der nur ein Teil der
   Karten seit dem letzten Arbeitstag geändert ist (hier alle).
-- Nachrichten: Speicher und CPU der Datenbank, echte Browser statt eines Skripts als
+- **Lasttest und Sicherung (M9):** im Container und im Cluster (`load.sh` mit `docker
+  stats`, Pods mit eigenen Kernen, Ingress, der Autoscaler beim Hoch- und
+  Herunterskalieren), mehr als zwei API-Prozesse, eine Datenbank auf eigener Maschine,
+  echte Browser (SPA-Dateien, Neuladen), Live-Bearbeitung, Hochladen und Importe im Mix,
+  Agenten-Läufe und Aufgaben unter dieser Last, die Dauer der 200 Anmeldungen vor dem
+  Lauf (nur ihr Speicher), eine Sicherung während des Lasttests, Sicherung auf
+  Netzspeicher, S3 über ein echtes Netz (gemessen: SeaweedFS auf derselben Maschine,
+  M9b) oder mit vielen kleinen Dateien (gemessen: 64 bzw. 32 große), Offsite-Kopie
+  mit restic, Wiederherstellung einer Datenbank mit Millionen Zeilen, die
+  Schreibgrenze mit der App selbst (gemessen: PostgreSQL allein).
+- Nachrichten: Speicher und CPU der Datenbank für Nachrichten allein (seit M9 nur im
+  ganzen Mix des Lasttests), echte Browser statt eines Skripts als
   Empfänger, mehr als ein Kanal oder viele Organisationen, Direktnachrichten und Threads
   unter Last, die Suche über viele Nachrichten, die Wirkung eines Proxys vor
   `/api/stream`, der Verlust der LISTEN-Verbindung unter Last (`resync`) und ein
   Neustart eines API-Pods mit 100 offenen Verbindungen.
+- **M9b:** das Ersetzen einer laufenden Installation mit großem Archiv (vorgeführt mit
+  rund 350 KB; die Wartungszeit wächst mit Dump und Dateien, siehe die Zeiten von
+  `restore apply` oben) und unter Last; die Kosten der Schutzschichten aus Task 18 unter
+  Last (der Lasttest mit 200 Personen lief davor): das Vermerken der letzten Nutzung je
+  Anfrage, die Zählzeile der Schreibgrenze je Schreibvorgang, der Virenscan (eigener
+  clamd), TLS zur Datenbank; die Anmeldung mit TOTP unter Last; der Hostinger-Stack auf
+  einem echten VPS (in der CI startet `hostinger-smoke.sh` ihn mit Docker); zwei
+  Collab-Pods im Cluster.
 - **Agenten (M6):** ein echter Anbieter (Netz, Latenz, Token-Zahlen, Kosten); der
   Worker im Image und mit `docker stats`; CPU von Worker, API und Datenbank während der
   Durchläufe; der Speicher der API; große Gesprächsverläufe, Werkzeugergebnisse und
@@ -888,22 +1323,34 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
 
 ### Empfehlung Request und Limit
 
-Aus den Messwerten mit 20–30 % Puffer:
+Seit M9 aus dem [Lasttest](#gemessen-lasttest-mit-200-personen-m9) (ohne Docker, RSS
+statt cgroup-Speicher); das Chart setzt diese Werte als Standard (`values.yaml`, geprüft
+in `deploy/helm/scripts/chart-rules-scaling.sh`):
 
-| Container | CPU Request | CPU Limit | Speicher Request | Speicher Limit | Chart-Standard heute |
+| Container | CPU Request | CPU Limit | Speicher Request | Speicher Limit | Chart-Standard |
 |---|---|---|---|---|---|
-| api (je Pod, ohne Collab-Prozess) | 250m | 3500m oder keins | 256Mi | 330Mi | Request 100m / 256Mi, Limit 512Mi |
-| collab (eine Replika) | 50m | 500m | 128Mi | 1Gi | Request 50m / 128Mi, Limit 1Gi |
-| worker (je Replika) | 50m | 300m (ohne Läufe gemessen) | 256Mi | 330Mi | Request 50m / 192Mi, Limit 384Mi |
-| db (mitgeliefert) | 100m | keins | 100Mi | 105Mi | Request 100m / 256Mi, Limit 1Gi |
+| api (je Pod, ohne Collab-Prozess) | 500m | keins | 320Mi | 512Mi | gleich (bis M9: 100m / 256Mi) |
+| worker (je Replika) | 250m | keins | 256Mi | 384Mi | gleich (bis M9: 50m / 192Mi) |
+| collab (je Replika) | 50m | keins | 128Mi | 1Gi | gleich |
+| db (mitgeliefert) | 250m | keins | 256Mi | 1Gi | gleich (bis M9: 100m) |
+| Sicherungs-Job | 50m | keins | 128Mi | 512Mi | gleich |
 
-- **api CPU:** Limit = Lastspitze 3,2 Kerne + 10 %. Ein kleineres Limit bricht nichts,
-  es senkt nur den Anmeldedurchsatz. Der Request ist gesetzt, nicht gemessen: Leerlauf
-  und warm liegen unter 1 %.
-- **api Speicher:** Die Messung enthält den Collab-Prozess (rund 35 MiB im Leerlauf,
-  92 MiB RSS beim Tippen). Request = Last-Durchschnitt 218 MiB + 20 %, Limit =
-  Lastspitze 253 MiB + 30 %; ohne Collab-Prozess bleibt damit Reserve. Das Chart
-  behält 256Mi/512Mi.
+- **api CPU:** je Prozess 0,2 % im Leerlauf, 33 % Ø / 54 % max bei 48 Anfragen/s auf
+  zwei Prozessen (P95 ≤ 80 ms) und 61 % Ø / 75–86 % max bei 95 Anfragen/s (P95 an der
+  Grenze der Ziele). Mit dem Ziel des Autoscalers (70 %) bekommt ein Pod ab 350m Hilfe,
+  also zwischen der bequemen und der knappen Messung; ohne Autoscaler reserviert der
+  Request, was ein Pod bei der halben Referenzlast braucht. Kein CPU-Limit: Anmeldungen
+  (argon2) brauchen kurz mehrere Kerne (M2: 3,2 Kerne bei 20 gleichzeitigen
+  Anmeldungen), ein Limit würde nur drosseln.
+- **api Speicher:** RSS 198–203 MiB nach dem Start, 238–249 MiB unter Last und danach,
+  höchstens 340–377 MiB beim Anmelden von 200 Personen (zwei argon2-Prüfungen zu
+  64 MiB zugleich). Request = Last 246 MiB + 20 % ≈ 300 → 320Mi; Limit 512Mi = Spitze
+  377 MiB + 35 %.
+- **worker:** CPU 2 % im Leerlauf (Fälligkeits-Schleife, Metriken), 18 % Ø bei 48 und
+  31–32 % Ø / 39–45 % max bei 95 Anfragen/s; Request 250m (der Autoscaler hilft ab
+  175m, der Last von Lauf 3). Speicher: RSS 200–217 MiB ohne Agenten-Läufe, in M6 bis
+  249 MiB mit 16 Läufen zugleich; Request 256Mi, Limit 384Mi. Wer
+  `HERD_RUN_CONCURRENCY` erhöht, gibt dem Worker mehr Speicher.
 - **collab:** CPU beim Tippen von 10 Personen bis 0,4 Kerne für den ganzen Container
   (API, Weiterleitung und Collab-Prozess zusammen), Speicher (RSS) 92 MiB mit einem
   kleinen Dokument. Große Seiten kosten viel mehr (Prüfung M4-1 P12, gemessen im
@@ -915,20 +1362,18 @@ Aus den Messwerten mit 20–30 % Puffer:
   unter `HERD_COLLAB_MEMORY_BUDGET_MB` (400, Schätzung, `docs/WIKI.md`); Faustregel
   Limit ≥ (130 MB + 250 MB je Prüf-Thread + Budget) / 0,8 = 975 MB. Das Chart setzt
   128Mi/1Gi (vorher 512Mi: drei bis fünf große Tabellen-Seiten brachten ihn darüber).
-- **worker:** In M3 RSS 104–107 MiB in Ruhe und bei 20 Nachrichten je Sekunde, CPU
-  20–24 %. Mit den Läufen der Agenten (M6) 173 MiB im Leerlauf, unter Last 199–234 MiB
-  mit 4 Läufen zugleich und 249 MiB mit 16 (alles ohne Image gemessen). Request =
-  Lastmittel rund 210 MiB + 20 %, Limit = Spitze 249 MiB + 30 %; CPU unter Läufen nicht
-  gemessen, das CPU-Limit stammt aus M3. Das Chart setzt Request 192Mi und Limit
-  384Mi; das Limit reicht, der Request liegt unter der Last. Beides bleibt, bis eine
-  Messung im Container vorliegt. Wer `HERD_RUN_CONCURRENCY` erhöht, gibt dem Worker mehr
-  Speicher.
-- **api mit SSE:** 200 offene Verbindungen und 20 Nachrichten je Sekunde kosteten je
-  Prozess +15 MiB und bis 50 % eines Kerns (ohne Anmeldelast); das bleibt im Rahmen der
-  Empfehlung oben.
-- **db:** Die Formel ergibt 100Mi/105Mi, aber nur für eine fast leere Datenbank.
-  PostgreSQLs `shared_buffers` ist ab Werk schon 128 MB; mit echten Daten wächst der
-  Bedarf. Das Chart behält 256Mi/1Gi. Produktiv ist die Datenbank ohnehin extern.
+- **db:** 32 Backends, CPU 48–51 % Ø / 67–68 % max bei 95 Anfragen/s, 32 % Ø bei 48;
+  Pss aller Backends 165–184 MiB Ø, höchstens 222 MiB (`shared_buffers` 128 MB anteilig
+  gezählt). Request 250m (die halbe Referenzlast), Speicher 256Mi/1Gi wie bisher; mit
+  echten Daten wächst der Bedarf. Produktiv ist die Datenbank ohnehin extern; das
+  mitgelieferte PostgreSQL hat `max_connections` 200 (`postgresql.maxConnections`, siehe
+  [Clusterfähigkeit](#clusterfähigkeit)).
+- **Sicherungs-Job:** gemessen höchstens 119–121 MiB RSS je Prozess
+  ([Sicherung](#gemessen-sicherung-und-wiederherstellung-m9)); 128Mi/512Mi bleiben.
+- **Autoscaler-Grenzen:** API 2 bis 6, Worker 1 bis 3 bleiben. Zwei API-Pods trugen die
+  Referenz knapp, sechs tragen rund das Dreifache (nicht im Cluster gemessen); die
+  Datenbankverbindungen der vollen Grenzen (bis 144) stehen unter
+  [Clusterfähigkeit](#clusterfähigkeit).
 - **Volume `/data`:** Anhänge (je Inhalt einmal) und temporäre Dateien von Upload,
   Import und Export (bis 100 MiB je laufendem Import). Das Chart legt 10Gi an.
 
@@ -955,22 +1400,16 @@ auflösen kann. Die Größe mit Updates steht im Build-Protokoll der CI.
 
 | | |
 |---|---|
-| Ansprechperson | Jan (Projektverantwortung, hat die Spezifikation freigegeben) |
-| Vertretung | noch nicht benannt |
+| Ansprechperson | T4 (Jans Antwort J5, 15.11.2026) |
+| Vertretung | nicht benannt |
 
 ## Sicherheitshinweise
 
-- **Vertrauensbereich Collab-Prozess (bewusst so, Review M2 R14):** Die API reicht beim
-  Aufbau einer Live-Verbindung das Sitzungs-Cookie der Person an den Collab-Prozess
-  weiter; die interne API nimmt Laden und Speichern für jede Seite an, die diese
-  Person bearbeiten darf, solange die Sitzung gilt. API und Collab-Prozess bilden
-  damit einen Vertrauensbereich: Ein übernommener Collab-Prozess könnte alle Seiten
-  lesen und überschreiben, die eine gerade verbundene Person bearbeiten darf, in ihrem
-  Namen, und Live-Sitzungen beliebiger Seiten beenden; erreicht er die öffentliche API,
-  könnte er sie als diese Person aufrufen. Im Chart trennt die NetworkPolicy den
-  Collab-Pod von der öffentlichen API; in Compose laufen beide im selben Container.
-  Mit M9 ersetzen kurzlebige, an Seite und Generation gebundene Tokens das
-  weitergereichte Cookie.
+Die Sicherheitshinweise (Vertrauensbereich des Collab-Prozesses, Anmeldung, Sitzungen,
+Kryptografie, Verbindungen, Datenklassen, Protokolle) und die Prüfung gegen OWASP ASVS
+5.0 Stufe 2 mit den offenen Lücken, ihrer Planung (M9b Tasks 16 und 18) und den
+dokumentierten Abweichungen (MFA für lokale Passwortkonten, TLS zwischen API und
+Collab-Prozess) stehen in [`SICHERHEIT.md`](SICHERHEIT.md).
 
 ## Betriebshinweise
 
@@ -984,7 +1423,9 @@ Wikis in [`WIKI.md`](WIKI.md), der Nachrichten (Worker, Outbox, SSE hinter einem
 in [`NACHRICHTEN.md`](NACHRICHTEN.md), der KI-Anbindung in [`KI.md`](KI.md), der Agenten
 (Worker, Läufe, Alarme, Rolling Update) in [`AGENTEN.md`](AGENTEN.md), von MCP
 (`/mcp` hinter einem Proxy, Token, externe Server, Konnektoren, Katalog) in
-[`MCP.md`](MCP.md#betrieb).
+[`MCP.md`](MCP.md#betrieb), seit M9 Sicherung, Wiederherstellung und Aufbewahrung in
+[`SICHERUNG.md`](SICHERUNG.md) und die Anmeldung über OIDC mit Freigabe in
+[`ANMELDUNG.md`](ANMELDUNG.md).
 
 ## Metriken und Alarme (seit M3)
 
@@ -1038,13 +1479,24 @@ Stunde wegen Fehlschlägen angehalten). Seit M8, je als Warnung:
 5 Minuten, 10 Minuten lang; aus `herd_http_requests_total{route="/mcp"}`) und
 `HerdMcpCatalogProblems` (übersprungene Katalog-Dateien, 15 Minuten). Bedeutung und
 Abhilfe in [`AGENTEN.md`](AGENTEN.md#metriken-und-alarme) und
-[`MCP.md`](MCP.md#metriken-und-alarme). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
+[`MCP.md`](MCP.md#metriken-und-alarme). Seit M9: `HerdBackupTooOld`,
+`HerdBackupFailing`, `HerdOffsiteBackupFailing`, `HerdBackupNeverRan`
+([`SICHERUNG.md`](SICHERUNG.md)), `HerdOidcFailing` ([`ANMELDUNG.md`](ANMELDUNG.md))
+und `HerdAutoscalerAtMax` (ein Autoscaler des Charts 30 Minuten am Maximum, Warnung;
+braucht kube-state-metrics). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
-## Tests (Backend Stand M7, sonst M6)
+## Tests (Stand M9b; ältere Zeilen zum Vergleich)
 
 | Paket | Tests | Stand |
 |---|---|---|
+| Alle Jobs der CI, M9b | Lauf 44428037881 auf `94e4c3a` (GitHub Actions) | 19.11.2026: alle grün. Backend 3.174 grün, 5 übersprungen, 1 Warnung, 37:42 min; Frontend 664 in 122 Dateien; Collab 288 (286 grün, 2 übersprungen: die Integration läuft eigens) und Integration 2 grün; Browser 76 grün, 11,0 min; dazu `restore` (Probe mit Ersetzen), Image mit `smoke.sh` (einfach, `SMOKE_NODES=1`, `SMOKE_S3=1`), Hostinger-Stack, Trivy, Chart und Lizenzen. Hier lokal nicht neu gezählt |
+| Backend (`pytest`, echtes PostgreSQL), Fix-Welle M9a | 2.832 (mit dem Test gegen echtes restic 0.18.1) | 16.11.2026: 2.832 grün, 1 Warnung (SADeprecationWarning); 41:14 min. ruff, ruff format, mypy (strict, 561 Dateien) sauber, `check_migrations` grün |
+| Frontend (`vitest`), Fix-Welle M9a | 633 in 113 Dateien | 16.11.2026: 633 grün im ersten Lauf |
+| Backend (`pytest`, echtes PostgreSQL), M9a | 2.813 (Backend-Stand von Commit `2f5207f`, Abschluss M9a) | 16.11.2026: 2.813 grün, 1 Warnung (SADeprecationWarning); 41:27 min. ruff, ruff format, mypy (strict, 560 Dateien) sauber, `check_migrations` grün |
+| Frontend (`vitest`), M9a | 632 in 113 Dateien | 16.11.2026: 632 grün im ersten Lauf |
+| Collab (`node --test`), M9a | 280 | 16.11.2026: 279 grün, 1 übersprungen |
+| Browser (`e2e/`, Playwright, echte App in Rolle `all`), M9a | 73 in 22 Dateien | 16.11.2026: erster Lauf 72 grün, 1 rot: `oidc.spec.mjs` „a person links an account…“ legte dora@e2e.example an, die `ai-agents.spec.mjs` schon mit anderem Passwort angelegt hatte (401 bei der Anmeldung; nur im ganzen Lauf, behoben mit einer eigenen Person). Danach 73 grün, 9,8 min |
 | Backend (`pytest`, echtes PostgreSQL), M7 | 2.037 (Backend-Stand von Commit `51d3dc5`) | 14.11.2026: 2.034 grün, 3 rot: `test_wiki_review_pass.py::test_a_due_page_is_reminded_once_per_interval` (der Test rechnete „später am Tag“ als jetzt + 3 h und lief nach 21 Uhr UTC; behoben in `4631d15`), `test_run_cancel_races.py::test_a_cancel_before_the_finish_wins` (409 `conflict.retry` der kurzen Sperrgrenze unter Last, danach ein Deadlock beim Leeren der Tabellen) und als Folge `::test_a_cancel_during_the_finish_waits_and_finds_it_done` (Reste des vorigen Tests); die Datei allein dreimal grün; 33:06 min. ruff, ruff format, mypy (strict, 413 Dateien) sauber |
 | Backend (`pytest`, echtes PostgreSQL), M6 | 1.716 (Backend-Stand von Commit `c1e700a`, gleich dem von `aab401b`) | 14.11.2026: 1.715 grün, 1 rot: `test_run_replay.py::test_a_run_goes_on_after_its_last_recorded_step` (der Stub gab die zweite vorbereitete Antwort nicht zurück; unter Last der Maschine, danach die Datei allein dreimal grün); 27:40 min. ruff, ruff format, mypy (strict, 363 Dateien) sauber. Ein später hinzugekommener Test (`95f8273`) ist hier nicht mitgezählt |
 | Frontend (`vitest`) | 412 in 71 Dateien (Stand `aab401b`) | 14.11.2026: 411 grün, 1 rot unter Last (`SkillProposals.test.tsx`, „a space's moderators find them beside the skills“: die Navigation „Skills und Vorschläge“ nicht gefunden), die Datei allein grün (10 von 10) |

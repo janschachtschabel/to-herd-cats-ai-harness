@@ -66,3 +66,14 @@ class AuditRepository:
         if before is not None:
             stmt = stmt.where(tuple_(AuditLog.created_at, AuditLog.id) < tuple_(*before))
         return [NamedEntry(e, n) for e, n in (await self.session.execute(stmt)).all()]
+
+    async def latest_of(self, org_id: uuid.UUID, actions: tuple[str, ...]) -> AuditLog | None:
+        """The newest entry with one of `actions` (the last restore attempt, plan M9
+        task 13)."""
+        stmt = (
+            select(AuditLog)
+            .where(AuditLog.org_id == org_id, AuditLog.action.in_(actions))
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .limit(1)
+        )
+        return await self.session.scalar(stmt)

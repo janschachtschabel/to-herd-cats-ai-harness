@@ -189,7 +189,8 @@ class Executor:
             )
         if dropped:  # after the take-up's transaction: counted, never named
             count_left_out(dropped)
-        sections = [*briefed.sections, personal_mark.PRESENT] if present else briefed.sections
+        told = personal_mark.sections([spec.name for spec in tools], present)
+        sections = [*briefed.sections, *told]
         instructions = context.instructions(
             agent.name,
             agent.instructions,

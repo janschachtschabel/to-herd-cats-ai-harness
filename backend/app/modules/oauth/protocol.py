@@ -6,7 +6,10 @@ redirects; the operator's `HERD_AI_EGRESS_PROXY` if set, except for listed hosts
 
 - The authorization URL carries `response_type=code`, `client_id`, `redirect_uri`,
   `state`, the S256 `code_challenge`, `scope` and `resource` (when the client names
-  them). Never the client secret.
+  them), plus the extra parameters of the connector's purpose (`connectors/purposes.py`:
+  Google's `access_type=offline`, `prompt=consent`), each on the purpose's allow-list
+  and never one of those.
+  Never the client secret.
 - Token requests are form-encoded with `Accept: application/json` (GitHub answers
   form-encoded without it); the client authenticates with HTTP Basic or in the form
   (`token_auth`), a public client sends only its `client_id`.
@@ -19,9 +22,11 @@ import base64
 import hashlib
 import json
 import secrets as random
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -111,7 +116,12 @@ def authorization_url(
     verifier: str,
     scopes: str,
     resource: str | None,
+    extra: Mapping[str, str] = MappingProxyType({}),
+    allowed_extra: frozenset[str] = frozenset(),
 ) -> str:
+    """`extra`: the purpose's own parameters, each named in `allowed_extra` (the
+    purpose's allow-list, `connectors/purposes.py`) and none replacing one set here;
+    ValueError otherwise (a programming error: both are constants in code)."""
     query: dict[str, str] = {
         "response_type": "code",
         "client_id": client_id,
@@ -124,6 +134,11 @@ def authorization_url(
         query["scope"] = scopes
     if resource:
         query["resource"] = resource
+    if not set(extra) <= allowed_extra:
+        raise ValueError("an extra parameter outside the purpose's allow-list")
+    if allowed_extra & {*query, "scope", "resource"}:  # also when not sent this time
+        raise ValueError("an extra parameter would replace one the flow sets")
+    query |= extra
     return f"{endpoint}?{urlencode(query, quote_via=quote)}"
 
 

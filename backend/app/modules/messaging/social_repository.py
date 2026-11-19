@@ -7,6 +7,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import ColumnElement, and_, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
@@ -139,6 +140,21 @@ class ReadRepository:
             where=ConversationRead.last_read_message_id < newer,
         ).returning(ConversationRead.conversation_id)
         return (await self.session.execute(stmt)).first() is not None
+
+    async def position(self, conversation_id: uuid.UUID) -> tuple[uuid.UUID, datetime] | None:
+        """The person's position in the conversation and when that message was
+        written; None before she read anything there."""
+        stmt = (
+            select(ConversationRead.last_read_message_id, Message.created_at)
+            .join(Message, Message.id == ConversationRead.last_read_message_id)
+            .where(
+                ConversationRead.org_id == self.scope.org_id,
+                ConversationRead.conversation_id == conversation_id,
+                ConversationRead.user_id == self.scope.principal.id,
+            )
+        )
+        row = (await self.session.execute(stmt)).first()
+        return None if row is None else (row[0], row[1])
 
     async def unread_page(self, after: uuid.UUID | None, limit: int) -> list[Unread]:
         """The person's visible conversations with something unread, by id."""

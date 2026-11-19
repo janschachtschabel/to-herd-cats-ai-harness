@@ -112,7 +112,8 @@
       "waitingAnswer": "Waiting for an answer to its question",
       "approval": {
         "rejected": "The release was rejected; the step did not run.",
-        "stale": "The content changed after the release; the step did not run."
+        "stale": "The content changed after the release; the step did not run.",
+        "tooLarge": "Personal and too large to show you in full for a release: not written, and you were not asked."
       },
       "mark": {
         "title": "Personal content in the history",

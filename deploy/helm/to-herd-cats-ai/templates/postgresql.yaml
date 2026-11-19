@@ -1,4 +1,12 @@
 {{- if .Values.postgresql.enabled }}
+{{- /* Every API or worker pod holds up to 16 connections (pool 5 + overflow 10 +
+LISTEN; measured in the load test, docs/STECKBRIEF.md); 10 more for the backup job,
+the migration and an operator's psql. */ -}}
+{{- $pods := add (include "herd.maxReplicas" (dict "root" $ "component" "api")) (include "herd.maxReplicas" (dict "root" $ "component" "worker")) -}}
+{{- $needed := add (mul 16 $pods) 10 -}}
+{{- if gt (int $needed) (int .Values.postgresql.maxConnections) -}}
+{{- fail (printf "postgresql.maxConnections (%d) is below the %d connections the API and worker pods may hold at their most (16 per pod + 10): raise it or lower the replicas or autoscaling.maxReplicas" (int .Values.postgresql.maxConnections) (int $needed)) -}}
+{{- end }}
 # A minimal single-pod PostgreSQL with pgvector, for test and staging only: no
 # replication, no backups. Production uses an external database (database.url).
 apiVersion: v1
@@ -52,6 +60,7 @@ spec:
         - name: postgresql
           image: {{ .Values.postgresql.image | quote }}
           imagePullPolicy: IfNotPresent
+          args: ["-c", "max_connections={{ int .Values.postgresql.maxConnections }}"]
           env:
             - name: POSTGRES_USER
               value: herd

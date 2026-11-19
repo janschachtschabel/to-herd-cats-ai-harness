@@ -12,7 +12,8 @@ also notes an admin's read by admin right):
   pages and tickets where they are now (a page locked or trashed since: no hit), and
   the drafts it read (only for a run that sees drafts in their spaces now).
 The result is the asker's alone in the run view (`runs.ASKER_ONLY`) once a hit holds
-the model's words or comes from a run that noted no space (or from such a result):
+the model's words, comes from a run that carried the personal mark (module review M8
+3, H1), or from a run that noted no space (or from such a result):
 the model's words are the conversation's content, which the run view shows nobody
 else, whatever spaces the other hits came from (review M6 finding 10).
 Outside a DM of the person alone with the agent, only runs of the same conversation:
@@ -23,6 +24,8 @@ result, a tool or its history: `personal_mark.py`), its words and its results al
 is found only alone with the agent, and marks the run that finds it, journaled with
 this call's result (module review M8 1 and 2: a later run in the same channel found
 it before and could post it there; a run that found it kept the mark only in memory).
+In a DM started afresh ("Neu beginnen", `fresh_start.py`), nothing of a run created
+before the cut, whatever its conversation (module review M8 4, K3).
 """
 
 import uuid
@@ -78,6 +81,7 @@ async def search_past_runs(ctx: ToolContext, args: SearchPastRunsArgs) -> ToolRe
         text=args.query,
         readable=readable,
         conversation_id=None if place.kind == PlaceKind.ALONE else run.conversation_id,
+        after=await ReadRepository(ctx.session, run.org_id).fresh_start(run.conversation_id),
         limit=CANDIDATES,
     )
     of_runs = await repo.reads(h.run_id for h in hits)
@@ -95,7 +99,12 @@ async def search_past_runs(ctx: ToolContext, args: SearchPastRunsArgs) -> ToolRe
             continue
         ctx.reads.personal |= personal  # the host journals it with this result
         spaces |= now
-        private |= _words(hit) or not now or bool((hit.content.get("attrs") or {}).get(ASKER_ONLY))
+        private |= (
+            personal
+            or _words(hit)
+            or not now
+            or bool((hit.content.get("attrs") or {}).get(ASKER_ONLY))
+        )
         ctx.reads.spaces |= now
         ctx.reads.pages |= noted.pages
         ctx.reads.tickets |= noted.tickets

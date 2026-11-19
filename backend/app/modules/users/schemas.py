@@ -19,7 +19,33 @@ class UserOut(BaseModel):
     is_active: bool
     locale: str
     last_login_at: datetime | None
+    # Self-registered and waiting for an admin to approve or reject (then null).
+    awaiting_approval_since: datetime | None
     version: int
+
+
+class AdminUserOut(UserOut):
+    """A person as the people administration lists them: with whether TOTP is on."""
+
+    totp_enabled: bool
+
+    @classmethod
+    def of(cls, user: object, *, totp_enabled: bool) -> "AdminUserOut":
+        return cls(**UserOut.model_validate(user).model_dump(), totp_enabled=totp_enabled)
+
+
+class SignupDecisionIn(BaseModel):
+    """Approve or reject a waiting account: the version the client read (409)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+
+
+class PendingCountOut(BaseModel):
+    """How many self-registered accounts wait for approval."""
+
+    count: int
 
 
 class UserCreate(BaseModel):

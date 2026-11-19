@@ -4,8 +4,8 @@ description: Knowledge and agent cockpit for companies (API, SPA and migrations 
 type: application
 # version = appVersion = the service version in backend/pyproject.toml
 # (deploy/helm/scripts/check-chart-version.sh keeps them equal).
-version: 0.1.0
-appVersion: "0.1.0"
+version: 1.0.0
+appVersion: "1.0.0"
 annotations:
   artifacthub.io/license: Apache-2.0
 home: https://github.com/janschachtschabel/to-herd-cats-ai-harness

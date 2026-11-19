@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { agentOf } from '@/features/agents/display'
+import { FreshStartMarker } from '@/features/agents/FreshStart'
 import { EmptyState, ErrorState, LoadingState } from '@/features/shared/states'
 import type { Message } from '@/lib/api'
 import { useConversationView } from './ConversationContext'
@@ -97,10 +99,12 @@ export function MessageList({
   emptyText: string
 }) {
   const { t } = useTranslation()
-  const { meId, highlight } = useConversationView()
+  const { meId, highlight, conversation } = useConversationView()
+  const freshStart = conversation.fresh_start_at ?? null
+  const agentName = agentOf(conversation)?.name ?? ''
   const rows = useMemo(
-    () => buildTimeline(list.messages, pending, newBefore),
-    [list.messages, pending, newBefore],
+    () => buildTimeline(list.messages, pending, newBefore, freshStart),
+    [list.messages, pending, newBefore, freshStart],
   )
   const scroller = useRef<HTMLDivElement>(null)
   const fromBottom = useRef(0)
@@ -164,6 +168,8 @@ export function MessageList({
                 <DaySeparator iso={row.date} {...days} />
               ) : row.kind === 'new' ? (
                 <NewMarker />
+              ) : row.kind === 'fresh' ? (
+                <FreshStartMarker at={row.at} agentName={agentName} />
               ) : row.kind === 'message' ? (
                 <MessageItem message={row.message} />
               ) : (

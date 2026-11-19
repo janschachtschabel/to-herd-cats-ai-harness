@@ -17,17 +17,24 @@ content and is persisted, never only in a worker's memory.
   - a tool that hands it personal content (`search_past_runs` finding anything of a
     marked run, `read_conversation` returning a marked message): the tool sets
     `Reads.personal` and the host journals `read.personal` with its result.
-- **What it holds back** (finding G2): a write that anyone but the person could read
-  (a channel, a ticket, a page, a proposal, a memory page, a skill, her own
-  conversation where others read along) is not refused: it waits for the asking
-  person's release of exactly what would be written (`ReleaseFirst`, raised by
-  `toolbox/writing.release_first`, turned into a release by `step_host.py`; in an
+- **What it holds back** (finding G2): every write but into its own conversation
+  alone with her (a channel, a ticket, a page, a proposal, a memory page, a skill, her
+  own conversation where others read along; her personal space and a space only she
+  belongs to alike, module review M8 4, K1 and K2: what is written there carries no
+  mark, the audience can grow and memory reaches every later run) is not refused: it
+  waits for the asking
+  person's release of exactly what would be written (`ReleaseFirst`, noted by
+  `toolbox/writing.release_first` and raised by `writing.effect` once nothing else
+  refused the call, turned into a release by `step_host.py`; in an
   automation's or an event rule's run the owner releases). What is written after a
   release is not marked: she decided to publish it. Into her own conversation alone
   with the agent no release is needed, and what is written there is marked. The
   run's final answer where others read stays held back (`writing.into_own`), and so
   does a question there; external calls follow `external_step.py`. The draft mark is
   another matter and still refuses (`writing.DRAFTS`).
+- **What the model is told** (`sections`): `PRESENT` when its history holds marked
+  messages; `PERSONAL_LINES` whenever it may call a tool whose result marks lines
+  `(personal) ` (`MARKS_LINES`).
 - **When it ends**: a run whose window and tool results hold nothing personal starts
   and stays unmarked. A later run never inherits a mark from an earlier one as such,
   only through content it is given. Since every answer of a marked run is marked, in
@@ -50,10 +57,27 @@ PRESENT = (
     "Some earlier messages of this conversation are marked personal: they hold what the "
     "person read through her own connection, and they are for her alone. You have not "
     "read anything like it in this run unless a tool result says so. Answer her here as "
-    "usual. Anything you write where others could read it first waits for her release "
-    "of exactly that text."
+    "usual. Anything you write anywhere else (any space, memory included) first waits "
+    "for her release of exactly that text."
 )
 PERSONAL_LINE = "(personal) "  # before a marked message or hit in a tool's result
+# The tools whose results may hold such lines, and what the model is told about them
+# whenever it is offered one of them (module review M8 3, H4).
+MARKS_LINES = frozenset({"read_conversation", "search_past_runs"})
+PERSONAL_LINES = (
+    "A line that starts with (personal) in a result of read_conversation or "
+    "search_past_runs holds what the person read through her own connection: it is for "
+    "her alone. Once you get such a line, this run holds it: answer her where you are "
+    "alone with her; anything you write anywhere else (any space, memory included) "
+    "first waits for her release of exactly that text."
+)
+
+
+def sections(offered: Sequence[str], present: bool) -> list[str]:
+    """What the run's instructions say about the mark: that its history holds personal
+    messages (`PRESENT`), and what a personal line means if a tool may give one."""
+    told = [PRESENT] if present else []
+    return told + ([PERSONAL_LINES] if MARKS_LINES & set(offered) else [])
 
 
 def in_window(turns: Sequence[Turn]) -> bool:

@@ -5,23 +5,25 @@
 - `migrate`: `alembic upgrade head`, then exit (the cluster's one-off job).
 - `all`: migrate first, then as `api` (single container, docker compose), and, when
   HERD_INTERNAL_TOKEN is set, the collab process (`node collab/server.mjs`) as a child
-  on 127.0.0.1:HERD_COLLAB_PORT. If the child ends, the launcher stops and exits 3.
-- `collab`: the collab process alone, in place of the launcher (its own deployment).
+  on 127.0.0.1:HERD_COLLAB_PORT, the one collab instance, announced at that address.
+  If the child ends, the launcher stops and exits 3.
+- `collab`: the collab process alone, in place of the launcher (its own deployment;
+  it announces itself at HERD_COLLAB_ADVERTISE_URL, plan M9 decision 17).
 - `worker`: the outbox dispatcher (`app.worker`) and the internal port only (probes,
   metrics); `all` runs the worker next to the API, in the same event loop.
 
-SIGTERM and SIGINT stop every server in an orderly way (the worker finishes the batch
-in progress); if one ends (for example because its port is taken), the others are
-stopped too.
+Once the servers are built, the start-up heap is frozen (`core/heap.py`: full garbage
+collections no longer walk it). SIGTERM and SIGINT stop every server in an orderly
+way (the worker finishes the batch in progress); if one ends (for example because its
+port is taken), the others are stopped too.
 """
 
 import asyncio
 import logging
-import os
 import signal
 import socket
 import sys
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from typing import Literal, Protocol
 
@@ -32,11 +34,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.config import Settings, get_settings
 from app.core.db import get_database
+from app.core.heap import freeze_startup_heap
 from app.core.logging import configure_logging
 from app.core.migrations import upgrade_head
 from app.core.spool import remove_stale_spools
+from app.launch_collab import CollabProcess, collab_command, collab_env, run_collab
 from app.modules.messaging.live import LiveHub
-from app.modules.orgs.service import ensure_bootstrap
+from app.modules.orgs.service import BootstrapRefused, ensure_bootstrap
 from app.web.collab_proxy import MAX_MESSAGE_BYTES
 from app.web.internal import create_internal_app
 from app.web.public import create_public_app
@@ -54,8 +58,7 @@ _STEPS: dict[str, tuple[Step, ...]] = {
     "worker": ("serve",),
 }
 
-COLLAB_EXIT_CODE = 3
-COLLAB_STOP_SECONDS = 15.0
+BOOTSTRAP_EXIT_CODE = 4  # HERD_BOOTSTRAP_ADMIN_PASSWORD refused (orgs/service.py)
 # How long an idle keep-alive connection stays open (HERD_KEEP_ALIVE_SECONDS). A client
 # that reuses a pooled connection at the moment the server closes it gets the request
 # reset (ECONNRESET; a reverse proxy answers 502 to a POST). Uvicorn's 5 s are shorter
@@ -205,109 +208,28 @@ async def run_servers(servers: Sequence[Server]) -> int:
             loop.remove_signal_handler(sig)
 
 
-# What the collab process may see of this environment (review M2 R13): the system's
-# basics, Node's own settings and its own settings, never the database credentials or
-# any other secret of the API.
-_COLLAB_PASSED = frozenset({"PATH", "HOME", "LANG", "LC_ALL", "TZ"})
-_COLLAB_PREFIXES = ("NODE_", "HERD_COLLAB_")
-
-
-def collab_env(settings: Settings, *, host: str) -> dict[str, str]:
-    """The collab process's environment: an allow list of this one, plus what it must
-    agree on with the API (values from a .env file reach it only this way)."""
-    env = {
-        name: value
-        for name, value in os.environ.items()
-        if name in _COLLAB_PASSED or name.startswith(_COLLAB_PREFIXES)
-    }
-    env.update(
-        HERD_ROLE=settings.role,
-        HERD_COLLAB_HOST=host,
-        HERD_COLLAB_PORT=str(settings.collab_port),
-        HERD_COLLAB_API_URL=settings.collab_api_url or f"http://127.0.0.1:{settings.internal_port}",
-        HERD_SESSION_COOKIE_NAME=settings.session_cookie_name,
-    )
-    if settings.internal_token is not None:
-        env["HERD_INTERNAL_TOKEN"] = settings.internal_token.get_secret_value()
-    if settings.public_url:
-        env["HERD_PUBLIC_URL"] = settings.public_url
-    return env
-
-
-def collab_command(settings: Settings) -> list[str]:
-    return ["node", str(settings.collab_script)]
-
-
-class CollabProcess:
-    """The collab process as a child, driven like the uvicorn servers: `serve` runs
-    it until it ends; setting `should_exit` sends SIGTERM (it saves what is unsaved
-    and closes), SIGKILL after COLLAB_STOP_SECONDS. Ending on its own is exit 3."""
-
-    def __init__(self, command: Sequence[str], env: Mapping[str, str]) -> None:
-        self.command = list(command)
-        self.env = dict(env)
-        self._process: asyncio.subprocess.Process | None = None
-        self._stopping = False
-
-    @property
-    def returncode(self) -> int | None:
-        return self._process.returncode if self._process else None
-
-    @property
-    def should_exit(self) -> bool:
-        return self._stopping
-
-    @should_exit.setter
-    def should_exit(self, value: bool) -> None:
-        if value and not self._stopping:
-            self._stopping = True
-            self._terminate()
-
-    def _terminate(self) -> None:
-        process = self._process
-        if process is None or process.returncode is not None:
-            return
-        process.terminate()
-        asyncio.get_running_loop().call_later(COLLAB_STOP_SECONDS, self._kill, process)
-
-    @staticmethod
-    def _kill(process: asyncio.subprocess.Process) -> None:
-        if process.returncode is None:
-            process.kill()
-
-    async def serve(self) -> None:
-        if self._stopping:
-            return
-        try:
-            self._process = await asyncio.create_subprocess_exec(*self.command, env=self.env)
-        except OSError as exc:
-            logger.error("collab process cannot start", extra={"error": type(exc).__name__})
-            raise SystemExit(COLLAB_EXIT_CODE) from None
-        if self._stopping:  # asked to stop while it was starting
-            self._terminate()
-        code = await self._process.wait()
-        if not self._stopping:
-            logger.error("collab process ended", extra={"code": code})
-            raise SystemExit(COLLAB_EXIT_CODE)
-
-
-def run_collab(settings: Settings) -> None:
-    """Role `collab`: node replaces this process (tini forwards signals to it)."""
-    command = collab_command(settings)
-    os.execvpe(command[0], command, collab_env(settings, host="0.0.0.0"))  # noqa: S104, S606
-
-
 async def bootstrap(settings: Settings) -> None:
-    """The organisation and first owner, in their own transaction, before serving."""
+    """The organisation and first owner, in their own transaction, before serving. A
+    guessable first password stops the start (exit status 4), with nothing created."""
     async with get_database().session_factory() as session:
-        await ensure_bootstrap(session, settings)
+        try:
+            await ensure_bootstrap(session, settings)
+        except BootstrapRefused as refused:
+            logger.error(
+                "bootstrap refused: HERD_BOOTSTRAP_ADMIN_PASSWORD is easy to guess (%s);"
+                " choose another one (docs/ANMELDUNG.md) and start again",
+                refused.code,
+            )
+            raise SystemExit(BOOTSTRAP_EXIT_CODE) from None
         await session.commit()
 
 
 async def serve(settings: Settings) -> int:
     if settings.role == "worker":
         alone = create_worker(get_database())
-        return await run_servers([_Server(internal_config(settings, alone)), alone])
+        servers_alone: list[Server] = [_Server(internal_config(settings, alone)), alone]
+        freeze_startup_heap()
+        return await run_servers(servers_alone)
     remove_stale_spools(settings.data_dir)
     await bootstrap(settings)
     worker = create_worker(get_database()) if settings.role == "all" else None
@@ -323,6 +245,7 @@ async def serve(settings: Settings) -> int:
         else:
             env = collab_env(settings, host="127.0.0.1")
             servers.append(CollabProcess(collab_command(settings), env))
+    freeze_startup_heap()
     return await run_servers(servers)
 
 

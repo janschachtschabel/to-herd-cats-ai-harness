@@ -1,6 +1,8 @@
 import {
   AtSign,
+  CalendarCheck,
   CalendarClock,
+  CalendarPlus,
   Check,
   CheckCheck,
   ClipboardCheck,
@@ -10,8 +12,10 @@ import {
   MessageSquareReply,
   OctagonAlert,
   ScrollText,
+  ShieldAlert,
   ShieldCheck,
   UserCheck,
+  UserPlus,
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
@@ -21,7 +25,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AgentBadge } from '@/features/agents/AgentBadge'
 import { useMe } from '@/features/auth/queries'
+import { CalendarDetails, CalendarSentence } from './CalendarSentences'
 import { AutomationSentence, ReviewDueSentence } from './Sentences'
+import { signupText } from './wording'
 import { conversationLabel } from '@/features/messaging/display'
 import { plainMentions } from '@/features/messaging/mentions'
 import { messageTarget, useOpenMessage } from '@/features/messaging/targets'
@@ -123,6 +129,10 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   skill_proposal: ScrollText,
   automation: CalendarClock,
   review_due: ClipboardCheck,
+  signup: UserPlus,
+  totp_locked: ShieldAlert,
+  invitation: CalendarPlus,
+  invite_reply: CalendarCheck,
 }
 
 /** Where an entry happened, for its sentence: its conversation, or where a proposal
@@ -163,7 +173,8 @@ function ActivityItem({
     (entry.conversation && entry.message_id) ||
     entry.skill_proposal ||
     entry.proposal ||
-    entry.automation,
+    entry.automation ||
+    entry.account,
   )
 
   const go = () => {
@@ -173,6 +184,10 @@ function ActivityItem({
     } else if (entry.skill_proposal) {
       const proposalId = entry.skill_proposal.id
       void navigate({ to: '/skill-proposals/$proposalId', params: { proposalId } })
+    } else if (entry.reason === 'totp_locked') {
+      void navigate({ to: '/profile' })
+    } else if (entry.account) {
+      void navigate({ to: '/admin/users', search: { filter: 'pending' } })
     } else if (entry.automation) {
       const automationId = entry.automation.id
       void navigate({ to: '/automations/$automationId', params: { automationId } })
@@ -201,6 +216,12 @@ function ActivityItem({
             <AutomationSentence entry={entry} />
           ) : entry.reason === 'review_due' ? (
             <ReviewDueSentence entry={entry} />
+          ) : entry.reason === 'signup' ? (
+            signupText(t, entry)
+          ) : entry.reason === 'totp_locked' ? (
+            t('activity.totpLocked')
+          ) : entry.reason === 'invitation' || entry.reason === 'invite_reply' ? (
+            <CalendarSentence entry={entry} />
           ) : (
             <>
               <span className="font-medium">{author ?? t('messaging.message.unknownAuthor')}</span>{' '}
@@ -213,6 +234,7 @@ function ActivityItem({
             </>
           )}
         </p>
+        <CalendarDetails entry={entry} />
         {entry.snippet && (
           <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
             {plainMentions(entry.snippet)}

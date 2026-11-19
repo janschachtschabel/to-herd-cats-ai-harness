@@ -31,6 +31,11 @@
 // operator catalogue file whose entry points at the MCP stub (and one broken file).
 // The browser accepts the stubs' certificate per context (`ignoreHTTPSErrors`), as do
 // the tests' requests to their control routes (tests/mcp-helpers.mjs).
+//
+// Sign-in (plan M9 task 5): the OIDC stub of the backend tests (public port + 7) runs
+// the same way over https for `localhost`; HERD_OIDC_ALLOWED_HOSTS=localhost lets the
+// app reach it, and HERD_OIDC_STUB_SECRET is the client secret a provider may name as
+// `env:` (tests/oidc-helpers.mjs).
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { get as httpsGet } from "node:https";
@@ -141,6 +146,10 @@ export default async function globalSetup() {
   // For what the tests make through the backend itself (`seedProposal`): the workers
   // inherit this process's environment.
   process.env.HERD_E2E_DATABASE_URL = databaseUrl;
+  // The backups (Verwaltung → Sicherung): the spec `backup` reads and changes the
+  // archives the app's worker writes there.
+  const backupDir = mkdtempSync(join(tmpdir(), "herd-e2e-backups-"));
+  process.env.HERD_E2E_BACKUP_DIR = backupDir;
   const appEnv = {
     ...process.env,
     HERD_ROLE: "all",
@@ -149,12 +158,12 @@ export default async function globalSetup() {
     HERD_PUBLIC_PORT: String(port),
     HERD_INTERNAL_PORT: String(port + 1),
     HERD_COLLAB_PORT: String(port + 2),
-    HERD_COLLAB_URL: `ws://127.0.0.1:${port + 2}`,
     HERD_INTERNAL_TOKEN: "e2e-".padEnd(48, "x"),
     HERD_BOOTSTRAP_ADMIN_EMAIL: OWNER.email,
     HERD_BOOTSTRAP_ADMIN_PASSWORD: OWNER.password,
     HERD_STATIC_DIR: DIST,
     HERD_DATA_DIR: dataDir,
+    HERD_BACKUP_DIR: backupDir,
     HERD_LOG_FORMAT: "text",
     HERD_SECRET_KEY: SECRET_KEY,
     HERD_RUN_LEASE_SECONDS: "5",
@@ -162,6 +171,20 @@ export default async function globalSetup() {
     HERD_PUBLIC_URL: `http://127.0.0.1:${port}`,
     HERD_MCP_ALLOWED_HOSTS: "localhost",
     HERD_MCP_CATALOG_DIR: catalogDir,
+    HERD_OIDC_ALLOWED_HOSTS: "localhost",
+    HERD_OIDC_STUB_SECRET: "oidc-SECRET-value-7",
+    // Every person of every spec signs in from the one address 127.0.0.1, and the
+    // limit per client address (30 attempts a minute, the second step of a TOTP
+    // sign-in included) counts them all: the whole suite is one client to it. How
+    // many fall into a minute depends on the runner's speed (25 locally, over 30 on
+    // CI before totp.spec), so it is raised here, as in deploy/compose/load.sh. The
+    // limit on failures per address and email stays as in production.
+    HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE: "1000",
+    // live-opening.spec creates and publishes a few hundred pages as one person in a
+    // few minutes, far beyond the per-person write limit a team member meets (120 a
+    // minute). The limit itself is proven by the backend's tests.
+    HERD_WRITE_RATE_PER_MINUTE: "100000",
+    HERD_UPLOAD_RATE_PER_MINUTE: "100000",
     SSL_CERT_FILE: tls.cert,
   };
   const startApp = () => {
@@ -260,22 +283,25 @@ export default async function globalSetup() {
   };
   const mcpStub = tlsStub("tests.support.mcp_stub", port + 5);
   const oauthStub = tlsStub("tests.support.oauth_stub", port + 6);
+  const oidcStub = tlsStub("tests.support.oidc_stub", port + 7);
   const teardown = async () => {
     control.closeAllConnections();
     await new Promise((resolve) => control.close(resolve));
     await restarting;
     if (app.child.exitCode === null) killGroup(app.child, "SIGTERM");
     if (stub.exitCode === null) stub.kill("SIGTERM");
-    for (const { child } of [mcpStub, oauthStub]) {
+    for (const { child } of [mcpStub, oauthStub, oidcStub]) {
       if (child.exitCode === null) child.kill("SIGTERM");
     }
     await app.exited;
     await stubExited;
     await mcpStub.exited;
     await oauthStub.exited;
+    await oidcStub.exited;
     process.removeListener("exit", orphanGuard);
     psql(adminUrl, `DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
     rmSync(dataDir, { recursive: true, force: true });
+    rmSync(backupDir, { recursive: true, force: true });
   };
   try {
     await appReady();
@@ -283,6 +309,7 @@ export default async function globalSetup() {
     const ca = readFileSync(tls.cert);
     await readyTls(`https://localhost:${port + 5}/_stub/log`, ca, Date.now() + 90_000);
     await readyTls(`https://localhost:${port + 6}/_stub/log`, ca, Date.now() + 90_000);
+    await readyTls(`https://localhost:${port + 7}/_stub/log`, ca, Date.now() + 90_000);
   } catch (error) {
     await teardown();
     throw error;

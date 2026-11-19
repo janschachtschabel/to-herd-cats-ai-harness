@@ -16,6 +16,7 @@ from app.core.security import (
     dummy_password_hash,
     hash_password,
     hash_token,
+    needs_rehash,
     new_session_token,
     verify_password,
 )
@@ -134,11 +135,15 @@ async def test_session_token_is_stored_hashed(
 
 
 async def test_sessions_store_no_client_details(session: AsyncSession) -> None:
-    """Nothing reads a session's address or browser, so neither is kept."""
+    """Nothing reads a session's address, so it is not kept; of the browser only a
+    device hint without version (J8), and its last use for the idle limit (J7)."""
     columns = await session.run_sync(
         lambda s: {c["name"] for c in inspect(s.connection()).get_columns("user_session")}
     )
-    assert columns == {"id", "org_id", "user_id", "token_hash", "expires_at"}
+    assert columns == {
+        *("id", "org_id", "user_id", "token_hash", "expires_at"),
+        *("last_used_at", "signed_in_at", "device", "reauth_at"),
+    }
 
 
 @pytest.mark.parametrize("case", ["unknown", "inactive", "no_password"])
@@ -278,7 +283,7 @@ def test_password_and_token_primitives() -> None:
 
 BOOT = Settings(
     bootstrap_admin_email="Boss@Example.com",
-    bootstrap_admin_password=SecretStr("boss-password-123"),
+    bootstrap_admin_password=SecretStr("lantern-orbit-73-q"),
     bootstrap_org_name="Müller & Söhne",
 )
 
@@ -289,7 +294,7 @@ async def test_bootstrap_creates_org_and_owner(session: AsyncSession, client: As
     assert org.name == "Müller & Söhne"
     user = (await session.scalars(select(User))).one()
     assert (user.email, user.system_role, user.org_id) == ("boss@example.com", "owner", org.id)
-    await login(client, "boss@example.com", "boss-password-123")
+    await login(client, "boss@example.com", "lantern-orbit-73-q")
 
 
 async def test_bootstrap_is_idempotent(session: AsyncSession) -> None:
@@ -327,3 +332,21 @@ async def test_bootstrap_takes_a_lock(session: AsyncSession) -> None:
         )
     )
     assert held == 1
+
+
+async def test_a_login_rehashes_a_password_stored_with_old_parameters(
+    client: AsyncClient, owner_user: User, session: AsyncSession
+) -> None:
+    """ASVS 5.0 V11.2.2: when the hashing parameters move on, each person's hash moves
+    with them at their next login (the old one still verifies until then)."""
+    from argon2 import PasswordHasher  # noqa: PLC0415
+
+    weak = PasswordHasher(time_cost=1, memory_cost=8 * 1024, parallelism=1).hash(PASSWORD)
+    owner_user.password_hash = weak
+    await session.flush()
+    body = {"email": owner_user.email, "password": PASSWORD}
+    assert (await client.post("/api/auth/login", json=body, headers=CSRF)).status_code == 200
+    await session.refresh(owner_user)
+    assert owner_user.password_hash != weak
+    assert not needs_rehash(owner_user.password_hash)
+    assert verify_password(owner_user.password_hash, PASSWORD)

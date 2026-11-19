@@ -8,8 +8,11 @@ start, so replay and every take-up keep the mark.
 
 Expand only: a column with a constant default (no rewrite) and a wider check (added
 `NOT VALID` and validated afterwards, so writes go on meanwhile). The previous release
-neither reads nor writes either; its journal replay and run view pass over a `mark`
-event it does not know.
+neither reads nor writes either. Its journal replay passes over a `mark` event it does
+not know, but its run view does not: an API pod of the previous release answers 500
+for the events of a run with a `mark` until it is replaced (transient, during a
+rolling upgrade). From this release on the run view passes over kinds it does not
+know (module review M8 3, H6).
 
 Revision ID: 5b7d9f1a3c6e
 Revises: a6ce005832fd

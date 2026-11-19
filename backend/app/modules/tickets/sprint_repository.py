@@ -34,6 +34,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
+from app.core.repository import DayKey, from_day
 from app.modules.tickets.models import Sprint, SprintState, StatusCategory, TicketStatus, WorkItem
 from app.modules.tickets.repository import TicketScope
 
@@ -104,6 +105,24 @@ class SprintRepository:
         if after is not None:
             stmt = stmt.where(tuple_(_ORDER_KEY, Sprint.id) > tuple_(literal(after[0]), after[1]))
         stmt = stmt.order_by(_ORDER_KEY, Sprint.id).limit(limit)
+        return list((await self.session.scalars(stmt)).all())
+
+    async def overlapping(
+        self, start: date, end: date, key: DayKey | None, limit: int
+    ) -> list[Sprint]:
+        """The sprints, of any state, that hold a day of `[start, end)`, by (first day,
+        id) from `key` on (the calendar's overlays)."""
+        stmt = (
+            select(Sprint)
+            .where(
+                self._visible(),
+                Sprint.starts_on < end,
+                Sprint.ends_on >= start,
+                from_day(Sprint.starts_on, Sprint.id, key),  # type: ignore[arg-type]
+            )
+            .order_by(Sprint.starts_on, Sprint.id)
+            .limit(limit)
+        )
         return list((await self.session.scalars(stmt)).all())
 
     async def active_exists(self, space_id: uuid.UUID) -> bool:

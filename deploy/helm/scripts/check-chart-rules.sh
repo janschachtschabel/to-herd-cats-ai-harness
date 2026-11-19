@@ -42,7 +42,8 @@ doc() { awk -v k="kind: $1" -v n="name: $2" '
   kind && $0 == "  " n { hit=1 }
   END { if (hit) printf "%s", buf }' <<<"$3"; }
 
-# Live editing: one collab replica, replaced with Recreate (documents live in memory).
+# Live editing: one collab replica by default, replaced with Recreate (documents live in
+# memory); several: chart-rules-scaling.sh.
 out=$(render)
 collab=$(doc Deployment t-to-herd-cats-ai-collab "$out")
 [[ -n $collab ]] || fail "no collab Deployment by default"
@@ -51,8 +52,14 @@ grep -q "type: Recreate" <<<"$collab" || fail "collab is not replaced with Recre
 grep -A1 -- "- name: HERD_ROLE" <<<"$collab" | grep -q "value: collab" || fail "collab role not set"
 grep -q 'value: "http://t-to-herd-cats-ai-internal:9090"' <<<"$collab" \
   || fail "collab does not reach the API's internal port"
+# Each collab pod announces itself at its own pod IP (plan M9 Task 15); the API relays
+# to the pod that owns a page, so it gets no fixed collab address.
+grep -B3 "fieldPath: status.podIP" <<<"$collab" | grep -q -- "- name: HERD_COLLAB_POD_IP" \
+  || fail "the collab pod does not learn its IP from the Downward API"
+grep -A1 -- "- name: HERD_COLLAB_ADVERTISE_URL" <<<"$collab" | grep -q 'value: "ws://$(HERD_COLLAB_POD_IP):1234"' \
+  || fail "the collab pod does not announce itself at its pod IP"
 api=$(doc Deployment t-to-herd-cats-ai-api "$out")
-grep -q 'value: "ws://t-to-herd-cats-ai-collab:1234"' <<<"$api" || fail "the API does not relay to collab"
+grep -q "HERD_COLLAB_URL\|HERD_COLLAB_ADVERTISE_URL" <<<"$api" && fail "the API gets a fixed collab address"
 
 # The internal token is never a chart value: generated into a kept Secret, or taken
 # from collab.internalToken.existingSecret.
@@ -68,7 +75,7 @@ out=$(render --set collab.internalToken.existingSecret=herd-token)
 grep -A4 -- "- name: HERD_INTERNAL_TOKEN" <<<"$out" | grep -q "name: herd-token" \
   || fail "collab.internalToken.existingSecret is not used"
 out=$(render --set collab.enabled=false)
-grep -q "HERD_INTERNAL_TOKEN\|HERD_COLLAB_URL" <<<"$out" && fail "live-editing settings without collab"
+grep -q "HERD_INTERNAL_TOKEN\|HERD_COLLAB_ADVERTISE_URL" <<<"$out" && fail "live-editing settings without collab"
 
 # HERD_PUBLIC_URL: from the Ingress (https with TLS) unless publicUrl is set.
 out=$(render --set ingress.enabled=true --set api.forwardedAllowIps=10.0.0.0/8 \
@@ -114,7 +121,8 @@ grep -q "name: monitoring" <<<"$policy" || fail "the scrapers in internalFrom ca
 
 # The worker (outbox dispatcher, HERD_ROLE=worker): its own Deployment, one replica by
 # default, more on request (they claim disjoint batches); probes and metrics on the
-# internal port, no public port, no files, no live-editing token. Its container has the
+# internal port, no public port, no live-editing token (its files claim, for removing
+# the files of deleted attachments: chart-rules-placement.sh). Its container has the
 # API's name, so HerdNotReady covers it.
 out=$(render)
 worker=$(doc Deployment t-to-herd-cats-ai-worker "$out")
@@ -125,8 +133,8 @@ grep -q -- "- name: to-herd-cats-ai$" <<<"$worker" || fail "the worker container
 grep -A3 "readinessProbe:" <<<"$worker" | grep -q "path: /ready" || fail "the worker's readiness is not /ready"
 grep -A4 "readinessProbe:" <<<"$worker" | grep -q "port: internal" || fail "the worker's probes are not on 9090"
 grep -B1 "containerPort: 9090" <<<"$worker" | grep -q "name: internal" || fail "the worker has no internal port"
-grep -q "containerPort: 8080\|HERD_INTERNAL_TOKEN\|HERD_COLLAB_URL\|mountPath: /data" <<<"$worker" \
-  && fail "the worker has a public port, the live-editing token or the files"
+grep -q "containerPort: 8080\|HERD_INTERNAL_TOKEN\|HERD_COLLAB_" <<<"$worker" \
+  && fail "the worker has a public port or the live-editing token"
 grep -q "HERD_DATABASE_PASSWORD_FILE" <<<"$worker" || fail "the worker has no database password"
 api=$(doc Deployment t-to-herd-cats-ai-api "$out")
 grep -A1 -- "- name: HERD_ROLE" <<<"$api" | grep -q "value: api$" || fail "the API pods do not run role api"
@@ -154,7 +162,7 @@ grep -q "port: 8080\|port: 1234\|component: api\|component: collab" <<<"$policy"
   && fail "the worker reaches or is reached by more than the database and the scrapes"
 grep -q "ingress: \[\]" <<<"$policy" || fail "the worker takes connections without internalFrom"
 postgres=$(doc NetworkPolicy t-to-herd-cats-ai-postgresql "$out")
-grep -q "values: \[api, migrate, worker\]" <<<"$postgres" || fail "the bundled PostgreSQL does not admit the worker"
+grep -q "values: \[api, migrate, worker, backup\]" <<<"$postgres" || fail "the bundled PostgreSQL does not admit the worker"
 out=$(render --set networkPolicy.enabled=true \
   --set "networkPolicy.internalFrom[0].namespaceSelector.matchLabels.team=monitoring")
 policy=$(doc NetworkPolicy t-to-herd-cats-ai-worker "$out")
@@ -233,6 +241,28 @@ for workload in t-to-herd-cats-ai-api t-to-herd-cats-ai-worker; do
 done
 if render --set 'mcp.allowedHosts={a b}' >/dev/null; then fail "mcp.allowedHosts took a space"; fi
 
+# OIDC (M9 Task 4): the sign-in settings reach the API pods only, private hosts empty by
+# default; the client secrets' Secret is the API's alone.
+out=$(render)
+api=$(doc Deployment t-to-herd-cats-ai-api "$out")
+grep -A1 -- "- name: HERD_OIDC_ALLOWED_HOSTS" <<<"$api" | grep -q 'value: ""' \
+  || fail "the API has no empty HERD_OIDC_ALLOWED_HOSTS by default"
+grep -A1 -- "- name: HERD_OIDC_RATE_PER_MINUTE" <<<"$api" | grep -q 'value: "30"' \
+  || fail "the API has no HERD_OIDC_RATE_PER_MINUTE"
+out=$(render --set 'oidc.allowedHosts={sso.corp.example,10.30.0.0/16}' --set oidc.ratePerMinute=12 \
+  --set oidc.existingSecret=herd-oidc)
+api=$(doc Deployment t-to-herd-cats-ai-api "$out")
+grep -A1 -- "- name: HERD_OIDC_ALLOWED_HOSTS" <<<"$api" | grep -q 'value: "sso.corp.example,10.30.0.0/16"' \
+  || fail "oidc.allowedHosts does not reach the API"
+grep -A1 -- "- name: HERD_OIDC_RATE_PER_MINUTE" <<<"$api" | grep -q 'value: "12"' \
+  || fail "oidc.ratePerMinute does not reach the API"
+grep -A1 -- "- secretRef:" <<<"$api" | grep -q "name: herd-oidc" \
+  || fail "oidc.existingSecret is not the API's envFrom"
+grep -q "HERD_OIDC_\|herd-oidc" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  && fail "the worker gets the sign-in settings"
+if render --set 'oidc.allowedHosts={a b}' >/dev/null; then fail "oidc.allowedHosts took a space"; fi
+if render --set oidc.ratePerMinute=0 >/dev/null; then fail "oidc.ratePerMinute=0 rendered"; fi
+
 # MCP (M8 Task 9): the operator's catalogue entries are a ConfigMap mounted read-only
 # into the API pods only, named by HERD_MCP_CATALOG_DIR; without one the variable is
 # empty (the shipped entries only) and nothing is mounted.
@@ -266,6 +296,56 @@ grep -q "HERD_MCP_MAX_CALLS_PER_RUN" <<<"$(doc Deployment t-to-herd-cats-ai-api 
   && fail "the API gets the worker's cap on external calls"
 if render --set mcp.maxCallsPerRun=0 >/dev/null; then fail "mcp.maxCallsPerRun=0 rendered"; fi
 
+# Backups (plan M9 Task 3): a CronJob running `backup run` one at a time and never
+# retried, on a kept claim of its own, the files claim mounted read-only; the offsite
+# Secret reaches the backup job alone, the AI keys never; the worker gets the alert's
+# limit (it exports the gauges).
+out=$(render)
+cron=$(doc CronJob t-to-herd-cats-ai-backup "$out")
+[[ -n $cron ]] || fail "no backup CronJob by default"
+grep -q 'schedule: "30 2 \* \* \*"' <<<"$cron" || fail "the backup schedule is not the default"
+grep -q "timeZone: Etc/UTC" <<<"$cron" || fail "the backup schedule is not UTC"
+grep -q "concurrencyPolicy: Forbid" <<<"$cron" || fail "backups may run at once"
+grep -q "backoffLimit: 0" <<<"$cron" || fail "a failed backup is retried"
+grep -qF '"python", "-m", "app.ops", "backup", "run", "--scheduled"]' <<<"$cron" || fail "the CronJob does not run backup run --scheduled"
+grep -A2 -- "- name: data" <<<"$cron" | grep -q "readOnly: true" || fail "the files claim is mounted writable"
+grep -A2 -- "- name: backups" <<<"$cron" | grep -q "claimName: t-to-herd-cats-ai-backups" \
+  || fail "the archives are not on the chart's claim"
+grep -q "envFrom\|HERD_AI_" <<<"$cron" && fail "the backup job gets more than its own environment"
+grep -A3 -- "- name: tmp" <<<"$cron" | grep -q "sizeLimit: 2Gi" \
+  || fail "the backup pod's /tmp has no size limit (backup.tmpSizeLimit)"
+claim=$(doc PersistentVolumeClaim t-to-herd-cats-ai-backups "$out")
+grep -q "helm.sh/resource-policy: keep" <<<"$claim" || fail "the backups claim is not kept"
+grep -A1 -- "- name: HERD_BACKUP_ALERT_AFTER_HOURS" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  | grep -q 'value: "26"' || fail "the worker has no HERD_BACKUP_ALERT_AFTER_HOURS"
+out=$(render --set backup.alertAfterHours=30 --set backup.keepDaily=3 --set backup.offsite.existingSecret=herd-offsite \
+  --set ai.existingSecret=herd-ai --set backup.persistence.existingClaim=herd-archives)
+cron=$(doc CronJob t-to-herd-cats-ai-backup "$out")
+grep -A1 -- "- name: HERD_BACKUP_ALERT_AFTER_HOURS" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  | grep -q 'value: "30"' || fail "backup.alertAfterHours does not reach the worker"
+grep -A1 -- "- name: HERD_BACKUP_KEEP_DAILY" <<<"$cron" | grep -q 'value: "3"' || fail "backup.keepDaily is not passed on"
+grep -A2 -- "envFrom:" <<<"$cron" | grep -q "name: herd-offsite" || fail "the offsite Secret does not reach the backup job"
+grep -A4 -- "- name: HERD_SECRET_KEY" <<<"$cron" | grep -q "key: HERD_SECRET_KEY" \
+  || fail "the backup job does not get HERD_SECRET_KEY alone from ai.existingSecret"
+grep -q "name: herd-ai$" <<<"$(grep -A2 -- "envFrom:" <<<"$cron")" && fail "the backup job gets every AI key"
+grep -q "herd-offsite" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  && fail "the offsite Secret reaches the app"
+grep -q "claimName: herd-archives" <<<"$cron" || fail "backup.persistence.existingClaim is not used"
+[[ -z $(doc PersistentVolumeClaim t-to-herd-cats-ai-backups "$out") ]] || fail "a backups claim despite existingClaim"
+out=$(render --set backup.enabled=false)
+grep -q "kind: CronJob\|t-to-herd-cats-ai-backups" <<<"$out" && fail "backup.enabled=false still renders the backup"
+if out=$(render --set persistence.enabled=false); then fail "backups without the files claim rendered"; fi
+grep -q "backup.enabled needs persistence.enabled" <<<"$out" || fail "unexpected error: $out"
+render --set persistence.enabled=false --set backup.enabled=false >/dev/null \
+  || fail "a trial without files and backups does not render"
+if render --set backup.schedule=daily >/dev/null; then fail "backup.schedule took a word"; fi
+out=$(render --set networkPolicy.enabled=true --set 'backup.offsite.egress[0].ports[0].port=443')
+policy=$(doc NetworkPolicy t-to-herd-cats-ai-backup "$out")
+grep -q "ingress: \[\]" <<<"$policy" || fail "the backup job accepts connections"
+grep -q "port: 443" <<<"$policy" || fail "backup.offsite.egress is not passed on"
+grep -q "values: \[api, migrate, worker, backup\]" <<<"$(doc NetworkPolicy t-to-herd-cats-ai-postgresql "$out")" \
+  || fail "the backup job cannot reach the bundled PostgreSQL"
+
 # The outbox and worker alerts (review M3 N3, N4). HerdWorkerAbsent pairs a release's
 # API scrape job "<fullname>-internal" with its worker job "<fullname>-worker": the jobs
 # are the names of the Services the ServiceMonitor selects, so both must keep them.
@@ -273,7 +353,9 @@ out=$(render --set metrics.prometheusRule.enabled=true --set metrics.serviceMoni
 rule=$(doc PrometheusRule t-to-herd-cats-ai "$out")
 for alert in HerdNotReady HerdOutboxBacklog HerdOutboxFailed HerdWorkerStalled HerdWorkerAbsent \
   HerdRunsStuck HerdRunsQueued HerdRunsFailing HerdAutomationsLagging HerdAutomationsFailing \
-  HerdExternalToolsFailing HerdOAuthRefreshFailing HerdMcpAuthFailures HerdMcpCatalogProblems; do
+  HerdExternalToolsFailing HerdOAuthRefreshFailing HerdMcpAuthFailures HerdMcpCatalogProblems \
+  HerdBackupTooOld HerdBackupFailing HerdOffsiteBackupFailing HerdBackupNeverRan HerdOidcFailing \
+  HerdAutoscalerAtMax; do
   grep -q -- "- alert: $alert$" <<<"$rule" || fail "the PrometheusRule lacks $alert"
 done
 grep -qF '"$1-internal", "job", "(.+)-worker"' <<<"$rule" \
@@ -284,5 +366,12 @@ for name in t-to-herd-cats-ai-internal t-to-herd-cats-ai-worker; do
   grep -q "app.kubernetes.io/endpoint: internal" <<<"$service" || fail "the ServiceMonitor does not scrape $name"
 done
 grep -q "HERD_ROLE" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" || fail "no worker to report"
+
+# Scaling, and where the M9 settings and secrets go (plan M9 Task 7).
+source "$root/deploy/helm/scripts/chart-rules-scaling.sh"
+source "$root/deploy/helm/scripts/chart-rules-placement.sh"
+source "$root/deploy/helm/scripts/chart-rules-storage.sh"
+source "$root/deploy/helm/scripts/chart-rules-admin.sh"
+source "$root/deploy/helm/scripts/chart-rules-security.sh"
 
 echo "chart rules OK"

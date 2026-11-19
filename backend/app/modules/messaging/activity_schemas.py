@@ -53,6 +53,30 @@ class ActivityAutomation(BaseModel):
     paused_reason: str | None
 
 
+class ActivityAccount(BaseModel):
+    """The self-registered account a `signup` notification is about (plan M9 task 5b;
+    its address: the user administration's waiting accounts); the account is also the
+    entry's `author`. `awaiting`: whether it still waits for approval."""
+
+    id: uuid.UUID
+    awaiting: bool
+
+
+class ActivityCalendarEvent(BaseModel):
+    """The calendar event an `invitation` or `invite_reply` is about (plan M10 task 4;
+    its address: `/api/events/{id}`); shown only while the person attends it, so in
+    full. `cancelled`: called off or deleted; `response`: the person's own answer
+    (null when she organises it)."""
+
+    id: uuid.UUID
+    title: str
+    starts_at: datetime
+    ends_at: datetime
+    all_day: bool
+    cancelled: bool
+    response: str | None
+
+
 class ActivityOut(BaseModel):
     """A notification: why, where, from whom, and the first 140 characters of the
     message's Markdown. `parent_id`: the thread the message is in (null: top level).
@@ -60,7 +84,9 @@ class ActivityOut(BaseModel):
     `author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top
     level has no conversation and no message, but `proposal` (plan M6); a
     `skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`
-    the automation (plan M7); `author` may be an agent (`type`)."""
+    the automation (plan M7), a `signup` the waiting account (plan M9), an
+    `invitation` or `invite_reply` the calendar event (plan M10); `author` may be an
+    agent (`type`)."""
 
     id: uuid.UUID
     reason: NotificationReason
@@ -72,6 +98,8 @@ class ActivityOut(BaseModel):
     proposal: ActivityProposal | None = None
     skill_proposal: ActivitySkillProposal | None = None
     automation: ActivityAutomation | None = None
+    account: ActivityAccount | None = None
+    calendar_event: ActivityCalendarEvent | None = None
     parent_id: uuid.UUID | None
     author: ActivityAuthor | None
     snippet: str
@@ -104,6 +132,21 @@ class ActivityOut(BaseModel):
             automation = ActivityAutomation(
                 id=n.automation_id, paused_reason=entry.automation_paused
             )
+        account = None
+        if n.account_id is not None:
+            account = ActivityAccount(id=n.account_id, awaiting=bool(entry.account_awaiting))
+        event = entry.calendar_event
+        calendar_event = None
+        if event is not None:
+            calendar_event = ActivityCalendarEvent(
+                id=event.id,
+                title=event.title,
+                starts_at=event.starts_at,
+                ends_at=event.ends_at,
+                all_day=event.all_day,
+                cancelled=event.cancelled,
+                response=event.response,
+            )
         return cls(
             id=n.id,
             reason=n.reason,
@@ -114,6 +157,8 @@ class ActivityOut(BaseModel):
             proposal=proposal,
             skill_proposal=skill_proposal,
             automation=automation,
+            account=account,
+            calendar_event=calendar_event,
             message_id=n.message_id,
             parent_id=entry.parent_id,
             author=author,

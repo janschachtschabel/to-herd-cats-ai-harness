@@ -1,0 +1,269 @@
+"""The SQL of `backup_run`. A backup acts for the installation, not for a person:
+its row belongs to the installation's organisation (there is one, `orgs/models.py`).
+
+An owner's "Jetzt sichern" (plan M9 task 13) is a row with trigger `admin` in state
+`running` that no backup has taken up yet: a request. A worker takes it up within
+REQUEST_GRACE (`modules/backups/jobs.py`); until then whoever holds the backup lock
+spares it (`interrupt_running(spare_requests_since=...)`), afterwards it counts as a
+backup whose process died. A restore spares none: a request in a restored archive is
+never run again."""
+
+import uuid
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+from sqlalchemy import ColumnElement, and_, func, not_, or_, select, text, update
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+
+from app.core.permissions import SYSTEM_ROLE_ACTIONS, Action
+from app.modules.backups.models import BackupRun, BackupState, BackupTrigger, OffsiteState
+from app.modules.orgs.models import Organization
+from app.modules.users.models import User
+
+# A backup holds this advisory lock on a connection of its own while it runs: whoever
+# takes it knows no backup is running, so every `running` row is one whose process died.
+BACKUP_LOCK = "herd.backup"
+_KEY = func.hashtextextended(BACKUP_LOCK, 0)
+# An owner's "Jetzt sichern" and "Einspielen" take this lock for their first
+# transaction (try, never wait): the look "is one running?" and the write after it are
+# one step across every API process (review M9b F2, F3).
+ADMIN_CLAIM = "herd.backup.admin"
+# The error code of an `interrupted` run: its process died (counts as a failure), or it
+# was the restored archive's own run, running in its snapshot (it made the archive).
+INTERRUPTED = "backup.interrupted"
+IN_RESTORED_ARCHIVE = "backup.in_restored_archive"
+# How long an administrator's request waits for a worker before it counts as dead.
+REQUEST_GRACE = timedelta(minutes=10)
+
+
+async def hold_backup_lock(connection: AsyncConnection) -> bool:
+    """Take the backup lock for the connection's session; False if a backup holds it.
+    Commits: the lock is the session's, and no transaction stays open while it is held
+    (a server's `idle_in_transaction_session_timeout` would end the session, and the
+    lock with it, while the backup goes on)."""
+    taken = bool(await connection.scalar(select(func.pg_try_advisory_lock(_KEY))))
+    await connection.commit()
+    return taken
+
+
+async def release_backup_lock(connection: AsyncConnection) -> None:
+    await connection.scalar(select(func.pg_advisory_unlock(_KEY)))
+    await connection.commit()
+
+
+@dataclass(frozen=True)
+class BackupFigures:
+    last_ok: datetime | None
+    last_failed: datetime | None
+    last_bytes: int | None
+    offsite_ok: datetime | None
+    offsite_failed: datetime | None
+
+
+class BackupRunRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def installation_org(self) -> uuid.UUID | None:
+        """The installation's organisation (the oldest, should there be several)."""
+        return await self.session.scalar(select(Organization.id).order_by(Organization.id).limit(1))
+
+    async def installation(self) -> tuple[uuid.UUID, str] | None:
+        """The installation's organisation and its name (the replace's confirmation)."""
+        row = (
+            await self.session.execute(
+                select(Organization.id, Organization.name).order_by(Organization.id).limit(1)
+            )
+        ).first()
+        return (row.id, row.name) if row is not None else None
+
+    async def get(self, run_id: uuid.UUID) -> BackupRun | None:
+        return await self.session.get(BackupRun, run_id)
+
+    async def copy_finished(self, org_id: uuid.UUID, run: BackupRun) -> None:
+        """A finished run of another database (a replace's safety archive) recorded
+        here too, under this database's organisation."""
+        self.session.add(
+            BackupRun(
+                org_id=org_id,
+                trigger=run.trigger,
+                state=run.state,
+                started_at=run.started_at,
+                finished_at=run.finished_at,
+                archive=run.archive,
+                bytes=run.bytes,
+                archive_sha256=run.archive_sha256,
+                error_code=run.error_code,
+                offsite_state=run.offsite_state,
+            )
+        )
+        await self.session.flush()
+
+    async def start(self, org_id: uuid.UUID, trigger: BackupTrigger, at: datetime) -> BackupRun:
+        run = BackupRun(org_id=org_id, trigger=trigger, state=BackupState.RUNNING, started_at=at)
+        self.session.add(run)
+        await self.session.flush()
+        return run
+
+    async def finish(
+        self,
+        run_id: uuid.UUID,
+        *,
+        state: BackupState,
+        at: datetime,
+        archive: str | None = None,
+        size: int | None = None,
+        archive_sha256: str | None = None,
+        error_code: str | None = None,
+    ) -> None:
+        await self.session.execute(
+            update(BackupRun)
+            .where(BackupRun.id == run_id)
+            .values(
+                state=state,
+                finished_at=at,
+                archive=archive,
+                bytes=size,
+                archive_sha256=archive_sha256,
+                error_code=error_code,
+            )
+        )
+
+    async def set_offsite(self, run_id: uuid.UUID, state: OffsiteState) -> None:
+        await self.session.execute(
+            update(BackupRun).where(BackupRun.id == run_id).values(offsite_state=state)
+        )
+
+    async def figures(self) -> BackupFigures:
+        """For the gauges, over every organisation (there is one): the last finish of a
+        good and of a failed backup (a killed one, `interrupted`, counts as failed; the
+        restored archive's own run, running in its snapshot, does not), the size of the
+        last good one, the last finish of a good backup whose offsite push worked and
+        of one whose push failed."""
+        ok = BackupRun.state == BackupState.OK
+        last_ok = await self.session.scalar(select(func.max(BackupRun.finished_at)).where(ok))
+        failed = or_(
+            BackupRun.state == BackupState.FAILED,
+            and_(
+                BackupRun.state == BackupState.INTERRUPTED,
+                BackupRun.error_code.is_distinct_from(IN_RESTORED_ARCHIVE),
+            ),
+        )
+        last_failed = await self.session.scalar(
+            select(func.max(BackupRun.finished_at)).where(failed)
+        )
+        size = await self.session.scalar(
+            select(BackupRun.bytes)
+            .where(ok)
+            .order_by(BackupRun.finished_at.desc(), BackupRun.id.desc())
+            .limit(1)
+        )
+        offsite: dict[OffsiteState, datetime | None] = {}
+        for state in (OffsiteState.OK, OffsiteState.FAILED):
+            offsite[state] = await self.session.scalar(
+                select(func.max(BackupRun.finished_at)).where(ok, BackupRun.offsite_state == state)
+            )
+        return BackupFigures(
+            last_ok, last_failed, size, offsite[OffsiteState.OK], offsite[OffsiteState.FAILED]
+        )
+
+    async def interrupt_running(
+        self,
+        at: datetime,
+        *,
+        code: str = INTERRUPTED,
+        started_before: datetime | None = None,
+        spare_requests_since: datetime | None = None,
+    ) -> int:
+        """Runs still `running` whose process is gone (after a restore, or seen by
+        whoever holds the backup lock), with `code`; with `started_before`, only runs
+        that started before that time; with `spare_requests_since`, not the
+        administrators' requests made since then (waiting for a worker); how many."""
+        stmt = update(BackupRun).where(BackupRun.state == BackupState.RUNNING)
+        if started_before is not None:
+            stmt = stmt.where(BackupRun.started_at < started_before)
+        if spare_requests_since is not None:
+            stmt = stmt.where(not_(_request_since(spare_requests_since)))
+        result = await self.session.execute(
+            stmt.values(state=BackupState.INTERRUPTED, finished_at=at, error_code=code)
+        )
+        return int(result.rowcount)  # type: ignore[attr-defined]
+
+    async def interrupt_dead(self, at: datetime) -> int:
+        """`interrupt_running` if no backup is running (the lock, for this
+        transaction); how many."""
+        if not await self.session.scalar(select(func.pg_try_advisory_xact_lock(_KEY))):
+            return 0
+        return await self.interrupt_running(at, spare_requests_since=at - REQUEST_GRACE)
+
+    async def claim_admin(self) -> bool:
+        """The administration's claim for this transaction; False while another
+        request holds it."""
+        claim = func.pg_try_advisory_xact_lock(func.hashtextextended(ADMIN_CLAIM, 0))
+        return bool(await self.session.scalar(select(claim)))
+
+    async def any_running(self, org_id: uuid.UUID) -> bool:
+        """A backup runs, or an administrator's request waits."""
+        found = await self.session.scalar(
+            select(BackupRun.id)
+            .where(BackupRun.org_id == org_id, BackupRun.state == BackupState.RUNNING)
+            .limit(1)
+        )
+        return found is not None
+
+    async def oldest_request(self, since: datetime) -> uuid.UUID | None:
+        """The oldest administrator's request made since `since` still waiting (or
+        whose worker died: it is taken up again), over every organisation."""
+        return await self.session.scalar(
+            select(BackupRun.id)
+            .where(BackupRun.state == BackupState.RUNNING, _request_since(since))
+            .order_by(BackupRun.started_at, BackupRun.id)
+            .limit(1)
+        )
+
+    async def page(
+        self, org_id: uuid.UUID, limit: int, after: tuple[datetime, uuid.UUID] | None
+    ) -> list[BackupRun]:
+        """Newest first, up to `limit` + 1 rows (whether there is a next page), after
+        the (started_at, id) of the last row of the page before."""
+        stmt = select(BackupRun).where(BackupRun.org_id == org_id)
+        if after is not None:
+            stmt = stmt.where(
+                or_(
+                    BackupRun.started_at < after[0],
+                    and_(BackupRun.started_at == after[0], BackupRun.id < after[1]),
+                )
+            )
+        stmt = stmt.order_by(BackupRun.started_at.desc(), BackupRun.id.desc()).limit(limit + 1)
+        return list((await self.session.scalars(stmt)).all())
+
+    async def managers(self, org_id: uuid.UUID) -> list[uuid.UUID]:
+        """The active people of the organisation who hold `backup.manage` (owners)."""
+        roles = [r for r, acts in SYSTEM_ROLE_ACTIONS.items() if Action.BACKUP_MANAGE in acts]
+        rows = await self.session.scalars(
+            select(User.id)
+            .where(User.org_id == org_id, User.is_active, User.system_role.in_(roles))
+            .order_by(User.id)
+        )
+        return list(rows.all())
+
+    async def latest(self, org_id: uuid.UUID, limit: int) -> list[BackupRun]:
+        """Newest first."""
+        stmt = (
+            select(BackupRun)
+            .where(BackupRun.org_id == org_id)
+            .order_by(BackupRun.started_at.desc(), BackupRun.id.desc())
+            .limit(limit)
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+
+def _request_since(since: datetime) -> ColumnElement[bool]:
+    return and_(BackupRun.trigger == BackupTrigger.ADMIN, BackupRun.started_at >= since)
+
+
+async def clear_tables(session: AsyncSession, names: Iterable[str]) -> None:
+    """Delete every row of the tables (fixed names from code, never input)."""
+    for name in names:
+        await session.execute(text(f'DELETE FROM "{name}"'))  # noqa: S608

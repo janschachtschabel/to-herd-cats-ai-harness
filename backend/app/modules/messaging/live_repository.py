@@ -7,17 +7,18 @@ administrator's sign-out delete it) and its person is active. Whether that perso
 see the conversation is `seen_by_person()`, the rule of `visible_conversations` from the
 person's side, with groups and memberships as they are when the statement runs; whether
 it may read a space's tickets or edit its pages (events for a space, plans M4b and M6)
-is `person_holds_role`.
+is `person_holds_role`; whether it belongs to a space whose calendars changed (plan M10)
+is `person_reads_space` without admin power.
 """
 
 import uuid
 from collections.abc import Collection
 
-from sqlalchemy import ColumnElement, and_, func, select
+from sqlalchemy import ColumnElement, SQLColumnExpression, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.core.access_repository import person_holds_role
+from app.core.access_repository import person_holds_role, person_reads_space
 from app.core.permissions import SPACE_ACTION_MIN_ROLE, Action
 from app.modules.auth.models import UserSession
 from app.modules.messaging.models import Conversation
@@ -73,6 +74,15 @@ async def valid_sessions(
     return set(await session.scalars(stmt))
 
 
+def _holds(space_id: SQLColumnExpression[uuid.UUID], action: Action) -> ColumnElement[bool]:
+    """Calendar events go to the space's members alone, never by admin power (plan M10
+    decision 3: the calendar lists hold no space an admin is not in, nor do their live
+    events)."""
+    if action == Action.CALENDAR_READ:
+        return person_reads_space(space_id, by_admin_power=False)
+    return person_holds_role(space_id, SPACE_ACTION_MIN_ROLE[action])
+
+
 async def space_readers(
     session: AsyncSession,
     session_ids: Collection[uuid.UUID],
@@ -93,7 +103,7 @@ async def space_readers(
             UserSession.id.in_(session_ids),
             space.id.in_(space_ids),
             _valid(),
-            person_holds_role(space.id, SPACE_ACTION_MIN_ROLE[action]),
+            _holds(space.id, action),
         )
     )
     return {(row[0], row[1]) for row in await session.execute(stmt)}

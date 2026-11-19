@@ -16,6 +16,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.db_errors import is_retryable, sqlstate_of
 from app.core.telemetry import current_trace_ids
+from app.core.validation_message import validation_message, vocabulary
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +124,8 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _handle_validation(request: Request, exc: RequestValidationError) -> JSONResponse:
-        fields = ", ".join(".".join(str(p) for p in e["loc"]) for e in exc.errors() if e.get("loc"))
-        message = f"Invalid request: {fields}" if fields else "Invalid request"
+        known = vocabulary(request.app)
+        message = validation_message(exc.errors(), known)
         return JSONResponse(status_code=422, content=error_body("validation_failed", message))
 
 

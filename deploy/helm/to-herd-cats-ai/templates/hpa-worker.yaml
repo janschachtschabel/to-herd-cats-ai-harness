@@ -1,0 +1,2 @@
+{{- /* The worker pods' autoscaler (worker.autoscaling; _scaling.tpl). */ -}}
+{{- include "herd.hpa" (dict "root" . "component" "worker") }}

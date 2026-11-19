@@ -22,7 +22,7 @@ test("a page that would change its meaning is not opened (4422)", async () => {
   // The parser reads the second line as a paragraph; written after the code block as a
   // block of its own (raw, for its HTML) it would be a list.
   await start("    b\n0. <x>");
-  const c = live.open({ cookie: "herd_session=token-a" });
+  const c = live.open({ grant: "herd_cg_a" });
   await until(() => c.closes.includes(4422));
   assert.ok(!c.provider.synced);
   assert.equal(live.api.saves.length, 0, "nothing saved");
@@ -33,7 +33,7 @@ const UNTIDY = "* eins\n* zwei\n\n| a |\n|---|\n| 1 |\n\n&copy; 2026, Titel\n===
 
 test("opening and closing the live editor without typing changes nothing", async () => {
   await start(UNTIDY);
-  const c = live.open({ cookie: "herd_session=token-a" });
+  const c = live.open({ grant: "herd_cg_a" });
   await synced(c);
   await pause(400); // longer than the save debounce
   c.destroy();
@@ -44,7 +44,7 @@ test("opening and closing the live editor without typing changes nothing", async
 
 test("a structural change without a change of meaning keeps the stored Markdown", async () => {
   await start(UNTIDY);
-  const c = live.open({ cookie: "herd_session=token-a" });
+  const c = live.open({ grant: "herd_cg_a" });
   await synced(c);
   // An edit that is undone again: the document's history changed, its Markdown not.
   type(c.doc, "!");
@@ -67,7 +67,7 @@ test("a stored live state the editor's schema does not allow is not opened (4422
   paragraph.insert(0, [new Y.XmlElement("horizontalRule")]);
   doc.getXmlFragment("default").insert(0, [paragraph]);
   live.api.ydoc = Buffer.from(Y.encodeStateAsUpdate(doc)).toString("base64");
-  const c = live.open({ cookie: "herd_session=token-a" });
+  const c = live.open({ grant: "herd_cg_a" });
   await until(() => c.closes.includes(4422));
   assert.equal(live.api.saves.length, 0, "nothing saved");
 });
@@ -102,7 +102,7 @@ test("a stored live state the browser would tidy is tidied by the server, not by
   const markdown = "| a | b |\n| --- | --- |\n| 1 |";
   await start(markdown);
   live.api.ydoc = raggedState();
-  const c = live.open({ cookie: "herd_session=token-a" });
+  const c = live.open({ grant: "herd_cg_a" });
   await synced(c);
   const rows = c.doc.getXmlFragment("default").get(0).toArray();
   assert.equal(rows[1].length, 2, "the row is as wide as the header when it arrives");
@@ -118,7 +118,7 @@ test("an empty page always holds a paragraph, so undoing everything keeps it val
   for (const stored of [null, Buffer.from(Y.encodeStateAsUpdate(new Y.Doc())).toString("base64")]) {
     await start("");
     live.api.ydoc = stored;
-    const c = live.open({ cookie: "herd_session=token-a" });
+    const c = live.open({ grant: "herd_cg_a" });
     await synced(c);
     const fragment = c.doc.getXmlFragment("default");
     assert.equal(fragment.length, 1);

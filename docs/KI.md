@@ -26,6 +26,11 @@ Eine Verbindung beschreibt einen Anbieter, der das OpenAI-Protokoll spricht:
 | `prices` | je Modell `{"input": "2.50", "output": "10"}` in Währung je Million Token; ohne Preis bleibt `cost` leer |
 | `max_concurrency`, `requests_per_minute` | Grenzen für Läufe über alle Worker ([`AGENTEN.md`](AGENTEN.md#wie-ein-lauf-arbeitet)) |
 
+- **`b_api`: Anmeldeart ungeprüft** (Frage J4 an Jan, M9). Der Schlüssel geht wie bei
+  allen Arten als `Authorization: Bearer <Schlüssel>`. Ob die b-api ihn so annimmt oder
+  einen eigenen Kopf erwartet, ist ohne Zugang nicht geprüft; bis zur Antwort gilt
+  Bearer. Die Verbindungsart ist optional; `openai_compatible` mit derselben Adresse
+  ist der Ausweg, falls die b-api das OpenAI-Protokoll mit Bearer spricht.
 - `POST /api/ai/connections/{id}/test` prüft mit einem kleinen Aufruf (Chat mit 16 Token
   oder ein Embedding) und antwortet mit einem Zustand: `ok`, `unauthorized`,
   `payment_required`, `forbidden`, `not_found`, `rate_limited`, `provider_error`,
@@ -51,7 +56,8 @@ Eine Verbindung beschreibt einen Anbieter, der das OpenAI-Protokoll spricht:
   `HERD_SECRET_KEY_PREVIOUS` entfernen. Das Skript schlüsselt alle `enc:`-Werte (der
   KI-Verbindungen und der Konnektoren, geteilter wie persönlicher, samt OAuth-Token,
   OAuth-Client-Geheimnissen und den Prüfwerten offener OAuth-Abläufe, siehe
-  [`MCP.md`](MCP.md#konnektoren)) in einer Transaktion neu um (alles oder nichts) und
+  [`MCP.md`](MCP.md#konnektoren), der OIDC-Anbieter und der TOTP-Geheimnisse,
+  siehe [`ANMELDUNG.md`](ANMELDUNG.md#zweiter-faktor-totp)) in einer Transaktion neu um (alles oder nichts) und
   nennt nur ihre Zahl. Das Image enthält
   `backend/scripts/` nicht: den Wechsel aus einem Quellstand desselben Release starten,
   mit derselben Datenbank und beiden Schlüsseln in der Umgebung.

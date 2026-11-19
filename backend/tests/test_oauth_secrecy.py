@@ -24,7 +24,7 @@ from app.modules.oauth import tokens
 from app.modules.oauth.models import OAuthFlow
 from tests.factories_connectors import SHARED
 from tests.factories_dms import People
-from tests.factories_oauth import CALLBACK, authorize, make_oauth_client, query_of
+from tests.factories_oauth import authorize, callback_for, make_oauth_client, query_of
 from tests.support.oauth_stub import OAuthStub
 
 _SPANS = InMemorySpanExporter()
@@ -47,7 +47,7 @@ async def test_no_code_state_verifier_token_or_client_secret_anywhere(
     verifier = secrets.resolve(flow.verifier_ref).get_secret_value()
     query = oauth_ready.state.authorize(url)
     secret_words = [query["code"], query["state"], verifier]
-    callback = await ai_people.admin.get(CALLBACK, params=query)
+    callback = await ai_people.admin.get(callback_for(url), params=query)
     location = callback.headers["location"]
     assert query_of(location)["status"] == "connected"
     first_access = oauth_ready.state.issued[-1]
@@ -61,7 +61,7 @@ async def test_no_code_state_verifier_token_or_client_secret_anywhere(
     await ai_people.admin.post(f"{SHARED}/{connector['id']}/disconnect", json={"version": 2})
     oauth_ready.state.failures.append(400)
     url = await authorize(ai_people.admin, SHARED, connector["id"])
-    failed = await ai_people.admin.get(CALLBACK, params=oauth_ready.state.authorize(url))
+    failed = await ai_people.admin.get(callback_for(url), params=oauth_ready.state.authorize(url))
     assert query_of(failed.headers["location"])["status"] == "failed"
     secret_words += [
         first_access,

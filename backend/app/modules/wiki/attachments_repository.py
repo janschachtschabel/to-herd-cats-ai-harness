@@ -25,7 +25,7 @@ class AttachmentRepository:
 
     async def lock_blob(self, sha256: str) -> None:
         """Serialise writing, counting and deleting the file of one content."""
-        await advisory_xact_lock(self.session, f"attachment.blob:{self.scope.org_id}:{sha256}")
+        await lock_blob(self.session, self.scope.org_id, sha256)
 
     async def add(self, attachment: Attachment) -> Attachment:
         self.session.add(attachment)
@@ -77,10 +77,14 @@ class AttachmentRepository:
         )
         return list((await self.session.scalars(stmt)).all())
 
-    async def uses_blob(self, sha256: str) -> bool:
-        """Whether any attachment of the organisation still has this content; looks
-        past the actor's view, since the file is shared organisation-wide."""
-        stmt = select(func.count()).where(
-            Attachment.org_id == self.scope.org_id, Attachment.sha256 == sha256
-        )
-        return bool(await self.session.scalar(stmt))
+
+async def lock_blob(session: AsyncSession, org_id: uuid.UUID, sha256: str) -> None:
+    """Serialise writing, counting and deleting the file of one content (any actor)."""
+    await advisory_xact_lock(session, f"attachment.blob:{org_id}:{sha256}")
+
+
+async def uses_blob(session: AsyncSession, org_id: uuid.UUID, sha256: str) -> bool:
+    """Whether any attachment of the organisation has this content; looks past any
+    actor's view, since the file is shared organisation-wide."""
+    stmt = select(func.count()).where(Attachment.org_id == org_id, Attachment.sha256 == sha256)
+    return bool(await session.scalar(stmt))

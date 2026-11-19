@@ -1,0 +1,17 @@
+{{- /*
+PodDisruptionBudgets (podDisruptionBudget; _scaling.tpl): one for each of the API, the
+worker and the collab process that runs at least two pods. One collab pod (the
+default, collab.replicas) gets none: a budget for a single pod would only block node
+drains. Several collab pods each hold their own pages (spec 12.4, plan M9 decision 17):
+an evicted one drains (saves, lets go of its pages) and its browsers reconnect to the
+others.
+*/ -}}
+{{- $budgets := list }}
+{{- range $component := list "api" "worker" "collab" }}
+{{- if or (ne $component "collab") $.Values.collab.enabled }}
+{{- with include "herd.pdb" (dict "root" $ "component" $component) }}
+{{- $budgets = append $budgets . }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- join "\n---\n" $budgets }}

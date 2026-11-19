@@ -1,13 +1,15 @@
 """The one permission check (spec 4.2). Every service asks `require` (or `can`); there
 is no other place that decides who may do what.
 
-- System admins and owners may do everything, in every space of their organisation.
+- System admins and owners may do everything, in every space of their organisation,
+  except what only an owner may (`OWNER_ONLY_ACTIONS`: `backup.manage`).
 - System-wide actions follow the system role (`SYSTEM_ROLE_ACTIONS`), except the
   derived ones (`DERIVED_ACTIONS`): `ai.use` holds whoever the AI assignment gives a
   usable connection (`modules/ai/effective.py`), `agent.create_personal` whoever has
   `ai.use` while the organisation allows personal agents, `mcp.use` every active
   person but guests while the organisation's MCP switch is on
-  (`modules/tokens/standing.py`); no role grants any of them.
+  (`modules/tokens/standing.py`), `calendar.sync` likewise with the calendar sync
+  switch (`modules/calendars/standing.py`); no role grants any of them.
 - Inside a space the effective role decides: the highest of the actor's direct role
   and its groups' roles; in `open` spaces everyone but a guest is at least `viewer`.
 - A space the actor may not read does not exist for it: `require` answers 404 as for
@@ -23,7 +25,8 @@ is no other place that decides who may do what.
   (spec 5.5), at most once per admin, space and UTC day. `can` only answers.
 
 Each check is one SQL query (`AccessRepository.facts`); lists filter with the SQL of
-`visible_space_ids`, which the check itself uses for readability.
+`visible_space_ids`, which the check itself uses for readability. Lists that must not
+grow with admin power (calendars, plan M10 decision 3) filter with `member_space_ids`.
 """
 
 import uuid
@@ -37,6 +40,7 @@ from app.core.access_repository import (
     AccessRepository,
     first_time,
     ids_with_role_stmt,
+    member_ids_stmt,
     visible_ids_stmt,
 )
 from app.core.actor import Actor
@@ -57,6 +61,7 @@ from app.modules.ai.effective import effective_assignment, personal_agents_allow
 from app.modules.audit.models import ADMIN_ACCESS
 from app.modules.audit.recorder import record_admin_access
 from app.modules.auth.context import AuthContext
+from app.modules.calendars.standing import holds_calendar_sync
 from app.modules.groups.repository import GroupRepository
 from app.modules.spaces.models import SpaceKind
 from app.modules.tokens.standing import holds_mcp_use
@@ -70,6 +75,8 @@ __all__ = [
     "actor_for",
     "can",
     "draft_space_ids",
+    "held_by_admin_power",
+    "member_space_ids",
     "my_roles",
     "require",
     "sees_drafts",
@@ -91,6 +98,14 @@ async def actor_for(session: AsyncSession, auth: AuthContext) -> Actor:
 def visible_space_ids(actor: Actor) -> Select[uuid.UUID]:
     """The ids of every space `actor` may read, as SQL for list filters."""
     return visible_ids_stmt(actor)
+
+
+def member_space_ids(actor: Actor) -> Select[uuid.UUID]:
+    """The ids of every space `actor` belongs to, as SQL for list filters that hold
+    for admins as for anyone (calendars, plan M10 decision 3): its memberships (own or
+    through a group) and the open spaces its role reads, never what admin power opens.
+    An admin reaches another space by naming it (`require`, audited)."""
+    return member_ids_stmt(actor)
 
 
 def space_ids_with(actor: Actor, action: Action) -> Select[uuid.UUID]:
@@ -168,15 +183,33 @@ async def require(
             await record_admin_access(session, actor, space_id, facts.kind)
 
 
+async def held_by_admin_power(
+    session: AsyncSession, actor: Actor, action: Action, space_id: uuid.UUID
+) -> bool:
+    """Whether the actor may do the space action in the space only through its admin
+    role: it may, and its membership (own, through a group, or an open space its role
+    reads) would not let it. For audits of writes by admin power (plan M10 task 3b)."""
+    if actor.system_role not in ADMIN_ROLES:
+        return False
+    facts = await AccessRepository(session).facts(actor, space_id)
+    if not _allows(facts, action):
+        return False
+    role = _effective_role(facts)
+    return role is None or role < SPACE_ACTION_MIN_ROLE[action]
+
+
 async def _derived(session: AsyncSession, actor: Actor, action: Action) -> bool:
     """`ai.use`: a person whose assignment gives a usable connection (active, no
     guest: `effective.judge` reads both afresh). `agent.create_personal`: `ai.use`
     while the organisation allows personal agents. `mcp.use`: the person as now and
-    the organisation's switch (no AI assignment needed)."""
+    the organisation's switch (no AI assignment needed). `calendar.sync`: the same,
+    with the organisation's calendar sync switch."""
     if actor.principal.type != PrincipalType.USER:
         return False
     if action == Action.MCP_USE:
         return await holds_mcp_use(session, actor.org_id, actor.principal.id)
+    if action == Action.CALENDAR_SYNC:
+        return await holds_calendar_sync(session, actor.org_id, actor.principal.id)
     if await effective_assignment(session, actor.org_id, actor.principal.id) is None:
         return False
     if action == Action.AGENT_CREATE_PERSONAL:

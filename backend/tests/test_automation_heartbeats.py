@@ -18,7 +18,7 @@ from app.core.outbox import Event, EventOutbox
 from app.modules.agents.run_models import RunState, StopReason
 from app.modules.automations.models import FiringOutcome
 from app.modules.automations.repository import AutomationRepository
-from app.modules.messaging.live_events import of_event
+from app.modules.messaging.live_publish import of_event
 from app.modules.messaging.models import MessageKind
 from app.modules.messaging.notification_models import Notification
 from tests.factories_agents import Bench

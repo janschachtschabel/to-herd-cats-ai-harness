@@ -12,6 +12,10 @@ worker look stuck; hung runs have their own gauge and alert).
 - Stopping cancels the runs in progress; their leases run out and another worker
   takes them up again and goes on from their journal (a tool's effect and its entry
   in the journal are committed together, so nothing is done twice).
+- In maintenance (plan M9 decision 9, the process's cache) a round claims and sweeps
+  nothing and cancels the runs held here, as stopping does: no step of theirs writes
+  into a database a restore is replacing; after maintenance a worker takes them up
+  again (where they still exist).
 - Every round also ends the waiting runs that are due (`control.sweep_waiting`:
   `waiting_timeout`, or `cancelled` on request), in a `try` of its own: a sweep that
   fails (`runs.sweep_failed`) keeps no run from being claimed.
@@ -25,6 +29,7 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 
@@ -37,6 +42,7 @@ from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import Claimed, claim, renew
 from app.modules.agents.gauge_repository import open_runs
 from app.modules.agents.step_host import units_of
+from app.modules.maintenance.cache import in_maintenance
 
 logger = logging.getLogger(__name__)
 
@@ -112,8 +118,10 @@ class RunLoop:
         concurrency: int,
         lease: float,
         executor: Executor | None = None,
+        paused: Callable[[], bool] = in_maintenance,
     ) -> None:
         self.database = database
+        self.paused = paused
         self.concurrency = concurrency
         self.lease = lease
         self.executor = executor or Executor(units_of(database.session_factory))
@@ -128,16 +136,8 @@ class RunLoop:
         try:
             while not stop.is_set():
                 self.wake.clear()
-                try:  # apart from the claims: a failing sweep must not stop them
-                    await self.sweep_once()
-                except Exception as exc:
-                    logger.warning("runs.sweep_failed", extra={"error": type(exc).__name__})
                 try:
-                    while len(self.held) < self.concurrency and not stop.is_set():
-                        claimed = await self.claim()
-                        if claimed is None:
-                            break
-                        self._start(claimed)
+                    await self.one_round(stop)
                     failures = 0
                 except Exception as exc:
                     failures += 1
@@ -152,6 +152,27 @@ class RunLoop:
             for task in tasks:
                 with suppress(asyncio.CancelledError):
                     await task
+
+    async def one_round(self, stop: asyncio.Event) -> None:
+        """Sweep the waiting runs, then claim while there is room (a failing claim
+        raises). In maintenance: cancel the runs held here and claim nothing."""
+        if self.paused():
+            self._cancel_held()
+            return
+        try:  # apart from the claims: a failing sweep must not stop them
+            await self.sweep_once()
+        except Exception as exc:
+            logger.warning("runs.sweep_failed", extra={"error": type(exc).__name__})
+        while len(self.held) < self.concurrency and not stop.is_set():
+            claimed = await self.claim()
+            if claimed is None:
+                break
+            self._start(claimed)
+
+    def _cancel_held(self) -> None:
+        for run_id, (_, task) in list(self.held.items()):
+            task.cancel()
+            del self.held[run_id]
 
     async def sweep_once(self) -> int:
         async with self.database.session_factory() as session, session.begin():

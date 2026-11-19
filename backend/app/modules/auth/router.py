@@ -1,52 +1,68 @@
 from fastapi import APIRouter, Request, Response
+from fastapi.responses import JSONResponse
 
 from app.modules.auth.context import AuthContext
+from app.modules.auth.cookies import clear_session_cookie, session_token
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep, SettingsDep
+from app.modules.auth.handover import hand_over
+from app.modules.auth.me import me_out
 from app.modules.auth.schemas import LoginRequest, MeOut
-from app.modules.auth.service import AuthService
-from app.modules.orgs.schemas import OrgOut
+from app.modules.auth.service import AuthService, SecondFactorNeeded
+from app.modules.totp.cookies import set_challenge_cookie
+from app.modules.totp.schemas import SecondFactorNeededOut
 from app.modules.users.profile import ProfileService
-from app.modules.users.schemas import PasswordChangeIn, ProfileUpdateIn, UserOut
+from app.modules.users.schemas import PasswordChangeIn, ProfileUpdateIn
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=MeOut)
+@router.post(
+    "/login",
+    response_model=MeOut,
+    responses={202: {"model": SecondFactorNeededOut, "description": "Second factor needed"}},
+)
 async def login(
     body: LoginRequest,
     request: Request,
     response: Response,
     session: SessionDep,
     settings: SettingsDep,
-) -> MeOut:
+) -> MeOut | JSONResponse:
+    """Signed in (200, the session cookie), or, for a person with TOTP, 202: the
+    password was right and the sign-in waits for the second factor
+    (`/auth/login/second-factor`, with the cookie set here); no session yet."""
     ip = request.client.host if request.client else None
-    user, token = await AuthService(session, settings).login(body.email, body.password, ip)
-    response.set_cookie(
-        settings.session_cookie_name,
-        token,
-        max_age=settings.session_ttl_hours * 3600,
-        httponly=True,
-        # https as the client saw it (X-Forwarded-Proto from a trusted proxy counts).
-        secure=settings.cookie_secure or request.url.scheme == "https",
-        samesite="lax",
-        path="/",
-    )
-    return await _me(AuthContext(user=user), session, settings)
+    service = AuthService(session, settings)
+    result = await service.login(body.email, body.password, ip)
+    if isinstance(result, SecondFactorNeeded):
+        waiting = SecondFactorNeededOut(expires_at=result.expires_at)
+        answer = JSONResponse(waiting.model_dump(mode="json"), status_code=202)
+        set_challenge_cookie(answer, request, settings, result.challenge_token)
+        return answer
+    await hand_over(session, settings, request, response, result.token)
+    return await _me(AuthContext(user=result.user), session, settings)
 
 
 @router.post("/logout", status_code=204)
 async def logout(
     request: Request, response: Response, session: SessionDep, settings: SettingsDep
 ) -> None:
-    token = request.cookies.get(settings.session_cookie_name)
+    token = session_token(request, settings)
     if token:
         await AuthService(session, settings).logout(token)
-    response.delete_cookie(settings.session_cookie_name, path="/")
+    clear_session_cookie(response, request, settings)
 
 
 @router.get("/me", response_model=MeOut)
 async def me(ctx: AuthDep, session: SessionDep, settings: SettingsDep) -> MeOut:
     return await _me(ctx, session, settings)
+
+
+@router.post("/me/touch", status_code=204)
+async def touch_me(ctx: AuthDep) -> None:
+    """The person works in this tab (typing in the live editor, say) though it asked
+    the API nothing for a while: a use of the session (J7, R18-4), nothing else. No
+    write for the write limit."""
 
 
 @router.patch("/me", response_model=MeOut)
@@ -81,10 +97,4 @@ async def change_my_password(
 
 
 async def _me(ctx: AuthContext, session: SessionDep, settings: SettingsDep) -> MeOut:
-    service = AuthService(session, settings)
-    return MeOut(
-        user=UserOut.model_validate(ctx.user),
-        org=OrgOut.model_validate(await service.organization(ctx)),
-        permissions=await service.permissions(ctx),
-        ai_model=await service.ai_model(ctx),
-    )
+    return await me_out(ctx, session, settings)

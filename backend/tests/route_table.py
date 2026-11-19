@@ -3,8 +3,8 @@ complete and the session and CSRF guards, `test_route_hiding.py` the hiding ones
 
 A new route that is not listed fails `test_every_api_route_is_listed`, so it cannot
 ship without a decision on who may call it. Guards:
-- `public`: no session needed (login; logout, which only ends the session it is sent
-  with and answers 204 without one).
+- `public`: no session needed (login and its second step; logout, which only ends the session it is sent
+  with and answers 204 without one; whether the installation is in maintenance).
 - `session`: any logged-in person; anonymous → 401.
 - `admin`: an administration right; members and guests → 403
   (`test_route_guards.py` checks every one of these).
@@ -22,6 +22,15 @@ ship without a decision on who may call it. Guards:
   `ticket_status.not_found`.
 - `sprint`: a role in the sprint's space; otherwise 404 `sprint.not_found`, as for an
   id nobody has (plan M4b).
+- `calendar`: a role in the calendar's space; otherwise 404 `calendar.not_found`, as for
+  an id nobody has (plan M10). An admin outside the space reaches it by naming the
+  space (`/api/spaces/{space_id}/calendars`, audited); the calendar lists are `session`.
+  Making an event is `calendar` too; the event window is `session` (another space's
+  events only by naming it with `space_id`, which is `require`d and audited); the
+  overlays are `session` (member spaces only, plan M10 task 9).
+- `event`: whoever sees the event (a role in its calendar's space, or its organiser);
+  otherwise 404 `event.not_found`, as for an id nobody has (plan M10 task 3a); an
+  attendee sees it too (task 4).
 - `ai`: an AI right (`ai.manage`); everyone else gets 404 `ai.not_found`, so people
   without it learn nothing about the AI set-up (plan M5).
 - `agent`: `agent.manage` (managing) or `ai.use` (an agent's profile); everyone else
@@ -43,6 +52,8 @@ ship without a decision on who may call it. Guards:
 - `token`: `mcp.use` (the organisation's MCP switch on; no guest); everyone else gets
   404 `token.not_found`, as for an unknown id (plan M8 task 1). The admins' list of
   every token and the MCP settings are `ai`.
+- `backup`: `backup.manage` (owners only); everyone else, admins included, gets 404
+  `backup.not_found`, as for an unknown archive (plan M9 task 13).
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
@@ -57,6 +68,23 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/auth/me", "session"),
     ("PATCH", "/api/auth/me", "session"),
     ("POST", "/api/auth/me/password", "session"),
+    ("POST", "/api/auth/me/touch", "session"),
+    ("POST", "/api/auth/login/second-factor", "public"),
+    ("GET", "/api/auth/me/totp", "session"),
+    ("POST", "/api/auth/me/totp/setup", "session"),
+    ("POST", "/api/auth/me/totp/confirm", "session"),
+    ("POST", "/api/auth/me/totp/disable", "session"),
+    ("POST", "/api/auth/me/totp/recovery-codes", "session"),
+    ("GET", "/api/auth/providers", "public"),
+    ("GET", "/api/maintenance", "public"),  # also in maintenance (plan M9 decision 9)
+    ("GET", "/api/auth/oidc/{key}/start", "public"),
+    ("GET", "/api/auth/oidc/{key}/callback", "public"),
+    ("GET", "/api/auth/me/identities", "session"),
+    ("DELETE", "/api/auth/me/identities/{identity_id}", "session"),
+    ("POST", "/api/auth/me/identities/{key}/link", "session"),
+    ("GET", "/api/auth/me/sessions", "session"),
+    ("POST", "/api/auth/me/sessions/sign-out-others", "session"),
+    ("DELETE", "/api/auth/me/sessions/{session_id}", "session"),
     ("GET", "/api/directory", "session"),
     ("GET", "/api/spaces", "session"),
     ("POST", "/api/spaces", "session"),
@@ -116,7 +144,9 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PATCH", "/api/messages/{message_id}", "message"),
     ("DELETE", "/api/messages/{message_id}", "message"),
     ("GET", "/api/conversations/unread", "session"),
+    ("GET", "/api/conversations/{conversation_id}/read", "conversation"),
     ("POST", "/api/conversations/{conversation_id}/read", "conversation"),
+    ("POST", "/api/conversations/{conversation_id}/fresh-start", "conversation"),
     ("PUT", "/api/messages/{message_id}/reactions/{emoji}", "message"),
     ("DELETE", "/api/messages/{message_id}/reactions/{emoji}", "message"),
     ("GET", "/api/activity", "session"),
@@ -153,6 +183,22 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/spaces/{space_id}/sprints", "space"),
     ("POST", "/api/spaces/{space_id}/sprints", "space"),
     ("PATCH", "/api/sprints/{sprint_id}", "sprint"),
+    ("GET", "/api/calendars", "session"),
+    ("GET", "/api/spaces/{space_id}/calendars", "space"),
+    ("POST", "/api/spaces/{space_id}/calendars", "space"),
+    ("PATCH", "/api/calendars/{calendar_id}", "calendar"),
+    ("DELETE", "/api/calendars/{calendar_id}", "calendar"),
+    ("GET", "/api/admin/calendar-settings", "admin"),
+    ("PUT", "/api/admin/calendar-settings", "admin"),
+    ("POST", "/api/calendars/{calendar_id}/events", "calendar"),
+    ("GET", "/api/calendar/events", "session"),
+    ("GET", "/api/calendar/overlays", "session"),
+    ("GET", "/api/events/{event_id}", "event"),
+    ("PATCH", "/api/events/{event_id}", "event"),
+    ("DELETE", "/api/events/{event_id}", "event"),
+    ("GET", "/api/events/{event_id}/attendees", "event"),
+    ("PUT", "/api/events/{event_id}/attendees", "event"),
+    ("POST", "/api/events/{event_id}/response", "event"),
     ("POST", "/api/sprints/{sprint_id}/start", "sprint"),
     ("POST", "/api/sprints/{sprint_id}/close", "sprint"),
     ("GET", "/api/stream", "session"),  # live delivery (server-sent events)
@@ -161,7 +207,20 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/admin/users", "admin"),
     ("PATCH", "/api/admin/users/{user_id}", "admin"),
     ("POST", "/api/admin/users/{user_id}/deactivate", "admin"),
+    ("POST", "/api/admin/users/{user_id}/sign-out", "admin"),
     ("POST", "/api/admin/users/{user_id}/reactivate", "admin"),
+    ("POST", "/api/admin/users/{user_id}/totp/reset", "admin"),
+    ("GET", "/api/admin/users/pending/count", "admin"),
+    ("POST", "/api/admin/users/{user_id}/approve", "admin"),
+    ("POST", "/api/admin/users/{user_id}/reject", "admin"),
+    ("GET", "/api/admin/users/{user_id}/identities", "admin"),
+    ("DELETE", "/api/admin/users/{user_id}/identities/{identity_id}", "admin"),
+    ("GET", "/api/admin/oidc-providers", "admin"),
+    ("POST", "/api/admin/oidc-providers", "admin"),
+    ("GET", "/api/admin/oidc-providers/{provider_id}", "admin"),
+    ("PATCH", "/api/admin/oidc-providers/{provider_id}", "admin"),
+    ("DELETE", "/api/admin/oidc-providers/{provider_id}", "admin"),
+    ("POST", "/api/admin/oidc-providers/{provider_id}/check", "admin"),
     ("GET", "/api/admin/groups", "admin"),
     ("POST", "/api/admin/groups", "admin"),
     ("GET", "/api/admin/groups/{group_id}", "admin"),
@@ -198,6 +257,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PATCH", "/api/ai/oauth-clients/{client_id}", "ai"),
     ("DELETE", "/api/ai/oauth-clients/{client_id}", "ai"),
     ("GET", "/api/ai/oauth/callback", "public"),
+    ("GET", "/api/ai/oauth/{client_id}/callback", "public"),
     ("GET", "/api/ai/my-mcp-servers", "ai"),
     ("GET", "/api/ai/mcp-servers", "ai"),
     ("POST", "/api/ai/mcp-servers", "ai"),
@@ -293,6 +353,14 @@ ROUTES: list[tuple[str, str, str]] = [
     ("DELETE", "/api/automations/{automation_id}", "automation"),
     ("POST", "/api/automations/{automation_id}/run", "automation"),
     ("POST", "/api/automations/{automation_id}/take-over", "automation"),
+    ("GET", "/api/backups", "backup"),
+    ("POST", "/api/backups", "backup"),
+    ("GET", "/api/backups/restore", "backup"),
+    ("GET", "/api/backups/archives", "backup"),
+    ("POST", "/api/backups/archives", "backup"),
+    ("GET", "/api/backups/archives/{name}", "backup"),
+    ("POST", "/api/backups/archives/{name}/check", "backup"),
+    ("POST", "/api/backups/archives/{name}/replace", "backup"),
 ]
 
 
@@ -306,6 +374,8 @@ def concrete(
     sprint_id: object | None = None,
     proposal_id: object | None = None,
     skill_id: object | None = None,
+    calendar_id: object | None = None,
+    event_id: object | None = None,
 ) -> str:
     versioned_delete = template in (
         "/api/ai/connections/{connection_id}",
@@ -317,6 +387,8 @@ def concrete(
         "/api/ai/budgets/{budget_id}",
         "/api/agents/{agent_id}",
         "/api/automations/{automation_id}",
+        "/api/calendars/{calendar_id}",
+        "/api/events/{event_id}",  # GET and PATCH ignore the query
     )
     ids = {
         "{message_id}": str(message_id or uuid7()),
@@ -343,6 +415,8 @@ def concrete(
         "{server_id}": str(uuid7()),
         "{tool_id}": str(uuid7()),
         "{sprint_id}": str(sprint_id or uuid7()),
+        "{calendar_id}": str(calendar_id or uuid7()),
+        "{event_id}": str(event_id or uuid7()),
         "{agent_id}": str(uuid7()),
         "{run_id}": str(uuid7()),
         "{approval_id}": str(uuid7()),
@@ -351,6 +425,10 @@ def concrete(
         "{skill_id}": str(skill_id or uuid7()),
         "{budget_id}": str(uuid7()),
         "{automation_id}": str(uuid7()),
+        "{key}": "google",
+        "{identity_id}": str(uuid7()),
+        "{provider_id}": str(uuid7()),
+        "{name}": "herd-20261116T080000Z-1.0.0.tar",
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -359,6 +437,8 @@ def concrete(
         "/diff": "?from=1&to=1",
         "/attachments": "?filename=x.txt",
         "/dm-inspect": f"?user_id={uuid7()}",
+        "/calendar/events": "?from=2026-11-23T00:00:00Z&to=2026-11-24T00:00:00Z",
+        "/calendar/overlays": "?from=2026-11-23&to=2026-11-24",
     }
     if "/ticket-statuses/" in template or versioned_delete:
         return template + "?version=1"
@@ -368,6 +448,7 @@ def concrete(
 # A valid body for every route that takes one, so the guard is what answers.
 BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PATCH", "/api/spaces/{space_id}"): {"name": "X", "version": 1},
+    ("POST", "/api/backups/archives/{name}/replace"): {"confirm": "X"},
     ("PUT", "/api/spaces/{space_id}/members"): {
         "member_type": "user",
         "member_id": str(uuid7()),
@@ -394,6 +475,7 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/conversations/{conversation_id}/messages"): {"body_md": "x"},
     ("PATCH", "/api/messages/{message_id}"): {"body_md": "x"},
     ("POST", "/api/conversations/{conversation_id}/read"): {"message_id": str(uuid7())},
+    ("POST", "/api/conversations/{conversation_id}/fresh-start"): {"version": 1},
     ("POST", "/api/spaces/{space_id}/tickets"): {"title": "X"},
     ("PATCH", "/api/tickets/{number}"): {"title": "X", "version": 1},
     ("PUT", "/api/tickets/{number}/tags"): {"tag_ids": [], "version": 1},
@@ -406,6 +488,17 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
         "ends_on": "2026-11-27",
     },
     ("PATCH", "/api/sprints/{sprint_id}"): {"name": "X", "version": 1},
+    ("POST", "/api/spaces/{space_id}/calendars"): {"name": "X"},
+    ("PATCH", "/api/calendars/{calendar_id}"): {"name": "X", "version": 1},
+    ("PUT", "/api/admin/calendar-settings"): {"sync_enabled": True, "version": 1},
+    ("POST", "/api/calendars/{calendar_id}/events"): {
+        "title": "X",
+        "starts_at": "2026-11-23T10:00:00Z",
+        "ends_at": "2026-11-23T11:00:00Z",
+    },
+    ("PATCH", "/api/events/{event_id}"): {"title": "X", "version": 1},
+    ("PUT", "/api/events/{event_id}/attendees"): {"version": 1, "attendees": []},
+    ("POST", "/api/events/{event_id}/response"): {"response": "accepted", "version": 1},
     ("POST", "/api/sprints/{sprint_id}/start"): {"version": 1},
     ("POST", "/api/sprints/{sprint_id}/close"): {"version": 1, "move_open_to": "backlog"},
     ("POST", "/api/ai/connections"): {"name": "X"},

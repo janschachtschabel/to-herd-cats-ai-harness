@@ -1,8 +1,10 @@
-"""The internal collab API (plan M2 task 8): the collab process authenticates live
-editors, loads and saves pages through it; a Markdown save ends the live session's
-generation. Revocation and ended generations: `test_wiki_collab_revocation.py`."""
+"""The internal collab API (plan M2 task 8, plan M9 task 6): the collab process admits
+live editors by the grants the relay issued, loads and saves pages through it; a
+Markdown save ends the live session's generation. Revocation and ended generations:
+`test_wiki_collab_revocation.py`; the grants themselves: `test_collab_grants.py`."""
 
 from datetime import timedelta
+from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
@@ -11,6 +13,8 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.errors import AppError
+from app.modules.wiki.collab_service import CollabService
 from app.modules.wiki.models import PageVersion
 from tests.factories_collab import (
     HEADER,
@@ -18,8 +22,9 @@ from tests.factories_collab import (
     collab_auth,
     expect_error,
     get_page,
+    grant_of,
+    load,
     put_live,
-    session_id_of,
     ydoc,
 )
 from tests.factories_wiki import Wiki, new_page, publish
@@ -28,7 +33,7 @@ from tests.factories_wiki import Wiki, new_page, publish
 async def test_internal_routes_need_token(
     internal: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    body = {"session_token": "x", "page_id": "01a1d2d9-2de5-75db-9dc6-a6fa1307273d"}
+    body = {"grant": "x", "page_id": "01a1d2d9-2de5-75db-9dc6-a6fa1307273d", "generation": 0}
     monkeypatch.setattr(get_settings(), "internal_token", None)
     r = await internal.post("/internal/collab/auth", json=body, headers={HEADER: TOKEN})
     expect_error(r, 503, "internal.disabled")
@@ -37,7 +42,7 @@ async def test_internal_routes_need_token(
         r = await internal.post("/internal/collab/auth", json=body, headers=headers)
         expect_error(r, 401, "internal.unauthorized")
     r = await internal.post("/internal/collab/auth", json=body, headers={HEADER: TOKEN})
-    expect_error(r, 401, "collab.session_invalid")
+    expect_error(r, 401, "collab.grant_invalid")
     # Probes and metrics need no token.
     for path in ("/health", "/metrics"):
         assert (await internal.get(path)).status_code == 200
@@ -53,42 +58,63 @@ def test_a_short_internal_token_is_refused() -> None:
     assert Settings(internal_token=SecretStr("")).internal_token is None
 
 
-async def test_auth_answers_editor_and_denies_viewer_and_hidden_page(
-    wiki: Wiki, collab: AsyncClient
+async def test_the_relay_admits_editors_only_and_auth_answers_the_grants_person(
+    wiki: Wiki, collab: AsyncClient, session: AsyncSession
 ) -> None:
     page = await publish(wiki.editor, await new_page(wiki.editor, wiki.space_id, "Live"))
-    r = await collab_auth(collab, wiki.editor, page)
+    grant = await grant_of(session, wiki.editor, page)
+    r = await collab_auth(collab, grant, page)
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["user"] == {"id": str(wiki.users["editor"].id), "name": "Wiki editor"}
     assert (body["generation"], body["can_edit"]) == (0, True)
-    assert body["session_id"]
-    expect_error(await collab_auth(collab, wiki.viewer, page), 403, "auth.permission_denied")
-    expect_error(await collab_auth(collab, wiki.outsider, page), 404, "page.not_found")
-    r = await collab.post(
-        "/internal/collab/auth", json={"session_token": "nope", "page_id": page["id"]}
-    )
-    expect_error(r, 401, "collab.session_invalid")
+    # The login session by an opaque name, the same for each of its grants.
+    again = (await collab_auth(collab, await grant_of(session, wiki.editor, page), page)).json()
+    other = (await collab_auth(collab, await grant_of(session, wiki.editor2, page), page)).json()
+    assert body["session_ref"] == again["session_ref"] != other["session_ref"]
+    assert len(body["session_ref"]) == 32
+    # The relay issues grants only to editors of a page they can see.
+    for client, page_, code in (
+        (wiki.viewer, page, "auth.permission_denied"),
+        (wiki.outsider, page, "page.not_found"),
+    ):
+        with pytest.raises(AppError) as refused:
+            await grant_of(session, client, page_)
+        assert refused.value.code == code
+    with pytest.raises(AppError) as refused:
+        await CollabService(session).admit("nope", UUID(page["id"]), 0)
+    assert refused.value.code == "collab.session_invalid"
+    with pytest.raises(AppError) as refused:
+        await grant_of(session, wiki.editor, page, generation=1)
+    assert refused.value.code == "collab.generation_ended"
     draft = await new_page(wiki.editor, wiki.space_id, "Entwurf")
-    expect_error(await collab_auth(collab, wiki.viewer, draft), 404, "page.not_found")
+    with pytest.raises(AppError) as refused:
+        await grant_of(session, wiki.viewer, draft)
+    assert refused.value.code == "page.not_found"
+    # A grant issued before the page went to the trash admits nothing any more.
     r = await wiki.moderator.post(
         f"/api/pages/{page['id']}/trash", json={"version": page["version"]}
     )
     assert r.status_code == 204
-    expect_error(await collab_auth(collab, wiki.editor, page), 404, "page.not_found")
+    expect_error(await collab_auth(collab, grant, page), 404, "page.not_found")
 
 
 async def test_get_returns_content_and_ydoc_of_the_current_generation_only(
-    wiki: Wiki, collab: AsyncClient
+    wiki: Wiki, collab: AsyncClient, session: AsyncSession
 ) -> None:
     page = await new_page(wiki.editor, wiki.space_id, "Live", content_md="# Start")
-    sid = await session_id_of(collab, wiki.editor, page)
-    url = f"/internal/collab/pages/{page['id']}"
-    r = await collab.get(url, params={"session_id": sid, "generation": 0})
+    sid = await grant_of(session, wiki.editor, page)
+    r = await load(collab, sid, page)
     assert r.status_code == 200, r.text
-    assert r.json() == {"generation": 0, "ydoc_b64": None, "content_md": "# Start", "title": "Live"}
+    assert r.json() == {
+        "generation": 0,
+        "ydoc_b64": None,
+        "content_md": "# Start",
+        "title": "Live",
+        "epoch": None,  # no instance named: a collab process of 1.0.0
+    }
     assert (await put_live(collab, page, [sid], ydoc_b64=ydoc(b"yjs"))).status_code == 200
-    r = await collab.get(url, params={"session_id": sid, "generation": 0})
+    r = await load(collab, sid, page)
     assert r.json()["ydoc_b64"] == ydoc(b"yjs") and r.json()["content_md"] == "live"
     # Saved in Markdown mode: a new generation, the old live state is not handed out.
     fresh = await get_page(wiki.editor, page)
@@ -96,33 +122,27 @@ async def test_get_returns_content_and_ydoc_of_the_current_generation_only(
         f"/api/pages/{page['id']}", json={"content_md": "markdown", "version": fresh["version"]}
     )
     assert r.json()["collab_generation"] == 1
-    r = await collab.get(url, params={"session_id": sid, "generation": 1})
+    r = await load(collab, await grant_of(session, wiki.editor, page, 1), page, 1)
     assert r.json() == {
         "generation": 1,
         "ydoc_b64": None,
         "content_md": "markdown",
         "title": "Live",
+        "epoch": None,
     }
-    expect_error(
-        await collab.get(url, params={"session_id": sid, "generation": 0}),
-        409,
-        "collab.generation_ended",
-    )
-    # A session loads only pages its person may edit.
-    space = (await wiki.admin.post("/api/spaces", json={"name": "Fremd", "kind": "team"})).json()
-    foreign = await new_page(wiki.admin, space["id"], "Fremd")
-    r = await collab.get(f"/internal/collab/pages/{foreign['id']}", params={"session_id": sid})
-    expect_error(r, 404, "page.not_found")
+    expect_error(await load(collab, sid, page), 409, "collab.generation_ended")
+    # A grant loads only while its person may edit the page.
     published = await publish(wiki.editor, await new_page(wiki.editor, wiki.space_id, "Offen"))
+    held = await grant_of(session, wiki.editor, published)
     r = await wiki.admin.put(
         f"/api/spaces/{wiki.space_id}/members",
         json={"member_type": "user", "member_id": str(wiki.users["editor"].id), "role": "viewer"},
     )
     assert r.status_code == 200, r.text
-    r = await collab.get(f"/internal/collab/pages/{published['id']}", params={"session_id": sid})
-    expect_error(r, 403, "auth.permission_denied")
-    r = await collab.get(url, params={"session_id": "01a1d2d9-2de5-75db-9dc6-a6fa1307273d"})
-    expect_error(r, 401, "collab.session_invalid")
+    expect_error(await load(collab, held, published), 403, "auth.permission_denied")
+    expect_error(await load(collab, "herd_cg_" + "x" * 43, page, 1), 401, "collab.grant_invalid")
+    r = await collab.get(f"/internal/collab/pages/{page['id']}", params={"generation": 1})
+    expect_error(r, 422, "validation_failed")  # no grant at all
 
 
 async def test_markdown_save_ends_generation(wiki: Wiki) -> None:
@@ -141,9 +161,11 @@ async def test_markdown_save_ends_generation(wiki: Wiki) -> None:
     assert r.json()["collab_generation"] == 1  # nothing changed, nothing ended
 
 
-async def test_put_saves_without_ending_the_generation(wiki: Wiki, collab: AsyncClient) -> None:
+async def test_put_saves_without_ending_the_generation(
+    wiki: Wiki, collab: AsyncClient, session: AsyncSession
+) -> None:
     page = await new_page(wiki.editor, wiki.space_id, "Live", content_md="a")
-    sid = await session_id_of(collab, wiki.editor, page)
+    sid = await grant_of(session, wiki.editor, page)
     r = await put_live(collab, page, [sid], content_md="# Live\n\nText")
     assert r.status_code == 200, r.text
     after = await get_page(wiki.editor, page)
@@ -161,8 +183,8 @@ async def test_put_creates_coalesced_collab_versions_per_author(
     wiki: Wiki, collab: AsyncClient, session: AsyncSession
 ) -> None:
     page = await new_page(wiki.editor, wiki.space_id, "Live", content_md="v1")
-    editor = await session_id_of(collab, wiki.editor, page)
-    editor2 = await session_id_of(collab, wiki.editor2, page)
+    editor = await grant_of(session, wiki.editor, page)
+    editor2 = await grant_of(session, wiki.editor2, page)
     for text in ("a", "ab", "abc"):
         assert (await put_live(collab, page, [editor], content_md=text)).status_code == 200
     versions_url = f"/api/pages/{page['id']}/versions"
@@ -197,9 +219,9 @@ async def test_put_creates_coalesced_collab_versions_per_author(
     assert numbers == [5, 4, 3, 2, 1]
 
 
-async def test_ydoc_over_5mb_is_413(wiki: Wiki, collab: AsyncClient) -> None:
+async def test_ydoc_over_5mb_is_413(wiki: Wiki, collab: AsyncClient, session: AsyncSession) -> None:
     page = await new_page(wiki.editor, wiki.space_id, "Live")
-    sid = await session_id_of(collab, wiki.editor, page)
+    sid = await grant_of(session, wiki.editor, page)
     big = ydoc(b"\x00" * (5 * 1024 * 1024 + 1))
     expect_error(await put_live(collab, page, [sid], ydoc_b64=big), 413, "collab.state_too_large")
     ok = ydoc(b"\x00" * (5 * 1024 * 1024))
@@ -209,29 +231,38 @@ async def test_ydoc_over_5mb_is_413(wiki: Wiki, collab: AsyncClient) -> None:
     expect_error(await put_live(collab, page, [sid], ydoc_b64=huge), 413, "collab.state_too_large")
 
 
-async def test_markdown_over_the_page_limit_is_413(wiki: Wiki, collab: AsyncClient) -> None:
+async def test_markdown_over_the_page_limit_is_413(
+    wiki: Wiki, collab: AsyncClient, session: AsyncSession
+) -> None:
     """Review M2 R8: the live editor says the page is too large, not "not found"."""
     page = await new_page(wiki.editor, wiki.space_id, "Live")
-    sid = await session_id_of(collab, wiki.editor, page)
+    sid = await grant_of(session, wiki.editor, page)
     r = await put_live(collab, page, [sid], content_md="x" * 200_001)
     expect_error(r, 413, "collab.state_too_large")
     assert (await put_live(collab, page, [sid], content_md="x" * 200_000)).status_code == 200
 
 
-async def test_put_refuses_bad_input(wiki: Wiki, collab: AsyncClient) -> None:
+async def test_put_refuses_bad_input(
+    wiki: Wiki, collab: AsyncClient, session: AsyncSession
+) -> None:
     page = await new_page(wiki.editor, wiki.space_id, "Live")
-    sid = await session_id_of(collab, wiki.editor, page)
+    sid = await grant_of(session, wiki.editor, page)
     expect_error(
         await put_live(collab, page, [sid], ydoc_b64="!!notbase64"), 422, "collab.state_invalid"
     )
     expect_error(await put_live(collab, page, []), 422, "validation_failed")
 
 
-async def test_saves_are_counted(wiki: Wiki, collab: AsyncClient) -> None:
+async def test_saves_are_counted(wiki: Wiki, collab: AsyncClient, session: AsyncSession) -> None:
     page = await new_page(wiki.editor, wiki.space_id, "Live")
-    sid = await session_id_of(collab, wiki.editor, page)
+    sid = await grant_of(session, wiki.editor, page)
     await put_live(collab, page, [sid])
-    await put_live(collab, page, [sid], generation=7)
+    fresh = await get_page(wiki.editor, page)
+    r = await wiki.editor.patch(
+        f"/api/pages/{page['id']}", json={"content_md": "md", "version": fresh["version"]}
+    )
+    assert r.json()["collab_generation"] == 1
+    await put_live(collab, page, [sid])  # the grant's generation has ended
     text = (await collab.get("/metrics")).text
     assert 'herd_collab_saves_total{result="saved"}' in text
     assert 'herd_collab_saves_total{result="generation_ended"}' in text

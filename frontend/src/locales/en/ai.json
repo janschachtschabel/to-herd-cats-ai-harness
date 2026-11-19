@@ -358,7 +358,14 @@
     "personalMark": {
       "short": "Personal",
       "title": "Personal: for you alone",
-      "text": "This message holds what you read through your own access, or it came about in a conversation that held it. It stays with you: while such a message is in the history the agent is given, it puts anything it wants to write elsewhere to you for release first."
+      "text": "This message holds what you read through your own access, or it came about in a conversation that held it. It stays with you: while such a message is in the history the agent is given, it puts anything it wants to write elsewhere to you for release first. With “Start afresh” at the top of your conversation alone with the agent you draw a line: after it the agent gets nothing from before (no history, no hits from earlier runs), and the mark ends for new runs. What you released for it to remember stays."
+    },
+    "freshStart": {
+      "action": "Start afresh",
+      "title": "Start afresh?",
+      "text": "From now on {{agent}} gets nothing in this conversation of what came before: no history from before this point, and neither reading the conversation nor searching its earlier runs (from other conversations too) finds anything from before. What you released for it to remember stays in its memory. The “Personal” mark ends with it for new runs. Work {{agent}} is doing in this conversation is cancelled; a notice shows it. The messages stay visible to you.",
+      "marker": "Started afresh on {{when}}",
+      "markerText": "{{agent}} gets nothing more of what is above: not in its history, not by reading the conversation, not by searching earlier runs. What you released for it to remember stays."
     }
   },
   "errors": {

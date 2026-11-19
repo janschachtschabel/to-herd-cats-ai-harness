@@ -16,7 +16,8 @@ rights of the person who asked, written for the agent (`by`, plan M6 task 6): th
 message is the agent's (`kind=agent`, its run in `run_id`, a `client_id` from the
 tool call), mentions nobody and starts no run. A person's message through an access
 token at `/mcp` (`by` with `via_token`, plan M8) is the person's (`kind=human`) with the
-token's name, and likewise mentions nobody and starts no run. Every change is emitted
+token's name, and likewise mentions nobody and starts no run. A person's message in
+a DM is dated after its fresh start (`dating.py`). Every change is emitted
 (`message.created|updated|deleted`, payload ids only) in its transaction; message
 text never goes into events or logs.
 """
@@ -35,8 +36,8 @@ from app.core.models_base import utcnow
 from app.core.outbox import emit
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.modules.audit.recorder import record
+from app.modules.messaging import dating, threads
 from app.modules.messaging import mentions as mentioning
-from app.modules.messaging import threads
 from app.modules.messaging.agent_hooks import RunStart, agent_hooks
 from app.modules.messaging.dm_repository import DmRepository, InspectionNote, Participant
 from app.modules.messaging.message_repository import MessageRepository
@@ -159,7 +160,7 @@ class MessageService:
                 "run_id": by.run_id if by else None,
                 "via_token": by.via_token if by else None,
                 "personal": personal,
-                "created_at": utcnow(),
+                "created_at": await dating.dated(repo, conversation, person=by is None),
             }
         )
         if message is None:  # only with a client_id: its author sent it before

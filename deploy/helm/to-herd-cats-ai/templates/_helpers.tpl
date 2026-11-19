@@ -36,10 +36,12 @@ app.kubernetes.io/part-of: to-herd-cats-ai
 {{- end -}}
 {{- end -}}
 
-{{/* The database URL without password: the bundled PostgreSQL or database.url. */}}
+{{/* The database URL without password: the bundled PostgreSQL (as herd_owner, the
+role the migration job's db-owner step makes: owner of the database, no superuser)
+or database.url. */}}
 {{- define "herd.databaseUrl" -}}
 {{- if .Values.postgresql.enabled -}}
-{{- printf "postgresql+asyncpg://herd@%s-postgresql:5432/herd" (include "herd.fullname" .) -}}
+{{- printf "postgresql+asyncpg://herd_owner@%s-postgresql:5432/herd" (include "herd.fullname" .) -}}
 {{- else -}}
 {{- $url := required "database.url is required when postgresql.enabled is false" .Values.database.url -}}
 {{- if regexMatch "://[^/@]*:[^/@]*@" $url -}}
@@ -49,13 +51,20 @@ app.kubernetes.io/part-of: to-herd-cats-ai
 {{- end -}}
 {{- end -}}
 
-{{/* The Secret holding the database password (key "password"), or "" for none. */}}
+{{/* The Secret holding the app's database password (key: herd.databasePasswordKey),
+or "" for none. */}}
 {{- define "herd.databaseSecret" -}}
 {{- if .Values.database.existingSecret -}}
 {{- .Values.database.existingSecret -}}
 {{- else if .Values.postgresql.enabled -}}
 {{- printf "%s-postgresql" (include "herd.fullname" .) -}}
 {{- end -}}
+{{- end -}}
+
+{{/* The key of the app's password in herd.databaseSecret: "owner-password" (herd_owner)
+with the bundled PostgreSQL, whose "password" is its superuser's; else "password". */}}
+{{- define "herd.databasePasswordKey" -}}
+{{- if .Values.postgresql.enabled -}}owner-password{{- else -}}password{{- end -}}
 {{- end -}}
 
 {{/* Pod Security "restricted" for the app pods (image user 10001). */}}
@@ -89,6 +98,9 @@ seccompProfile:
 - name: HERD_DATABASE_PASSWORD_FILE
   value: /var/run/secrets/herd/database/password
 {{- end }}
+{{- with include "herd.databaseTlsEnv" $root }}
+{{ . }}
+{{- end }}
 {{- end -}}
 
 {{/* Environment shared by the API and the migration job; `role` is api or migrate. */}}
@@ -105,7 +117,29 @@ seccompProfile:
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: {{ . | quote }}
 {{- end }}
-{{- range $name, $value := $root.Values.api.env }}
+{{- end -}}
+
+{{/* A container's environment: the chart's own entries (`own`, a rendered list), then
+the values' extra map (`extra`, named `where`). The render fails for an extra name that
+names a secret (PASSWORD, SECRET, TOKEN, EGRESS_PROXY, OFFSITE) or that the chart sets
+itself, in any case (the app reads its settings case-insensitively, and the last of two
+entries would win): secrets come from Secrets, the chart's settings from its values. */}}
+{{- define "herd.withExtraEnv" -}}
+{{- $taken := dict -}}
+{{- range regexFindAll "(?m)^- name: \\S+" .own -1 }}
+{{- $_ := set $taken (upper (trimPrefix "- name: " .)) true -}}
+{{- end }}
+{{- range $name, $value := .extra }}
+{{- if regexMatch "PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE" (upper $name) }}
+{{- fail (printf "%s.%s names a secret: it comes from a Secret, never from values" $.where $name) }}
+{{- end }}
+{{- if hasKey $taken (upper $name) }}
+{{- fail (printf "%s.%s is set by the chart itself (or twice): use the chart's value for it" $.where $name) }}
+{{- end }}
+{{- $_ := set $taken (upper $name) true -}}
+{{- end }}
+{{- .own }}
+{{- range $name, $value := .extra }}
 - name: {{ $name }}
   value: {{ $value | quote }}
 {{- end }}
@@ -114,16 +148,35 @@ seccompProfile:
 {{/* Volumes of the app pods: a writable /tmp and the database password file
 (the files volume /data is the API's alone, see deployment-api.yaml). */}}
 {{- define "herd.volumes" -}}
+{{- include "herd.volumesSized" (dict "root" . "tmpSizeLimit" "") -}}
+{{- end -}}
+
+{{/* herd.volumes with a sizeLimit on /tmp ("" for none): dict root, tmpSizeLimit. */}}
+{{- define "herd.volumesSized" -}}
 - name: tmp
+{{- if .tmpSizeLimit }}
+  emptyDir:
+    sizeLimit: {{ .tmpSizeLimit }}
+{{- else }}
   emptyDir: {}
-{{- with include "herd.databaseSecret" . }}
+{{- end }}
+{{- with include "herd.databaseSecret" .root }}
 - name: database-password
   secret:
     secretName: {{ . }}
     defaultMode: 0440
     items:
-      - key: password
+      - key: {{ include "herd.databasePasswordKey" $.root }}
         path: password
+{{- end }}
+{{- with .root.Values.database.caSecret }}
+- name: database-ca
+  secret:
+    secretName: {{ . }}
+    defaultMode: 0444
+    items:
+      - key: ca.crt
+        path: ca.crt
 {{- end }}
 {{- end -}}
 
@@ -133,6 +186,11 @@ seccompProfile:
 {{- if include "herd.databaseSecret" . }}
 - name: database-password
   mountPath: /var/run/secrets/herd/database
+  readOnly: true
+{{- end }}
+{{- if .Values.database.caSecret }}
+- name: database-ca
+  mountPath: /var/run/secrets/herd/database-ca
   readOnly: true
 {{- end }}
 {{- end -}}
@@ -168,6 +226,17 @@ seccompProfile:
       key: token
 {{- end -}}
 
+{{/* During a rotation, the token before it (key "previous", optional): the API alone
+accepts it beside the current one; the collab process sends only the current one. */}}
+{{- define "herd.internalTokenPreviousEnv" -}}
+- name: HERD_INTERNAL_TOKEN_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "herd.internalTokenSecret" . }}
+      key: previous
+      optional: true
+{{- end -}}
+
 {{/* AI settings of the API pods (connection tests, personal agents, automations). */}}
 {{- define "herd.aiApiEnv" -}}
 - name: HERD_AI_CHECK_TIMEOUT_SECONDS
@@ -185,6 +254,14 @@ seccompProfile:
 - name: HERD_MCP_CATALOG_DIR
   value: {{ ternary (include "herd.mcpCatalogDir" .) "" (ne .Values.mcp.catalogConfigMap "") | quote }}
 {{ include "herd.mcpServersEnv" . }}
+{{- end -}}
+
+{{/* Sign-in through OIDC (API pods: start, callback, discovery, keys). */}}
+{{- define "herd.oidcApiEnv" -}}
+- name: HERD_OIDC_ALLOWED_HOSTS
+  value: {{ join "," .Values.oidc.allowedHosts | quote }}
+- name: HERD_OIDC_RATE_PER_MINUTE
+  value: {{ .Values.oidc.ratePerMinute | quote }}
 {{- end -}}
 
 {{/* Where the operator's catalogue entries (mcp.catalogConfigMap) are mounted. */}}
@@ -213,4 +290,145 @@ seccompProfile:
 - name: HERD_MCP_MAX_CALLS_PER_RUN
   value: {{ .Values.mcp.maxCallsPerRun | quote }}
 {{ include "herd.mcpServersEnv" . }}
+{{- end -}}
+
+{{/* The API container's own environment (api.env comes after, herd.withExtraEnv). */}}
+{{- define "herd.apiOwnEnv" -}}
+{{ include "herd.env" (dict "root" . "role" "api") }}
+{{ include "herd.aiApiEnv" . }}
+# The administration's archive uploads (docs/SICHERUNG.md).
+- name: HERD_BACKUP_UPLOAD_MAX_BYTES
+  value: {{ .Values.backup.uploadMaxBytes | int64 | quote }}
+{{ include "herd.mcpApiEnv" . }}
+{{ include "herd.oidcApiEnv" . }}
+{{ include "herd.securityApiEnv" . }}
+{{- with include "herd.s3Env" . }}
+{{ . }}
+{{- end }}
+{{- if include "herd.publicUrl" . }}
+{{ include "herd.publicUrlEnv" . }}
+{{- end }}
+{{- if .Values.collab.enabled }}
+# Live editing: /collab/ WebSockets are checked here and relayed to the collab
+# pod that owns the page (each announces its address), which calls back on the
+# internal port with the token.
+{{ include "herd.internalTokenEnv" . }}
+{{ include "herd.internalTokenPreviousEnv" . }}
+{{- end }}
+{{- end -}}
+
+{{/* The worker container's own environment (worker.env comes after). */}}
+{{- define "herd.workerOwnEnv" -}}
+{{ include "herd.databaseEnv" (dict "root" . "role" "worker") }}
+{{- with .Values.tracing.otlpEndpoint }}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ . | quote }}
+{{- end }}
+{{ include "herd.aiWorkerEnv" . }}
+{{ include "herd.mcpWorkerEnv" . }}
+{{ include "herd.securityWorkerEnv" . }}
+{{- with include "herd.s3Env" . }}
+{{ . }}
+{{- end }}
+# The backups' gauges (docs/SICHERUNG.md): HerdBackupTooOld's limit.
+- name: HERD_BACKUP_ALERT_AFTER_HOURS
+  value: {{ .Values.backup.alertAfterHours | quote }}
+{{- end -}}
+
+{{/* The collab container's own environment (collab.env comes after). */}}
+{{- define "herd.collabOwnEnv" -}}
+- name: HERD_ROLE
+  value: collab
+- name: HERD_COLLAB_PORT
+  value: "1234"
+# The API's internal port (/internal/collab/*), guarded by the token.
+- name: HERD_COLLAB_API_URL
+  value: {{ printf "http://%s-internal:9090" (include "herd.fullname" .) | quote }}
+# Where the API's relay reaches this pod: it announces itself there (plan M9
+# decision 17). The pod IP comes from the Downward API.
+- name: HERD_COLLAB_POD_IP
+  valueFrom:
+    fieldRef:
+      fieldPath: status.podIP
+- name: HERD_COLLAB_ADVERTISE_URL
+  value: "ws://$(HERD_COLLAB_POD_IP):1234"
+{{ include "herd.internalTokenEnv" . }}
+{{- if include "herd.publicUrl" . }}
+{{ include "herd.publicUrlEnv" . }}
+{{- end }}
+{{- end -}}
+
+{{/* Attachments in S3 (s3.*, plan M9 decision 18): the settings of the API, worker
+and backup pods. The access key comes from the Secret by reference, the secret key as a
+file (HERD_S3_SECRET_ACCESS_KEY_FILE); neither is ever a value. */}}
+{{- define "herd.s3Env" -}}
+{{- if .Values.s3.enabled -}}
+{{- $secret := required "s3.existingSecret is required with s3.enabled (keys access-key-id and secret-access-key)" .Values.s3.existingSecret -}}
+- name: HERD_STORAGE
+  value: s3
+- name: HERD_S3_ENDPOINT
+  value: {{ required "s3.endpoint is required with s3.enabled" .Values.s3.endpoint | quote }}
+- name: HERD_S3_REGION
+  value: {{ .Values.s3.region | quote }}
+- name: HERD_S3_BUCKET
+  value: {{ required "s3.bucket is required with s3.enabled" .Values.s3.bucket | quote }}
+{{- with .Values.s3.prefix }}
+- name: HERD_S3_PREFIX
+  value: {{ . | quote }}
+{{- end }}
+- name: HERD_S3_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: {{ $secret }}
+      key: access-key-id
+- name: HERD_S3_SECRET_ACCESS_KEY_FILE
+  value: /var/run/secrets/herd/s3/secret-access-key
+{{- end }}
+{{- end -}}
+
+{{- define "herd.s3Volume" -}}
+{{- if .Values.s3.enabled -}}
+- name: s3-secret
+  secret:
+    secretName: {{ .Values.s3.existingSecret }}
+    defaultMode: 0440
+    items:
+      - key: secret-access-key
+        path: secret-access-key
+{{- end }}
+{{- end -}}
+
+{{- define "herd.s3VolumeMount" -}}
+{{- if .Values.s3.enabled -}}
+- name: s3-secret
+  mountPath: /var/run/secrets/herd/s3
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/* Whether the API and worker pods mount the backups claim on /backups, for the
+administration's page: with backup.enabled, on a ReadWriteMany claim the chart creates
+or an existing claim (the operator's to make reachable). "true" or "". */}}
+{{- define "herd.backupsShared" -}}
+{{- $b := .Values.backup -}}
+{{- if and $b.enabled (or $b.persistence.existingClaim (has "ReadWriteMany" $b.persistence.accessModes)) -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/* The backups claim's volume and mount for the API and worker pods (herd.backupsShared). */}}
+{{- define "herd.backupsVolume" -}}
+{{- if include "herd.backupsShared" . -}}
+- name: backups
+  persistentVolumeClaim:
+    claimName: {{ .Values.backup.persistence.existingClaim | default (printf "%s-backups" (include "herd.fullname" .)) }}
+{{- end -}}
+{{- end -}}
+
+{{- define "herd.backupsVolumeMount" -}}
+{{- if include "herd.backupsShared" . -}}
+# The archives, for the administration's page (Verwaltung → Sicherung).
+- name: backups
+  mountPath: /backups
+{{- end -}}
 {{- end -}}

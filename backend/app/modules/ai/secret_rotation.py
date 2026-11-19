@@ -1,7 +1,8 @@
 """Re-encrypting stored secrets under the current `HERD_SECRET_KEY` (docs/KI.md):
 with the old key in `HERD_SECRET_KEY_PREVIOUS`, every `enc:` reference (AI
 connections; connectors, shared and personal, with their OAuth access and refresh
-tokens; OAuth client secrets; open OAuth flows' verifiers) is rotated in one
+tokens; OAuth client secrets; open OAuth flows' verifiers; OIDC providers' client
+secrets; people's TOTP secrets) is rotated in one
 transaction; if any cannot be decrypted, nothing changes. The values are never shown;
 a failure names only the table and the row's id."""
 
@@ -13,6 +14,8 @@ from app.core import secrets
 from app.modules.ai.repository import encrypted_connections
 from app.modules.connectors.repository import encrypted_connectors
 from app.modules.oauth.repository import all_flows, encrypted_clients
+from app.modules.oidc.repository import encrypted_providers
+from app.modules.totp.repository import all_totps
 
 
 class RotationFailed(Exception):  # noqa: N818
@@ -48,6 +51,15 @@ async def rotate_secrets(session: AsyncSession) -> int:
         count += 1
     for flow in await all_flows(session):
         flow.verifier_ref = _rotated("oauth_flow", flow.id, flow.verifier_ref)
+        count += 1
+    for provider in await encrypted_providers(session):
+        assert provider.client_secret_ref is not None
+        provider.client_secret_ref = _rotated(
+            "oidc_provider", provider.id, provider.client_secret_ref
+        )
+        count += 1
+    for totp in await all_totps(session):
+        totp.secret_ref = _rotated("user_totp", totp.id, totp.secret_ref)
         count += 1
     await session.flush()
     return count

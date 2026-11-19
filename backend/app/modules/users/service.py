@@ -1,9 +1,16 @@
-"""People administration: create, change, deactivate, reactivate, list.
+"""People administration: create, change, deactivate, reactivate, list, and the
+decision on a self-registered account awaiting approval (plan M9 task 5b: approve lets
+the person in as the member they registered as; reject deletes the account, which was
+never active, with what signing up created, so its address is free again (module
+review M9a, N4); either needs the version read, 409 otherwise, and an owner for a
+waiting account made owner). A waiting account is approved, never reactivated
+(`users.awaiting_approval`), so every way in leaves its audit entry.
 
 Every change is audited in the transaction that makes it. Writes for one organisation
 are serialised (`lock_admin_writes`), so the version check, the email check and the
-last-owner rule hold under concurrent requests. A new password is hashed before that
-lock, with no database connection held (`_hash`). Only an owner grants or revokes the
+last-owner rule hold under concurrent requests. A new password is refused when it is
+easy to guess (`core/password_check.py`) and hashed before that lock, with no database
+connection held (`_hash`). Only an owner grants or revokes the
 owner role, and only an owner changes an owner's password or (de)activates an owner.
 """
 
@@ -16,12 +23,16 @@ from app.core.access import Action, Actor, require
 from app.core.access_events import access_changed
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
+from app.core.password_check import context_words, refuse_guessable
 from app.core.principal import SystemRole
 from app.core.security import hash_password_async
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.auth.repository import SessionRepository
+from app.modules.orgs.repository import OrganizationRepository
 from app.modules.spaces.service import SpaceService
+from app.modules.totp.repository import ChallengeRepository, TotpRepository
 from app.modules.users.models import User
+from app.modules.users.removal_repository import AccountRemoval
 from app.modules.users.repository import UserRepository
 from app.modules.users.schemas import UserCreate, UserUpdate
 
@@ -40,7 +51,9 @@ class UserService:
         await require(self.session, actor, Action.USER_MANAGE)
         if _is_owner(data.system_role):
             _owner_only(actor)
-        password_hash = await self._hash(data.password)
+        password_hash = await self._checked_hash(
+            actor, data.password, email=data.email, name=data.name
+        )
         await self.users.lock_admin_writes(actor.org_id)
         if await self.users.get_by_email(actor.org_id, data.email):
             raise Conflict(code="users.email_taken")
@@ -69,7 +82,15 @@ class UserService:
         """A new password ends the person's sessions; someone changing their own keeps
         `current_session`, the one they are making the change with."""
         await require(self.session, actor, Action.USER_MANAGE)
-        password_hash = await self._hash(data.password)
+        password_hash = None
+        if data.password is not None:
+            target = await self.users.get_current(actor.org_id, user_id)
+            if target is None:
+                raise NotFound(code="users.not_found")
+            name = data.name or target.name
+            password_hash = await self._checked_hash(
+                actor, data.password, email=target.email, name=name
+            )
         user = await self._current(actor, user_id)
         role_changes = data.system_role is not None and data.system_role != user.system_role
         if role_changes and (_is_owner(data.system_role) or _is_owner(user.system_role)):
@@ -101,6 +122,16 @@ class UserService:
             await self._audit(actor, "user.password_changed", user)
         return user
 
+    async def sign_out(
+        self, actor: Actor, user_id: uuid.UUID, *, current_session: uuid.UUID | None
+    ) -> None:
+        """Every session of the person ends (ASVS 5.0 V7.4.5); an administrator signing
+        out themselves keeps `current_session`, the one they act with."""
+        user = await self._activity_target(actor, user_id)
+        keep = current_session if actor.principal.id == user.id else None
+        await self.sessions.delete_for_user(actor.org_id, user.id, keep=keep)
+        await self._audit(actor, "user.signed_out", user)
+
     async def deactivate(self, actor: Actor, user_id: uuid.UUID) -> None:
         """Deactivated people are logged out at once: all their sessions are deleted."""
         user = await self._activity_target(actor, user_id)
@@ -112,20 +143,80 @@ class UserService:
             await self.session.flush()
             await self._audit(actor, "user.deactivated", user)
 
+    async def reset_totp(self, actor: Actor, user_id: uuid.UUID) -> None:
+        """The person's TOTP and recovery codes are gone (a lost device, ASVS 5.0
+        V6.4.4: the admin makes sure who asks, as when the account was made), and so
+        are their sign-ins waiting for a code; they sign in with the password alone
+        until they set it up again. Audited when there was something to reset."""
+        user = await self._activity_target(actor, user_id)
+        if await TotpRepository(self.session, actor.org_id).remove(user.id):
+            await ChallengeRepository(self.session).delete_for_users(actor.org_id, [user.id])
+            await self._audit(actor, "user.totp_reset", user)
+
     async def reactivate(self, actor: Actor, user_id: uuid.UUID) -> None:
         """The person can log in again; idempotent."""
         user = await self._activity_target(actor, user_id)
+        if user.awaiting_approval_since is not None:
+            raise Conflict(code="users.awaiting_approval")
         if not user.is_active:
             user.is_active = True
             user.version += 1
             await self.session.flush()
             await self._audit(actor, "user.reactivated", user)
 
-    async def list(self, actor: Actor, params: PageParams) -> Page[User]:
+    async def approve_signup(self, actor: Actor, user_id: uuid.UUID, version: int) -> User:
+        """A self-registered account is active from now on, as the role it has
+        (signing up gave member)."""
+        user = await self._waiting(actor, user_id, version)
+        user.awaiting_approval_since = None
+        user.is_active = True
+        user.version += 1
+        await self.session.flush()
+        await self._audit(actor, "user.signup_approved", user)
+        return user
+
+    async def reject_signup(self, actor: Actor, user_id: uuid.UUID, version: int) -> None:
+        """A self-registered account is deleted: it never was active. The audit entry
+        `user.signup_rejected` keeps its id only."""
+        user = await self._waiting(actor, user_id, version)
+        await self._audit(actor, "user.signup_rejected", user)
+        await AccountRemoval(self.session).delete_never_active(actor.org_id, user.id)
+        self.session.expunge(user)
+
+    async def _waiting(self, actor: Actor, user_id: uuid.UUID, version: int) -> User:
+        """The account awaiting approval, at the version read; an owner's to decide
+        when it was made owner meanwhile."""
+        user = await self._activity_target(actor, user_id)
+        if user.version != version:
+            raise Conflict(code="users.version_conflict")
+        if user.awaiting_approval_since is None:
+            raise Conflict(code="users.not_pending")
+        return user
+
+    async def list(
+        self, actor: Actor, params: PageParams, *, pending: bool = False
+    ) -> tuple[Page[User], set[uuid.UUID]]:
+        """A page of people, and which of them have TOTP on."""
         await require(self.session, actor, Action.USER_MANAGE)
         after = decode_id_cursor(params.cursor) if params.cursor else None
-        rows = await self.users.page(actor.org_id, after, params.limit + 1)
-        return id_page(rows, params.limit, lambda u: u.id)
+        rows = await self.users.page(actor.org_id, after, params.limit + 1, pending=pending)
+        page = id_page(rows, params.limit, lambda u: u.id)
+        totps = TotpRepository(self.session, actor.org_id)
+        return page, await totps.enabled_among([u.id for u in page.items])
+
+    async def count_pending(self, actor: Actor) -> int:
+        await require(self.session, actor, Action.USER_MANAGE)
+        return await self.users.count_pending(actor.org_id)
+
+    async def _checked_hash(
+        self, actor: Actor, password: str | None, *, email: str, name: str
+    ) -> str | None:
+        """The hash of a new password that is not easy to guess (422 otherwise)."""
+        if password is None:
+            return None
+        org = await OrganizationRepository(self.session).get(actor.org_id)
+        await refuse_guessable(password, context_words(org_name=org.name, email=email, name=name))
+        return await self._hash(password)
 
     async def _hash(self, password: str | None) -> str | None:
         """Hash before any lock is taken, with no connection held: the transaction so

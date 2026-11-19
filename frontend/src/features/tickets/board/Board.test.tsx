@@ -118,6 +118,11 @@ describe('board', () => {
     )
     expect(within(views).getByRole('link', { name: 'Wiki' })).not.toHaveAttribute('aria-current')
     expect(within(views).getByRole('link', { name: 'Epics' })).toBeInTheDocument()
+    // The space's calendar: the calendar page, filtered to it (plan M10).
+    expect(within(views).getByRole('link', { name: 'Kalender' })).toHaveAttribute(
+      'href',
+      '/calendar?space=space-1',
+    )
   })
 })
 

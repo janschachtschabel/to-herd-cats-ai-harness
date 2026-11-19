@@ -1,0 +1,160 @@
+# Everything switched on at once, for CI (helm lint/template, kubeconform, the chart
+# rules in scripts/chart-rules-placement.sh): autoscalers for the API and the worker
+# with their disruption budgets, every Secret named (none generated), backups with an
+# offsite copy and its egress, sign-in through OIDC with its egress, the MCP catalogue,
+# attachments in S3 with its egress, existing claims, Ingress with TLS, NetworkPolicy,
+# monitoring and tracing.
+image:
+  tag: "1.0.0"
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+imagePullSecrets:
+  - name: regcred
+api:
+  replicas: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  forwardedAllowIps: 10.0.0.0/8
+  env:
+    HERD_LOG_LEVEL: INFO
+worker:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+  env:
+    HERD_LOG_LEVEL: INFO
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+secrets:
+  existingSecret: herd-app
+ai:
+  existingSecret: herd-ai
+mcp:
+  allowedHosts: [gitlab.corp.example, 10.20.0.0/16]
+  catalogConfigMap: herd-catalog
+oidc:
+  allowedHosts: [sso.corp.example]
+  existingSecret: herd-oidc
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports:
+        - port: 443
+          protocol: TCP
+virusScan:
+  clamavAddress: clamav.tools.svc:3310
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tools
+      ports:
+        - port: 3310
+          protocol: TCP
+publicUrl: https://herd.example.com
+persistence:
+  existingClaim: herd-files
+s3:
+  enabled: true
+  endpoint: https://s3.eu-central-1.amazonaws.com
+  region: eu-central-1
+  bucket: herd-files
+  prefix: herd/prod
+  existingSecret: herd-s3
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports:
+        - port: 443
+          protocol: TCP
+backup:
+  schedule: "15 1 * * *"
+  alertAfterHours: 25
+  persistence:
+    existingClaim: herd-archives
+  offsite:
+    existingSecret: herd-offsite
+    egress:
+      - to:
+          - ipBlock:
+              cidr: 203.0.113.0/24
+        ports:
+          - port: 443
+            protocol: TCP
+collab:
+  replicas: 2
+  internalToken:
+    existingSecret: herd-internal-token
+database:
+  url: postgresql+asyncpg://herd@db.example.internal:5432/herd
+  existingSecret: herd-db
+  sslMode: verify-full
+  caSecret: herd-db-ca
+  migrate:
+    url: postgresql+asyncpg://herd_owner@db.example.internal:5432/herd
+    existingSecret: herd-db-owner
+    runtimeRole: herd
+postgresql:
+  enabled: false
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 100m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: herd.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: herd-tls
+      hosts: [herd.example.com]
+networkPolicy:
+  enabled: true
+  publicFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+  internalFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.20.0.0/16
+      ports:
+        - port: 5432
+          protocol: TCP
+  aiEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: egress-proxy
+      ports:
+        - port: 3128
+          protocol: TCP
+metrics:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+tracing:
+  otlpEndpoint: http://otel-collector.monitoring:4318

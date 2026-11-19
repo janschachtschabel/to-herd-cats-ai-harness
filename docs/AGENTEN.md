@@ -84,12 +84,21 @@ Ein Werkzeug kann für einen Agenten auf **„Nach Freigabe“** stehen. Will de
 nutzen, erscheint im Gespräch (oder Thread) eine **Freigabekarte**: was er tun will (mit
 Diff bei Seiten), wer entscheidet, bis wann. Entscheiden darf nur die Person, die den
 Lauf ausgelöst hat, und nur, wenn sie die Änderung auch selbst vornehmen dürfte. Andere
-sehen die Karte ohne Knöpfe. **Freigeben** setzt den Lauf fort; **Ablehnen** (mit
+sehen die Karte ohne Knöpfe und nur mit dem Namen des Werkzeugs: Die Zusammenfassung
+(`summary`) und die Angaben des Aufrufs sieht nur die gefragte Person. Die
+Zusammenfassung nennt nur, was das System selbst aufgelöst hat: den Schlüssel eines
+Tickets, das der Lauf an seinem Ort findet, den Namen eines Status, wie der Bereich ihn
+führt, und die IDs der Objekte, an die die Freigabe gebunden ist; nie einen Text, den
+das Modell gewählt hat (was sich nicht auflösen lässt, fehlt dort; Review M8 5,
+Befund L1). In einem markierten Lauf ist die Karte in ihrer Direktnachricht allein mit
+dem Agenten selbst als persönlich markiert (auch bei einer Einsicht durch Admins
+zurückgehalten). **Freigeben** setzt den Lauf fort; **Ablehnen** (mit
 optionalem Grund) teilt das dem Agenten mit, er arbeitet ohne diese Änderung weiter.
 Hat sich das Objekt zwischen Anfrage und Ausführung geändert (z. B. hat jemand die Seite
 bearbeitet), wird nichts ausgeführt; die Karte zeigt „Veraltet“, und der Agent kann neu
-fragen. Schreibende **externe Werkzeuge** (Stufe 4) fragen immer: Die Karte nennt Server
-und Werkzeug („Tracker · create_issue“), die entscheidende Person sieht die Argumente,
+fragen. Schreibende **externe Werkzeuge** (Stufe 4) fragen immer: Die Karte nennt das
+Werkzeug, die entscheidende Person sieht dazu Server und Werkzeug („Tracker ·
+create_issue“) und die Argumente,
 die nach der Freigabe an den Server gehen. Hat sich der Server oder das Werkzeug seit
 der Anfrage geändert, ist die Freigabe veraltet, und es wird nichts gesendet. Ohne Entscheidung endet der Lauf nach `HERD_AI_APPROVAL_HOURS` (Standard 72
 Stunden). Eine **Rückfrage** (`ask_user`) erscheint ebenso als Karte mit Antwortfeld
@@ -131,7 +140,9 @@ Beschreibung seiner Skills und holt den Text, wenn er ihn braucht. **Nichts in e
 Skill wird ausgeführt**: Ein Skill ist Text, auch wenn er Code enthält. Skills stehen
 unter **Skills** im Bereich (für alle mit KI, die den Bereich lesen) und in der
 Verwaltung; Moderatoren eines Bereichs pflegen dessen Skills, organisationsweite die
-Admins. Versionen, Wiederherstellen, Import (SKILL.md oder ZIP) und Export gibt es dort.
+Admins. Versionen, Wiederherstellen, Import (SKILL.md oder ZIP) und Export gibt es dort. Mit
+einem Virenscanner (`HERD_CLAMAV_ADDRESS`, [`WIKI.md`](WIKI.md)) wird ein Import vor dem
+Speichern geprüft (Fund 422 `attachment.rejected_by_scan`).
 
 ### Gedächtnis
 
@@ -498,9 +509,10 @@ das Modell sieht:
 | `ask_user`, `submit_result`, die Antwort | erlaubt (eigenes Gespräch) |
 | `post_message` | ins eigene Gespräch erlaubt, in einen Kanal abgelehnt |
 | `propose_page_change` | zu einer Seite von X erlaubt, sonst abgelehnt |
+| `propose_new_page` | eine neue Seite in X erlaubt (seit M9; einen Vorschlag lesen nur die Bearbeitenden von X), sonst abgelehnt |
 | `update_page` | an einem Entwurf von X erlaubt, sonst abgelehnt |
 | `comment_ticket`, `set_ticket_status`, `create_ticket`, `link_ticket_page`, `assign_ticket` | abgelehnt |
-| `propose_new_page`, `propose_skill`, `update_memory` | abgelehnt |
+| `propose_skill`, `update_memory` | abgelehnt |
 
 Das eigene Gespräch des Laufs ist ausgenommen, weil dessen Publikum die Antwort
 ohnehin liest: die Person allein (sie durfte den Entwurf lesen) oder der Thread eines
@@ -512,16 +524,24 @@ wer in dessen Bereich Seiten bearbeiten darf.
 externes Werkzeug ein Ergebnis über den persönlichen Konnektor der fragenden Person
 (Server mit `connector_scope` `personal`), trägt der Lauf die persönliche Marke
 (`Reads.personal`, im Journal unter `read.personal`). Seit Review M8 2 (Befund G2) wird
-ein Schreiben, das andere als die Person lesen könnten, nicht mehr abgelehnt: Jedes
-schreibende Werkzeug der Tabelle (ein Kanal, ein Ticket, eine Seite, ein Vorschlag,
-eine Gedächtnisseite, ein Skill, auch `post_message` ins eigene Gespräch, wo andere
-mitlesen) wartet auf die **Freigabe der fragenden Person**, die genau den Inhalt zeigt,
+ein Schreiben unter der Marke nicht mehr abgelehnt: Jedes schreibende Werkzeug der
+Tabelle (ein Kanal, ein Ticket und seine Felder, eine Seite, ein Vorschlag, eine
+Gedächtnisseite, ein Skill oder Skill-Vorschlag, eine Übergabe, auch `post_message`
+ins eigene Gespräch, wo andere mitlesen) wartet auf die **Freigabe der fragenden
+Person**, die genau den Inhalt zeigt,
 der geschrieben würde (die Freigabekarte trägt `personal: true`, ihre Angaben stehen
 offen; im Lauf einer Automatisierung oder Ereignisregel gibt die Eigentümerin frei).
 Gibt sie frei, läuft genau dieser Aufruf, und was so geschrieben wird, ist nicht
 markiert: Sie hat entschieden, es zu veröffentlichen. Lehnt sie ab, sieht das Modell
-die Ablehnung. Ins eigene Gespräch allein mit dem Agenten braucht es keine Freigabe;
-was dort steht, ist markiert. Zurückgehalten bleiben die eigene Antwort des Laufs und
+die Ablehnung. Der **einzige** Ort, an den ein markierter Lauf ohne Freigabe schreibt,
+ist sein eigenes Gespräch allein mit ihr (ihre Direktnachricht mit dem Agenten); was
+dort steht, ist markiert (`personal`). Jeder andere Ort wartet auf ihre Freigabe, auch
+ihr persönlicher Bereich und ein Teambereich, in dem sie heute allein Mitglied ist,
+und auch das Gedächtnis des Agenten (Review M8 4, Befunde K1 und K2; die Ausnahme aus
+Review M8 3, Befund H7, ist zurückgenommen): Was dort steht, trägt keine Marke, ein
+Teambereich kann später Mitglieder bekommen, und ein Gedächtnis liest jeder spätere
+Lauf des Agenten (auch der einer Automation oder einer nach „Neu beginnen“) ohne
+Marke. So steht nirgends ohne Marke, was sie nicht freigegeben hat. Zurückgehalten bleiben die eigene Antwort des Laufs und
 `ask_user`, wo andere mitlesen (Kanal, Thread einer Seite oder eines Tickets,
 Direktnachricht mit mehreren): Der Lauf endet dann statt mit seiner Antwort mit
 `policy_blocked` (`personal_connector`, im Halt-Ereignis und im Hinweis des Gesprächs,
@@ -529,6 +549,12 @@ Direktnachricht mit mehreren): Der Lauf endet dann statt mit seiner Antwort mit
 mit dem Agenten antwortet und ihr vorlegt, was er von dort anderswo schreiben will).
 Externe Aufrufe folgen der Regel unten (Freigabe je Aufruf, an einen anderen Server
 ebenso). Die Entwurfsmarke lehnt weiter ab, auch unter der persönlichen Marke.
+Gefragt wird erst, wenn nichts anderes den Aufruf ablehnt (Review M8 3, Befund H3):
+Entwurfsmarke, Leck in einen anderen Bereich, ein für KI geschlossener Bereich und die
+eigenen Ablehnungen des Werkzeugs (etwa ein unbekanntes Eltern-Ticket oder Gedächtnis
+aus der Direktnachricht in einen geteilten Bereich) kommen zuerst; die Freigabe wird
+unmittelbar vor dem Schreiben verlangt (`writing.effect`). So wird sie nie um etwas
+gebeten, das ohnehin abgelehnt würde.
 
 Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Workers
 (Review M8 2, Befund G1; `agents/personal_mark.py`):
@@ -551,18 +577,89 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
 - **Was das Modell erfährt**: Ein Lauf, den sein Verlauf markiert, bekommt in seinen
   Anweisungen, dass frühere Nachrichten persönlich sind und dass er selbst in diesem
   Lauf nichts dergleichen gelesen hat, außer ein Werkzeugergebnis sagt es; was er
-  anderswo schreiben will, wartet auf ihre Freigabe genau dieses Textes. Ein
+  anderswo schreiben will, wartet auf ihre Freigabe genau dieses Textes. Wer
+  `read_conversation` oder `search_past_runs` aufrufen darf, erfährt in seinen
+  Anweisungen außerdem, was eine Zeile mit `(personal)` am Anfang bedeutet: Gelesenes
+  über den eigenen Zugang der Person, nur für sie, und was er danach anderswo schreibt,
+  wartet auf ihre Freigabe (Review M8 3, Befund H4). Ein
   abgelehnter Rückfrage- oder Antwortversuch nennt den Grund („others read along
   here“).
 - **Was die Person sieht**: In ihrer Direktnachricht trägt eine markierte Nachricht das
   Abzeichen „Persönlich“; ein Klick erklärt, was es heißt und wann der Agent vorher
   fragt. Die Freigabekarte unter der Marke sagt, dass genau der gezeigte Inhalt
-  geschrieben wird und danach nicht mehr markiert ist.
+  geschrieben wird, jetzt oder später von anderen gelesen werden kann und danach nicht
+  mehr markiert ist, und zeigt ihn vollständig und
+  aufgeklappt: alle Angaben des Aufrufs und bei einer Seitenänderung den ganzen
+  Vergleich, ohne Knopf zum Öffnen (Review M8 3, Befund H5). Was sich so nicht
+  vollständig zeigen lässt (ein Vergleich über `HERD_DIFF_MAX_LINES`), kann sie nicht
+  freigeben: Der Aufruf wird abgelehnt, bevor eine Karte entsteht (das Modell liest
+  `Refused (personal_release.too_large)`, die Laufansicht sagt es ihr in Worten), und
+  eine schon gestellte Freigabe, die inzwischen zu groß ist (die Grenze wurde
+  gesenkt), lässt sich nur noch ablehnen (409 `approval.not_shown_in_full`). Fragt
+  ein Werkzeug auf `confirm` in einem markierten Lauf, ist seine Karte immer
+  persönlich, auch wenn der Aufruf gerade abgelehnt würde (ein fehlendes Ticket, ein
+  fehlendes Recht): bis sie entscheidet, kann sich das ändern. Nur eine Nachricht in
+  ihre Direktnachricht allein mit dem Agenten bekommt die gewöhnliche Karte (Review
+  M8 5, Befund L2; ersetzt Review M8 4, Befund K5). Ist das Werkzeug ein lesendes
+  (etwa `read_ticket`), sagt die persönliche Karte stattdessen, dass der Agent unter
+  ihrer persönlichen Markierung lesen möchte, dabei nichts geschrieben wird und das
+  Gelesene unter der Markierung bleibt (`reads` an der Freigabe; nicht für `ask_user`
+  und `submit_result`, die freigegeben eine Nachricht schreiben, Review M8 6, Befund M1). Eine Freigabe, die die Marke
+  verlangt, aber nicht als persönliche gestellt wurde, gilt als veraltet
+  (`approval_stale`): Das Modell muss neu fragen.
 - **Sie endet**, wenn kein persönlicher Inhalt im Kontext ist: Ein Lauf, dessen
   Verlaufsfenster und Werkzeugergebnisse nichts Markiertes enthalten, beginnt und
   bleibt ohne Marke. Weil jede Antwort eines markierten Laufs selbst markiert ist,
   hält sich die Marke in einer laufenden Direktnachricht, solange markierte Antworten
   im Verlaufsfenster stehen (24.000 Zeichen, die neuesten zuerst).
+  Das ist so gewollt: Nichts nimmt die Marke von selbst wieder ab (keine Heuristik).
+  Der Ausweg ist ihre ausdrückliche Entscheidung (Review M8 3, Befund H2).
+- **„Neu beginnen“**: In ihrer Direktnachricht allein mit dem Agenten (eine Person, ein
+  Agent) steht oben im Gespräch „Neu beginnen“. Nach einer Rückfrage, die sagt, was es
+  bewirkt, setzt es einen Schnitt (`conversation.fresh_start_at`): Läufe danach bekommen
+  nichts von vor dem Schnitt, weder im Verlaufsfenster noch über `read_conversation`
+  (auch keinen Thread unter einer Nachricht von davor), und `search_past_runs` findet
+  dort nichts aus Läufen, die vor dem Schnitt entstanden, gleich in welchem Gespräch
+  (Review M8 4, Befund K3). Was bleibt, ist das Gedächtnis des Agenten: Es steht in
+  jedem Lauf, und unter der Marke wird nur Gedächtnis, was sie freigegeben hat (siehe
+  oben). Ohne Markiertes im Kontext beginnen die Läufe ohne Marke. Offene Läufe
+  des Gesprächs (wartend, laufend, auf Freigabe oder Antwort wartend; nicht die einer
+  Automation) werden abgebrochen, jeder mit seinem Hinweis im Gespräch, damit keiner,
+  der vor dem Schnitt begonnen hat oder gefragt wurde, nach ihm antwortet. Der Schnitt
+  kommt von der Uhr der Datenbank und liegt nie vor einer Nachricht oder einem Lauf,
+  die das Gespräch schon hat; „Neu beginnen“ und eine gleichzeitig gesendete Nachricht
+  der Person warten aufeinander an der Zeile des Gesprächs (`FOR NO KEY UPDATE` gegen
+  `FOR SHARE`). Kam die Nachricht zuerst, wird ihr Lauf mit Hinweis abgebrochen; kommt
+  sie danach, liegt sie hinter dem Schnitt (auch wenn die Uhr des API-Knotens
+  nachgeht), und ihr Lauf liest sie. Ebenso der Lauf, den ein endender Lauf für ihre
+  Nachricht aus seiner Wartezeit einreiht: Er hält die Zeile wie ihre Nachricht und
+  wird abgebrochen; kam „Neu beginnen“ zuerst, wartet es auf den endenden Lauf und
+  antwortet 409 `conflict.retry`; die Oberfläche sendet es dann von selbst noch einmal
+  (wie jede Anfrage mit diesem Code), und das bricht ihn ab (Review M8 5, Befund L4). Keiner endet stumm (Review M8 4, Befund K4).
+  Die Nachrichten davor bleiben, wie sie sind, markierte auch, und sie sieht sie
+  weiter; im Gespräch zeigt eine Linie „Neu begonnen am …“, wo der Schnitt liegt.
+  Das Abzeichen „Persönlich“ und die Freigabekarte unter der Marke nennen diesen
+  Weg; die Rückfrage sagt genau, was der Schnitt abschneidet und
+  dass freigegebenes Gedächtnis bleibt. Frühere markierte Läufe bleiben markiert
+  (anderswo, etwa in einem Kanal, findet `search_past_runs` sie ohnehin nie).
+  API: `POST /api/conversations/{id}/fresh-start` mit `{"version": n}` (die gelesene
+  Version des Gesprächs) → das Gespräch mit `fresh_start_at` und neuer Version. Wer das
+  Gespräch nicht sieht, bekommt 404 `conversation.not_found`; in jedem anderen Gespräch
+  (Kanal, Thread, Direktnachricht mit mehreren oder mit einer Person) 403
+  `conversation.not_alone_with_agent`; eine veraltete Version 409
+  `conversation.version_conflict`. Audit `conversation.fresh_start` mit der Zahl der
+  abgebrochenen Läufe (`cancelled_runs`), nie Inhalt. Ein Live-Ereignis gibt es dafür
+  nicht: Andere Tabs derselben Person zeigen die Linie nach dem nächsten Laden.
+- **Ein markierter Lauf gehört der fragenden Person** (Review M8 3, Befund H1): In der
+  Laufansicht (`/api/runs/{id}/events`) sieht jede andere Person (die verantwortliche,
+  wer `agent.manage` hat, ein Admin) **jedes** Ereignis eines Laufs, der die Marke trägt,
+  geschwärzt, vom ersten an, nicht erst ab der Marke, gleich aus welchen Bereichen es
+  kam: Werkzeugname, Quelle und Dauer bleiben, Text und Angaben nicht. Ebenso ist ein
+  Ergebnis von `search_past_runs` mit einem Treffer aus einem markierten Lauf nur ihres
+  (`asker_only`), und der suchende Lauf ist dadurch selbst markiert. Eine Vorschau, die
+  nichts ändert (`update_page` ohne Token), läuft unter der Marke ohne Freigabe, aber nie
+  als freigegebener Aufruf: Sie schreibt nichts (ein Schreiben ohne Freigabe lehnt
+  `effect` mit „Not without the person's release“ ab), und ihre Ausgabe sieht nur sie.
 - **Wer markierte Nachrichten liest**: wer die Direktnachricht liest, also die Person.
   Die Nachrichtensuche findet ohnehin nur Nachrichten von Personen, die Laufansicht
   zeigt anderen weder die Worte des Modells noch Ergebnisse ohne Bereich, `/mcp` hat
@@ -999,6 +1096,12 @@ DBOS aus: [Aufgaben im Worker](#aufgaben-im-worker-m7).
   der dritten solchen endet der Lauf mit `error` (Detail `attempts`).
 - Ohne laufenden Worker gehen keine Läufe verloren; sie warten (`HerdRunsQueued`,
   `HerdWorkerAbsent`).
+- **Wartungsmodus** (M9b, Einspielen eines Archivs im laufenden Betrieb,
+  [`SICHERUNG.md`](SICHERUNG.md#einspielen-in-eine-laufende-installation-wartungsmodus)):
+  Der Worker nimmt keine Läufe auf, feuert keine Aufgaben und liefert keine Ereignisse
+  aus; Läufe in Arbeit gibt er ab wie bei SIGTERM. Nach der Wartung nimmt ein Worker
+  sie wieder auf, sofern das eingespielte Archiv sie enthält (ein Lauf, dessen
+  Sperrfrist im Archiv noch galt, wartet bis zu deren Ende).
 
 ### Aufgaben im Worker (M7)
 
@@ -1640,6 +1743,7 @@ erst nach der Freigabe einer Person:
 | `HERD_MCP_CATALOG_DIR` | leer | API | Verzeichnis mit eigenen Katalog-Vorlagen der Installation (`*.yaml`, zusätzlich zu GitHub und GitLab; Chart `mcp.catalogConfigMap`; [`MCP.md`](MCP.md#katalog)) |
 | `HERD_MCP_MAX_CALLS_PER_RUN` | 20 | Worker | gesendete Aufrufe externer Werkzeuge je Lauf (1 bis 500); der nächste wird nicht gesendet (Chart `mcp.maxCallsPerRun`) |
 | `HERD_MCP_RATE_PER_MINUTE` | 120 | API | Aufrufe je Zugangstoken und Minute an `/mcp` (Chart `mcp.ratePerMinute`; [`MCP.md`](MCP.md#betrieb)) |
+| `HERD_WRITE_RATE_PER_MINUTE` | 120 | API, Worker | Schreibvorgänge je Person und je Agent und Minute; ein Agent hat seinen eigenen Zähler, ein schreibendes Werkzeug darüber meldet `rate.limited` und schreibt nichts (Chart `writeLimit.perMinute`; [`SICHERHEIT.md`](SICHERHEIT.md)) |
 | `HERD_AI_<NAME>` | – | API, Worker | Anbieterschlüssel, auf die Verbindungen mit `env:` verweisen |
 
 **Compose:** die Schlüssel in der optionalen Datei `deploy/compose/ai.env` (Vorlage
@@ -1760,9 +1864,17 @@ Zeilen eines anderen Workers übersprungen):
   jede Wiederaufnahme liest diese Kopie, nie die Regel;
 - die Aufrufzeilen von `/mcp` (`mcp_call`, siehe [`MCP.md`](MCP.md#nutzung-je-token))
   nach 90 Tagen (`MCP_CALL_RETENTION`; Index auf `mcp_call.created_at`, Migration
-  `729e9c8f5547`).
+  `729e9c8f5547`);
+- Zeilen, deren Zeit abgelaufen ist (`app/worker/upkeep.py`, seit M9): beendete
+  Anmeldesitzungen eine Stunde nach ihrem Ende, OAuth- und OIDC-Abläufe bei Ablauf,
+  Collab-Berechtigungen eine Stunde nach Ablauf, Treffer der Ratenbegrenzung nach ihrem
+  Fenster (60 s), Ratenfenster der KI-Verbindungen eine Stunde nach Beginn. Die Module
+  räumen unterwegs weiter selbst auf (beim Anmelden, beim nächsten Ablauf, bei der
+  nächsten Berechtigung); die Fälligkeits-Schleife erfasst, wozu niemand zurückkommt.
 
-Die Fristen sind Konstanten in `app/worker/due.py`, keine Einstellungen. Folge: Eine
+Die Fristen stehen im Aufbewahrungskatalog `app/core/retention.py` (eine Regel je
+Tabelle, siehe [`SICHERUNG.md`](SICHERUNG.md#aufbewahrung-je-tabelle)), keine
+Einstellungen. Folge: Eine
 Aufgabe, die 90 Tage nicht gefeuert hat, zeigt keinen letzten Lauf mehr (ihre Läufe
 bleiben in der Laufliste).
 
@@ -1788,7 +1900,8 @@ bleiben in der Laufliste).
 
 ### Bekannte Grenzen
 
-- **Ein Schritt über seine Sperrfrist hinaus zählt nicht für `max_concurrency`:**
+- **Ein Schritt über seine Sperrfrist hinaus zählt nicht für `max_concurrency`** (M6,
+  mit M9 als Grenze belassen):
   Hält ein Schritt die Zeile seines Laufs länger als die Sperrfrist
   (`HERD_RUN_LEASE_SECONDS`, 30 s; ein Schritt darf bis zu 5 s auf Sperren warten und
   je Anweisung 20 s rechnen), steht `lease_until` bis zum Festschreiben in der
@@ -1798,6 +1911,14 @@ bleiben in der Laufliste).
   Zeilen erkennen; als laufend zählen auch abgelaufene Läufe ohne Sperre würde einen
   abgestürzten Lauf seine eigene Wiederaufnahme blockieren lassen. Werkzeugschritte
   dauern Millisekunden bis Sekunden, daher bleibt es dabei.
+- **Abbrechen während eines Schritts** (M6, seit M7 mit kurzer Sperrgrenze; mit M9 als
+  Grenze belassen): Der Abbruch wartet höchstens 0,5 s auf die Zeile des Laufs
+  (`REASSIGN_LOCK_TIMEOUT_SECONDS`). Hält ein Schritt sie länger (Abschluss eines
+  Schritts unter Last, ein langer Werkzeugschritt), antwortet er 409 `conflict.retry`
+  mit `Retry-After: 1` und schreibt nichts; die Weboberfläche fragt einmal von selbst
+  erneut, ein API-Aufrufer muss es selbst tun. Einen Abbruch, der in den laufenden
+  Schritt hineingreift, gibt es nicht: Er wirkt vor dem nächsten Schritt oder im
+  Abschluss.
 - **Verbrauch wird in zwei seltenen Fällen zu wenig gezählt**, nie doppelt: Ein
   Anbieteraufruf eines Workers, der danach abstürzt oder seine Sperrfrist verliert, ist
   bezahlt, aber nicht gebucht; und scheitern beim Abschluss eines Schritts sowohl das
@@ -1907,6 +2028,21 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   durchziehen (oder alte API-Pods vor dem Start der neuen beenden).
 - Ein Worker des vorigen Releases arbeitet keine Läufe ab, die er nicht kennt (wartende,
   Ticket-Läufe); er sollte nicht neben neuen Workern weiterlaufen.
+- M8, persönliche Marke (Migration `5b7d9f1a3c6e`): die Ereignisart `mark` (nur die
+  Prüfung erweitert). Die Wiedergabe des Journals eines Workers des vorigen Releases
+  übergeht sie; die Laufansicht eines API-Pods des vorigen Releases scheitert an einem
+  Lauf mit `mark` (500), bis er ersetzt ist. Ab diesem Release übergeht die Laufansicht
+  (API und Oberfläche) jede Ereignisart, die sie nicht kennt (Review M8 3, Befund H6).
+- M8, „Neu beginnen“ (Migration `f3a7c9e1b5d8`): die Spalte `conversation.fresh_start_at`
+  (nullbar, ohne Umschreiben). Ein Worker des vorigen Releases liest sie nicht und gibt
+  Läufen weiter den ganzen Verlauf (die Marke hält dann wie zuvor), bis er ersetzt ist;
+  den Schnitt setzt nur ein API-Pod dieses Releases.
+- M8, Text der Freigabekarten (Migration `9e4b6d2f8a17`, nur Daten): Jede schon
+  geschriebene Freigabekarte im Gespräch trägt danach nur noch den Namen ihres
+  Werkzeugs, wie neue Karten (Review M8 5, Befund L1); die alten Texte werden nicht
+  aufbewahrt, ein Downgrade stellt sie nicht wieder her. Wiederholbar. Ein Worker des
+  vorigen Releases schreibt neue Karten noch mit der alten Zusammenfassung, bis er
+  ersetzt ist.
 
 ### Woran man Probleme erkennt
 

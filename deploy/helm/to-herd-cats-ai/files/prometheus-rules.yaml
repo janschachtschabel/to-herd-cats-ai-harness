@@ -235,3 +235,87 @@ groups:
         annotations:
           summary: "{{ $value }} catalogue files of {{ $labels.namespace }}/{{ $labels.job }} are skipped"
           description: "The AI administration lists them under Catalogue, problems (GET /api/ai/mcp-catalog/problems); the log entries mcp.catalog_problem name the file and what is wrong, never its content. Check the files with uv run python -m scripts.check_mcp_catalog <dir> and fix the ConfigMap (mcp.catalogConfigMap)."
+      # Backups (plan M9, docs/SICHERUNG.md). A backup job is short-lived and cannot be
+      # scraped; every worker reads the last runs from backup_run every 10 s and exports
+      # them as timestamps (0: none yet). HERD_BACKUP_ALERT_AFTER_HOURS (backup.alertAfterHours,
+      # 26 by default) comes as herd_backup_alert_after_seconds, so this file stays fixed.
+      # The last good backup is older than that.
+      - alert: HerdBackupTooOld
+        expr: |
+          (
+            time() - max by (namespace, job) (herd_backup_last_success_timestamp_seconds)
+              > max by (namespace, job) (herd_backup_alert_after_seconds)
+          )
+          and
+          max by (namespace, job) (herd_backup_last_success_timestamp_seconds) > 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The last good backup of {{ $labels.namespace }}/{{ $labels.job }} is older than its limit"
+          description: "No backup has succeeded within backup.alertAfterHours. Look at the backup job (CronJob herd-backup, or the compose service backup) and at python -m app.ops backup list: the state and error code of the last runs (backup.dump_failed, backup.tools_too_old, backup.io, ...). Without a backup, a restore can only go back to the last good archive."
+      # The last backup failed: its finish is later than the last good one's. Clears with
+      # the next good backup.
+      - alert: HerdBackupFailing
+        expr: |
+          max by (namespace, job) (herd_backup_last_failure_timestamp_seconds)
+            > max by (namespace, job) (herd_backup_last_success_timestamp_seconds)
+        labels:
+          severity: warning
+        annotations:
+          summary: "The last backup of {{ $labels.namespace }}/{{ $labels.job }} failed"
+          description: "python -m app.ops backup list names its error code; the job's exit status is 1. A failed archive is removed at once and never counts for retention; older archives stay."
+      # The last good backup did not reach the restic repository (HERD_BACKUP_OFFSITE_*).
+      # With offsite off both gauges stay 0 and nothing fires.
+      - alert: HerdOffsiteBackupFailing
+        expr: |
+          max by (namespace, job) (herd_backup_offsite_last_failure_timestamp_seconds)
+            > max by (namespace, job) (herd_backup_offsite_last_success_timestamp_seconds)
+        labels:
+          severity: warning
+        annotations:
+          summary: "The last backup of {{ $labels.namespace }}/{{ $labels.job }} did not reach the offsite repository"
+          description: "The archive on the backups volume is good (backup list: offsite=failed). restic could not reach or open the repository, or init, backup, forget or check failed: check the repository, its password and the storage's credentials in the backup's own Secret (backup.offsite.existingSecret) or backup.env, and run restic snapshots by hand with them."
+      # No good backup ever, for 26 hours of a worker exporting the gauge: the backup job
+      # never ran or never succeeded (a fresh installation without the CronJob or the
+      # compose service, a wrong schedule).
+      - alert: HerdBackupNeverRan
+        expr: |
+          max by (namespace, job) (herd_backup_last_success_timestamp_seconds) == 0
+        for: 26h
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.namespace }}/{{ $labels.job }} has no good backup after 26 hours"
+          description: "Is the backup job there (backup.enabled; compose service backup) and does its schedule fire? python -m app.ops backup list shows the runs; python -m app.ops backup run makes one by hand."
+      # Sign-in through OIDC (M9): over half of the callbacks in 15 minutes failed because
+      # of the provider (unreachable, an answer that is not OIDC, a wrong issuer, an ID
+      # token that does not verify), at least 3 of them, for 5 minutes. People refused by
+      # the rules (domains, links) do not count.
+      - alert: HerdOidcFailing
+        expr: |
+          (
+            sum by (namespace, job) (increase(herd_oidc_logins_total{outcome=~"provider_unreachable|provider_error|issuer_mismatch|id_token_invalid"}[15m]))
+              / sum by (namespace, job) (increase(herd_oidc_logins_total[15m]))
+          ) > 0.5
+          and
+          sum by (namespace, job) (increase(herd_oidc_logins_total{outcome=~"provider_unreachable|provider_error|issuer_mismatch|id_token_invalid"}[15m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OIDC sign-ins of {{ $labels.namespace }}/{{ $labels.job }} fail at the provider"
+          description: "Sign-ins through an OIDC provider fail because of the provider (outcome provider_unreachable, provider_error, issuer_mismatch or id_token_invalid of herd_oidc_logins_total; log entries oidc id token refused name the provider's key and the reason). Run Check for the provider in the administration (Anmeldung); a private provider must be named in oidc.allowedHosts, and with networkPolicy.enabled the way out must be allowed (oidc.egress). Password sign-in keeps working."
+      # An autoscaler of ours (api.autoscaling, worker.autoscaling; its name holds the
+      # chart's) has run at its maximum for 30 minutes: the bounds are too low for the
+      # load, or something keeps the CPU busy. Needs kube-state-metrics.
+      - alert: HerdAutoscalerAtMax
+        expr: |
+          max by (namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=~".*to-herd-cats-ai.*-(api|worker)"})
+            >= max by (namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{horizontalpodautoscaler=~".*to-herd-cats-ai.*-(api|worker)"})
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Autoscaler {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler }} has run at its maximum for 30 minutes"
+          description: "Its pods stay busy at autoscaling.maxReplicas (api or worker). Raise maxReplicas only while the database has room for 16 more connections per pod (docs/STECKBRIEF.md, Clusterfähigkeit); otherwise look at what keeps the CPU busy or give the pods a larger CPU request."

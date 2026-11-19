@@ -143,4 +143,30 @@ describe('activity', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/tickets/42'))
     expect(router.state.location.search).toEqual({ message: entry.message_id })
   })
+
+  test('a locked second factor tells its person and opens the profile', async () => {
+    const me = makeMe([])
+    const entry = makeActivity({
+      reason: 'totp_locked',
+      conversation: null,
+      message_id: null,
+      author: { type: 'user', id: me.user.id, name: me.user.name },
+      snippet: '',
+      account: { id: me.user.id, awaiting: false },
+    })
+    mockApi({
+      ...shellRoutes(me),
+      'GET /api/activity': page([entry]),
+      'POST /api/activity/:id/read': { status: 204 },
+      'GET /api/auth/me/identities': page([]),
+      'GET /api/auth/providers': page([]),
+      'GET /api/auth/me/totp': { enabled_at: null, recovery_codes_left: 0, unavailable: null },
+    })
+    const { user, router } = await renderApp('/activity')
+    expect(
+      await screen.findByText(/Nach zehn falschen Codes ist deine Zwei-Faktor-Anmeldung/),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Öffnen' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/profile'))
+  })
 })

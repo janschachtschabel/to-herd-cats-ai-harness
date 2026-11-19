@@ -1,4 +1,5 @@
-// Test helpers: a fake internal API, Hocuspocus clients with a session cookie.
+// Test helpers: a fake internal API, Hocuspocus clients carrying a grant (as the API's
+// relay sends it: `Authorization: Bearer herd_cg_...`).
 import { createServer } from "node:http";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import WebSocket from "ws";
@@ -12,10 +13,16 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
   const state = {
     generation,
     markdown,
+    epoch: 1, // the asking instance's binding to the page (plan M9 decision 17)
+    announcements: [], // each instance heartbeat: { id, url, draining }
+    releases: [], // the ids of instances that let go of their pages
+    sequence: [], // "announce" | "announce:draining" | "save" | "release", in order
+    // grant -> [opaque login session, person, name]. The relay issues a grant per
+    // connection; here connections of one person and login share theirs.
     users: {
-      "token-a": ["session-a", "user-a", "Anna"],
-      "token-b": ["session-b", "user-b", "Ben"],
-      "token-a2": ["session-a2", "user-a", "Anna"], // Anna's second login
+      herd_cg_a: ["session-a", "user-a", "Anna"],
+      herd_cg_b: ["session-b", "user-b", "Ben"],
+      herd_cg_a2: ["session-a2", "user-a", "Anna"], // Anna's second login
     },
     pages: {}, // page id -> Markdown, for pages other than `markdown`
     saves: [],
@@ -30,11 +37,12 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
       {
         generation_ok: true,
         generation: state.generation,
-        revoked_session_ids: [],
-        revoked_user_ids: [],
+        revoked_grants: [],
+        ended_grants: [],
       },
     ],
     tokens: [],
+    loadGrants: [], // the X-Herd-Grant of each load
   };
   const server = createServer(async (request, response) => {
     let body = "";
@@ -46,18 +54,32 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
       response.writeHead(status, { "Content-Type": "application/json" });
       response.end(JSON.stringify(payload));
     };
+    if (url.pathname === "/internal/collab/instances" && request.method === "POST") {
+      state.announcements.push(json);
+      state.sequence.push(json.draining ? "announce:draining" : "announce");
+      response.writeHead(204);
+      return response.end();
+    }
+    if (url.pathname.startsWith("/internal/collab/instances/") && request.method === "DELETE") {
+      state.releases.push(url.pathname.split("/").pop());
+      state.sequence.push("release");
+      response.writeHead(204);
+      return response.end();
+    }
     if (url.pathname === "/internal/collab/auth") {
       state.authCalls++;
       if (state.authDelayMs) await new Promise((resolve) => setTimeout(resolve, state.authDelayMs));
-      const user = state.users[json.session_token];
-      if (!user) return reply([401, { error: { code: "collab.session_invalid" } }]);
+      state.auths = [...(state.auths ?? []), json];
+      const user = state.users[json.grant];
+      if (!user) return reply([401, { error: { code: "collab.grant_invalid" } }]);
       return reply([
         200,
         {
           user: { id: user[1], name: user[2] },
-          session_id: user[0],
+          session_ref: user[0],
           generation: state.generation,
           can_edit: true,
+          epoch: state.epoch,
         },
       ]);
     }
@@ -72,6 +94,8 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
       return response.end();
     }
     if (request.method === "GET") {
+      state.loadGrants.push(request.headers["x-herd-grant"]);
+      state.loadInstances = [...(state.loadInstances ?? []), url.searchParams.get("instance_id")];
       const pageId = url.pathname.split("/")[4];
       return reply([
         200,
@@ -80,11 +104,13 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
           ydoc_b64: state.ydoc ?? null,
           content_md: state.pages[pageId] ?? state.markdown,
           title: "T",
+          epoch: state.epoch,
         },
       ]);
     }
     if (request.method === "PUT") {
       state.saves.push(json);
+      state.sequence.push("save");
       return reply(state.saveAnswer(json));
     }
     state.checks.push(json);
@@ -107,9 +133,12 @@ function socketWith(headers) {
   };
 }
 
-/** A browser-like client: provider, document, and every close event it saw. */
-export function client(url, { cookie, origin = ORIGIN, name = `page:${PAGE}` } = {}) {
+/** A browser-like client: provider, document, and every close event it saw. `grant` is
+ * sent the way the API's relay sends it; `cookie` only as a browser would (the
+ * integration test goes through the relay). */
+export function client(url, { grant, cookie, origin = ORIGIN, name = `page:${PAGE}` } = {}) {
   const headers = { origin };
+  if (grant) headers.authorization = `Bearer ${grant}`;
   if (cookie) headers.cookie = cookie;
   const doc = new Y.Doc();
   const closes = [];

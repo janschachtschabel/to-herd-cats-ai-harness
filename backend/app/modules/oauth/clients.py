@@ -11,6 +11,11 @@
   ones are revoked at the old endpoints and deleted, shared ones lose their tokens
   unless `keep_shared_connectors` (`connectors/moving.py`; module review M8 1,
   finding 4). The audit names how many.
+- Purpose (plan M10 decision 18): the service serves one purpose, `mcp` unless named.
+  The AI administration's routes manage `mcp` apps with `ai.manage` (404
+  `ai.not_found` without it); the calendar's Google app is `calendar`, managed with
+  `calendar.manage` (403 without it, task 13c's routes). An app of another purpose
+  answers like an unknown id and is in no list; the moving rule holds for each.
 - A client a connector or an MCP server names is not deleted (409
   `oauth_client.in_use`). Every write names the version it read (409
   `oauth_client.version_conflict`).
@@ -22,12 +27,13 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import egress, secrets
-from app.core.access import Action, Actor
+from app.core.access import Actor
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
-from app.modules.ai.access import require_ai
 from app.modules.ai.schemas import SecretIn
 from app.modules.audit.recorder import record
+from app.modules.connectors import purposes
+from app.modules.connectors.models import Purpose
 from app.modules.connectors.moving import MOVING_ENDPOINTS, disconnect_client
 from app.modules.oauth.discovery import Discovery, discover
 from app.modules.oauth.models import OAuthClient
@@ -44,6 +50,8 @@ _FIELDS = (
     "token_auth",
     "scopes",
     "resource",
+    "issuer",
+    "issuer_in_response",
 )
 
 
@@ -52,12 +60,14 @@ def client_not_found() -> NotFound:
 
 
 class ClientService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, purpose: Purpose = Purpose.MCP) -> None:
         self.session = session
+        self.purpose = purpose
 
     async def _repo(self, actor: Actor) -> ClientRepository:
-        await require_ai(self.session, actor, Action.AI_MANAGE)
-        return ClientRepository(self.session, actor.org_id)
+        manage = purposes.rule_for(self.purpose).manage
+        await purposes.require_right(self.session, actor, self.purpose, manage)
+        return ClientRepository(self.session, actor.org_id, self.purpose)
 
     async def list(self, actor: Actor, params: PageParams) -> Page[OAuthClient]:
         repo = await self._repo(actor)
@@ -82,14 +92,17 @@ class ClientService:
         await repo.lock_names()
         if await repo.name_taken(data.name):
             raise Conflict(code="oauth_client.name_taken")
-        client = await repo.add(
-            OAuthClient(
-                org_id=actor.org_id,
-                **{name: getattr(data, name) for name in _FIELDS},
-                client_secret_ref=_secret_ref(data.client_secret),
-            )
+        made = OAuthClient(
+            org_id=actor.org_id,
+            purpose=self.purpose,
+            **{name: getattr(data, name) for name in _FIELDS},
+            client_secret_ref=_secret_ref(data.client_secret),
         )
+        _check_issuer(made)
+        client = await repo.add(made)
         details = {"secret": _kind(client.client_secret_ref), "token_auth": client.token_auth}
+        if self.purpose != Purpose.MCP:
+            details["purpose"] = self.purpose.value
         await self._audit(actor, "oauth_client.created", client, details)
         return client
 
@@ -128,6 +141,7 @@ class ClientService:
             if getattr(client, name) != value:
                 setattr(client, name, value)
                 changed.add(name)
+        _check_issuer(client)
         if "client_secret" in data.model_fields_set:
             client.client_secret_ref = _secret_ref(data.client_secret)
             changed.add("client_secret")
@@ -162,6 +176,12 @@ def _found(client: OAuthClient | None) -> OAuthClient:
     if client is None:
         raise client_not_found()
     return client
+
+
+def _check_issuer(client: OAuthClient) -> None:
+    """A server said to send `iss` always (J13) is checked against a known issuer."""
+    if client.issuer_in_response and client.issuer is None:
+        raise ValidationFailed(code="oauth_client.issuer_required")
 
 
 def _check_url(url: str | None) -> None:

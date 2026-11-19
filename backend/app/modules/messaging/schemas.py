@@ -93,7 +93,8 @@ class ConversationOut(BaseModel):
     `version` guards writes (send it back; stale → 409). A direct message lists its
     `participants` and, on its own (`GET /conversations/{id}`), every admin
     `inspections` of it; both are empty for other kinds. `page_id`: a page thread's
-    page (null for other kinds)."""
+    page (null for other kinds). `fresh_start_at`: where the person started her DM
+    alone with an agent afresh (its agent sees nothing from before; null: never)."""
 
     id: uuid.UUID
     kind: ConversationKind
@@ -106,6 +107,7 @@ class ConversationOut(BaseModel):
     created_at: datetime
     version: int
     can_post: bool
+    fresh_start_at: datetime | None = None
     participants: list[ParticipantOut] = Field(default_factory=list)
     inspections: list[InspectionNoteOut] = Field(default_factory=list)
 
@@ -133,6 +135,7 @@ class ConversationOut(BaseModel):
             created_at=conversation.created_at,
             version=conversation.version,
             can_post=can_post,
+            fresh_start_at=conversation.fresh_start_at,
             participants=[ParticipantOut.of(p) for p in participants],
             inspections=[InspectionNoteOut(at=n.at, admin_name=n.admin_name) for n in inspections],
         )

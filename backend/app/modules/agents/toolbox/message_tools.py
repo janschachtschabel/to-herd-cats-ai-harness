@@ -54,8 +54,6 @@ async def post_message(ctx: WriteContext, args: PostMessageArgs) -> ToolResult:
         return refusal("conversation", NOT_FOUND, attrs)
     own = ctx.answers_in(conversation.id)
     shared = own and bool(await into_own_conversation(ctx, conversation.id))
-    if shared:  # its own conversation, but others read along: her release first
-        release_first(ctx)
     if not own and (
         conversation.kind != ConversationKind.CHANNEL
         or conversation.space_id is None
@@ -68,6 +66,8 @@ async def post_message(ctx: WriteContext, args: PostMessageArgs) -> ToolResult:
         # Its own conversation reads the run's answer anyway (`writing`, drafts).
         if why := await leaks_into(ctx, conversation.space_id, editors_only=own):
             return refusal("conversation", why, attrs)
+    if shared:  # its own conversation, but others read along: her release first
+        release_first(ctx)
 
     async def write() -> ToolResult:
         digest = hashlib.sha256(args.text.encode()).hexdigest()

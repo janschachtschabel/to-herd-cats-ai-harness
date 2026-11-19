@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { makeEvent, makeRun } from '@/test/runs'
-import { buildTimeline, externalOutcome, externalToolName } from './timeline'
+import { approvalOutcome, buildTimeline, externalOutcome, externalToolName } from './timeline'
 
 const TOOL = 'ext_0123456789ab_create_issue'
 const UNKNOWN =
@@ -76,5 +76,28 @@ describe('external calls in a run’s timeline', () => {
     expect(externalToolName(TOOL)).toBe('create_issue')
     expect(externalToolName('ext_0123456789abcdef0123456789abcdef_get_items')).toBe('get_items')
     expect(externalToolName('search')).toBeNull()
+  })
+})
+
+describe('event kinds this version does not know', () => {
+  test('are passed over, never shown as a stop (module review M8 3, H6)', () => {
+    const later = makeEvent({
+      kind: 'from_the_future' as unknown as 'stop',
+      seq: 4,
+      content: { reason: 'completed' },
+    })
+    const stop = makeEvent({ kind: 'stop', seq: 5, content: { reason: 'completed' } })
+    const items = buildTimeline([model, answered, later, stop], makeRun({ state: 'done' }))
+    expect(items.map((item) => item.kind)).toEqual(['model', 'tool', 'stop'])
+  })
+})
+
+describe('a personal release that could not be shown', () => {
+  test('is named for the person (module review M8 3, H5)', () => {
+    expect(approvalOutcome('Refused (personal_release.too_large): you have read …')).toBe(
+      'tooLarge',
+    )
+    expect(approvalOutcome('approval_stale: …')).toBe('stale')
+    expect(approvalOutcome('Refused (other)')).toBeNull()
   })
 })

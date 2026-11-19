@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app.core.downloads import content_disposition
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.auth.write_limits import UPLOAD
 from app.modules.skills.format import FILENAME
 from app.modules.skills.transfer import ImportResult, SkillTransfer
 
@@ -65,7 +66,9 @@ class SkillImportOut(BaseModel):
         )
 
 
-@skill_transfer.post("/import", response_model=SkillImportOut, openapi_extra=_BODY)
+@skill_transfer.post(
+    "/import", response_model=SkillImportOut, openapi_extra=_BODY, dependencies=UPLOAD
+)
 async def import_skills(
     request: Request,
     actor: ActorDep,

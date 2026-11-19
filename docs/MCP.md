@@ -529,8 +529,21 @@ mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
 - Audit `oauth_client.created`, `.updated` (Feldnamen, beim Geheimnis nur seine Art,
   bei neuen Endpunkten `moved` mit den Zahlen getrennter Konnektoren), `.deleted`; nie
   Werte.
-- **Beim Anbieter registrieren**: Als Rückleitungsadresse (Callback-URL) trägt man
-  `<HERD_PUBLIC_URL>/api/ai/oauth/callback` ein, genau so.
+- **Beim Anbieter registrieren**: Jede OAuth-App hat eine eigene Rückleitungsadresse
+  (Callback-URL), `<HERD_PUBLIC_URL>/api/ai/oauth/<id>/callback` (seit M9b; `id` ist
+  die der App hier, nicht die Client-ID beim Anbieter). Die Antwort nennt sie als
+  `callback_url`, die Karte der App zeigt sie; sie wird beim Anbieter genau so
+  eingetragen (bei GitHub und GitLab geht das auch nach dem Anlegen). **Nach dem Update
+  auf M9b**: Für jede bestehende OAuth-App die neue Adresse beim Anbieter eintragen;
+  bestehende Verbindungen laufen weiter (das Erneuern braucht keine Rückleitung), nur
+  neues Verbinden braucht sie.
+- **Aussteller** (`issuer`, optional) und `issuer_in_response`: Der Aussteller des
+  Autorisierungsservers (RFC 8414); schickt der Server in seiner Antwort `iss` mit
+  (RFC 9207), muss es genau dieser sein. `issuer_in_response: true` (aus den
+  Metadaten, `authorization_response_iss_parameter_supported`) heißt, der Server
+  schickt `iss` immer; eine Antwort ohne gilt dann als fremd. Ohne Aussteller (422
+  `oauth_client.issuer_required` mit `issuer_in_response`) wird ein gesendetes `iss`
+  nicht verglichen; dann schützt allein die eigene Rückleitungsadresse.
 - **Ermitteln** (`POST /api/ai/oauth-clients/discover` mit `{"url": "<MCP-Server>"}`):
   schlägt die Felder vor, wie die MCP-Autorisierung (Stand 2025-11-25) es vorsieht:
   Zuerst wird der Server ohne Token gefragt; nennt seine 401-Antwort in
@@ -556,15 +569,20 @@ mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
   `{"authorization_url"}`; die Oberfläche schickt den Browser dorthin. Die Adresse
   trägt `response_type=code`, `client_id`, `redirect_uri`, `state`, die
   S256-`code_challenge`, `scope` und `resource`, nie das Client-Geheimnis.
-- **Rückkehr**: Der Anbieter schickt den Browser an `GET /api/ai/oauth/callback`. Der
-  Code wird eingelöst (mit Prüfwert, derselben Rückleitungsadresse und `resource`),
+- **Rückkehr**: Der Anbieter schickt den Browser an
+  `GET /api/ai/oauth/<id>/callback`, die Rückleitungsadresse seiner App. Ein Ablauf
+  wird nur an der Adresse beendet, mit der er begann (sonst `invalid`, der Ablauf ist
+  verbraucht, nichts wird eingelöst), und `iss` muss passen (sonst `issuer_mismatch`,
+  ebenso). Der Code wird eingelöst (mit Prüfwert, derselben Rückleitungsadresse und `resource`),
   die Token als `enc:` gespeichert, die Version des Konnektors erhöht, Audit
   `connector.connected` (Geltung, ob ein Erneuerungstoken kam). Danach geht der
   Browser auf die Seite `/ai/oauth/done?status=…` (mit `connector` und `scope`, wenn
   bekannt); `status` ist `connected`, `denied` (abgelehnt beim Anbieter), `failed`
-  (Fehler des Anbieters oder beim Einlösen) oder `invalid` (unbekannter, benutzter,
-  abgelaufener oder fremder `state`, Konnektor weg, Rechte weg). Was der Anbieter
-  sagt, steht nie in dieser Adresse.
+  (Fehler des Anbieters oder beim Einlösen), `invalid` (unbekannter, benutzter,
+  abgelaufener oder fremder `state`, falsche Rückleitungsadresse, Konnektor weg,
+  Rechte weg) oder `issuer_mismatch` (`iss` nicht der Aussteller der App, oder es
+  fehlt, obwohl der Server es zugesagt hat). Was der Anbieter sagt, steht nie in
+  dieser Adresse.
 - **Trennen**: `POST …/{id}/disconnect` mit `{"version"}` löscht die Token (Audit
   `connector.disconnected`) und widerruft sie nach dem Commit beim Anbieter (RFC 7009,
   erst das Erneuerungstoken, dann das Zugangstoken), sofern der Client einen
@@ -581,12 +599,46 @@ mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
   der Anweisung gelöscht, die sie findet, also genau **einmal** eingelöst. Eine
   Rückkehr aus einer anderen Sitzung verbraucht sie nicht. Abgemeldete Sitzungen
   nehmen ihre offenen Abläufe mit.
-- Die **Rückleitungsadresse** ist `HERD_PUBLIC_URL` plus `/api/ai/oauth/callback`, nie
-  aus Kopfzeilen der Anfrage (`Host`, `X-Forwarded-Host`). Ohne `HERD_PUBLIC_URL` oder
+- Die **Rückleitungsadresse** ist `HERD_PUBLIC_URL` plus `/api/ai/oauth/<id>/callback`
+  (je App eine eigene, Schutz gegen Mix-up-Angriffe: die Antwort eines Servers kann
+  keinen Ablauf beenden, der mit einem anderen begann), nie aus Kopfzeilen der Anfrage
+  (`Host`, `X-Forwarded-Host`). Die gemeinsame Adresse früherer Versionen,
+  `/api/ai/oauth/callback`, beendet nur noch Abläufe, die mit ihr begannen (also
+  höchstens 10 Minuten nach dem Update). Ohne `HERD_PUBLIC_URL` oder
   mit `http` außer für `localhost`/`127.0.0.1` gibt es kein OAuth (422
   `connector.oauth_unconfigured`).
 - Das Sitzungs-Cookie ist `SameSite=Lax`; die Rückkehr ist eine Navigation, es kommt
   also mit. Ohne gültige Sitzung endet sie mit `invalid`.
+- **Zweck (M10):** Konnektoren und OAuth-Apps haben einen Zweck, `mcp` (alles hier)
+  oder `calendar` (der Zugang einer Person zu ihrem externen Kalender, die Google-App
+  des Kalenders). Diese Seiten zeigen und ändern nur `mcp`; ein Kalender-Zugang oder
+  eine Kalender-App ist hier in keiner Liste und antwortet wie eine unbekannte ID, und
+  ein Kalender-Zugang geht nie an einen MCP-Server (umgekehrt ebenso). Die
+  Rückleitungsadresse bleibt die der App; nach der Rückkehr entscheidet der Zweck des
+  Konnektors, welches Recht noch einmal geprüft wird (`ai.use` bzw. `calendar.sync`) und
+  wohin der Browser geht (`/ai/oauth/done` bzw. `/calendar/accounts`); ohne Sitzung
+  oder ohne passenden Ablauf entscheidet der Zweck der App, deren Rückleitungsadresse
+  getroffen wurde. Die Datenbank hält das auch: ein Kalender-Zugang ist persönlich und
+  an keinem Server, er verbindet sich nur über eine App seines Zwecks, und ein
+  MCP-Server nennt nur Zugänge und Apps des Zwecks `mcp` (zusammengesetzte
+  Fremdschlüssel über `purpose`).
+- **Zwei bewusste Ausnahmen von „wie eine unbekannte ID“:**
+  - **Rückleitungsadresse:** `GET /api/ai/oauth/<ID einer Kalender-App>/callback` mit
+    einem unbekannten oder fehlenden `state` schickt jeden, auch ohne Sitzung, auf
+    `/calendar/accounts?status=invalid`, eine unbekannte ID dagegen auf
+    `/ai/oauth/done?status=invalid`. Verraten wird nur, dass eine nicht zu erratende ID
+    eine Kalender-App ist; jede Autorisierungsanfrage der App zeigt diese ID ihrer
+    Nutzerin ohnehin. Eine eigene Rückleitungsadresse je Zweck würde dagegen den Schutz
+    gegen Verwechslung der Anbieter (M9b, J13) aufheben.
+  - **Namen:** Namen sind über beide Zwecke eindeutig (je Person bzw. Organisation), wie
+    in M8 (der eindeutige Index umfasst beide; ihn aufzuteilen wäre ein Contract). Eine
+    MCP-App mit dem Namen der Kalender-App antwortet daher 409
+    `oauth_client.name_taken`, obwohl keine Liste hier die andere zeigt. Heute liegen
+    `ai.manage` und `calendar.manage` in denselben Rollen, niemand erfährt also etwas
+    Neues. Weil die Installation aus dem Katalog den Namen des Eintrags nimmt, blockiert
+    eine Kalender-App namens „GitHub“ die Installation von GitHub mit diesem 409: dann
+    die Kalender-App umbenennen. Kalender-Zugänge tragen einen erzeugten Namen
+    (`calendar:<id>`), der nie mit einem getippten zusammenstößt.
 
 ### Erneuerung
 
@@ -756,22 +808,37 @@ Recht 404 `ai.not_found`.
   geteilte Konnektor oder bei `personal` der eigene der fragenden Person. Ein Ergebnis
   über den **eigenen Konnektor** der fragenden Person markiert den Lauf wie ein
   gelesener Entwurf (`Reads.personal`, im Journal als `read.personal`, sodass auch ein
-  fortgesetzter Lauf es weiß): Was er danach schreiben will, wo außer dieser Person
-  jemand lesen könnte (ein Kanal, ein Ticket, eine Seite, ein Vorschlag, ein
-  Gedächtnis), wartet auf ihre Freigabe genau dieses Inhalts (Freigabekarte mit
+  fortgesetzter Lauf es weiß): Was er danach anderswo als allein mit ihr
+  schreiben will (ein Kanal, ein Ticket, eine Seite, ein Vorschlag, ein Gedächtnis,
+  jeder Bereich), wartet auf ihre Freigabe genau dieses Inhalts (Freigabekarte mit
   `personal: true`; im Lauf einer Automation oder Ereignisregel: der Eigentümerin);
-  freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Allein mit ihr in
-  der Direktnachricht geht alles ohne Freigabe weiter. In einem Kanal, Thread oder
+  freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Die Karte sagt, dass
+  er jetzt oder später von anderen gelesen werden kann, und zeigt den Inhalt
+  vollständig (Review M8 4, Befund K5), auch beim Schreibwerkzeug eines Servers, den
+  sie mit ihrem eigenen Konnektor nutzt: Was es schreibt, verlässt das System
+  (Review M8 5, Befund L3); was sich nicht vollständig zeigen lässt (ein Vergleich über
+  `HERD_DIFF_MAX_LINES`), wird abgelehnt (`personal_release.too_large`), statt zur
+  Freigabe zu stehen (Review M8 3, Befund H5). Ohne Freigabe schreibt er nur in sein
+  eigenes Gespräch allein mit ihr (ihre Direktnachricht mit dem Agenten; markiert).
+  Jeder andere Ort wartet, auch ihr persönlicher Bereich, ein Bereich, in dem sie heute
+  allein ist, und das Gedächtnis des Agenten: Was dort steht, trägt keine Marke
+  (Review M8 4, Befunde K1 und K2). In einem Kanal, Thread oder
   einer Direktnachricht mit mehreren bleiben seine Antwort und seine Rückfrage
   zurückgehalten: Er endet statt mit seiner Antwort mit `policy_blocked`
   (`personal_connector`, auch im Hinweis des Gesprächs: `system.stop_detail`). Die
   Marke beginnt also mit dem ersten persönlichen Inhalt im Kontext und endet, wenn
-  keiner mehr darin ist. Sie folgt dem Inhalt: Jede Nachricht eines markierten Laufs ist selbst markiert
+  keiner mehr darin ist. Jedes Ereignis eines markierten Laufs zeigt die Laufansicht
+  nur ihr; alle anderen sehen es geschwärzt, den ganzen Lauf (Review M8 3, Befund H1). Sie folgt dem Inhalt: Jede Nachricht eines markierten Laufs ist selbst markiert
   (`personal`), und ein späterer Lauf ist markiert, sobald eine markierte Nachricht in
   sein Verlaufsfenster, ein Treffer eines markierten Laufs aus `search_past_runs` oder
   eine markierte Nachricht aus `read_conversation` in seinen Kontext kommt; das steht
   sofort in seinem Journal. Ohne markierten Inhalt im Kontext beginnt ein Lauf ohne
-  Marke (siehe [`AGENTEN.md`](AGENTEN.md)). Ergebnisse über einen geteilten
+  Marke (siehe [`AGENTEN.md`](AGENTEN.md)). Von selbst nimmt nichts die Marke ab; mit
+  „Neu beginnen“ in ihrer Direktnachricht allein mit dem Agenten setzt die Person einen
+  Schnitt, nach dem Läufe dort nichts von davor bekommen: keinen Verlauf, nichts über
+  `read_conversation` und keinen Treffer von `search_past_runs` aus früheren Läufen;
+  was sie zum Merken freigegeben hat, bleibt (`POST /api/conversations/{id}/fresh-start`;
+  Review M8 3, Befund H2; Review M8 4, Befund K3). Ergebnisse über einen geteilten
   Konnektor, Fehler und `external_outcome_unknown` markieren nicht. Trägt der Lauf die Marke, wartet jeder
   Aufruf eines externen Servers, den er nicht mit dem eigenen Konnektor der fragenden
   Person nutzt (geteilter Konnektor oder keiner), auch eines **lesenden** Werkzeugs, auf
@@ -851,7 +918,8 @@ Werkzeug einzeln: Eine Vorlage schlägt nur vor.
 
 - **GitHub** bietet keine dynamische Client-Registrierung: Für OAuth legt die
   Organisation eine eigene GitHub-App (empfohlen: Token laufen ab und werden erneuert)
-  oder OAuth-App an, Callback-URL `<HERD_PUBLIC_URL>/api/ai/oauth/callback`. GitHub
+  oder OAuth-App an, Callback-URL die der OAuth-App hier
+  (`<HERD_PUBLIC_URL>/api/ai/oauth/<id>/callback`, auf ihrer Karte). GitHub
   hat keinen Widerrufs-Endpunkt nach RFC 7009; Zugänge widerruft man bei GitHub in den
   Einstellungen des Kontos. GitHub Enterprise Server hat keinen entfernten MCP-Server.
   Nicht geprüft werden konnte, ob GitHubs Autorisierungsserver den Parameter
@@ -1004,8 +1072,8 @@ im Prozess (keine Sitzungen, keine Streams). Für den Weg dorthin gilt:
   Proxy); private Hosts zusätzlich in `HERD_MCP_ALLOWED_HOSTS`.
 - **OAuth:** `HERD_PUBLIC_URL` (Chart `publicUrl`, sonst aus dem ersten Ingress-Host)
   muss die Adresse sein, unter der Browser die App öffnen; die Rückleitungsadresse
-  `<HERD_PUBLIC_URL>/api/ai/oauth/callback` muss beim Anbieter genau so eingetragen
-  sein. Ihr Query enthält den Code: Er steht im Zugriffsprotokoll des Proxys, ist aber
+  jeder OAuth-App, `<HERD_PUBLIC_URL>/api/ai/oauth/<id>/callback`, muss beim Anbieter
+  genau so eingetragen sein (nach dem Update auf M9b neu eintragen). Ihr Query enthält den Code: Er steht im Zugriffsprotokoll des Proxys, ist aber
   nur einmal und nur mit Prüfwert einlösbar.
 
 ### Einstellungen

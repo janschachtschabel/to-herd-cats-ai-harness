@@ -21,8 +21,8 @@ for (const [label, limits] of [
 ]) {
   test(`an update over the ${label} limit closes only its sender`, async () => {
     live = await liveFixture({ createCollabServer, ...limits });
-    const anna = live.open({ cookie: "herd_session=token-a" });
-    const ben = live.open({ cookie: "herd_session=token-b" });
+    const anna = live.open({ grant: "herd_cg_a" });
+    const ben = live.open({ grant: "herd_cg_b" });
     await Promise.all([synced(anna), synced(ben)]);
     await until(() => live.api.saves.length === 1);
     type(anna.doc, " klein");
@@ -44,7 +44,7 @@ test("the size is measured exactly before an update is admitted (review M2 S5)",
   // 300 characters fit under a limit of 400: admitted, though a rough estimate of what
   // the update could add would refuse it. 200 more do not fit: refused.
   live = await liveFixture({ createCollabServer, maxMarkdownChars: 400, measureEveryMs: 0 });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await synced(anna);
   type(anna.doc, ` ${"a".repeat(300)}`);
   await until(() => live.api.saves.some((s) => s.content_md.includes("a".repeat(300))));
@@ -58,8 +58,8 @@ test("a long text in one cell of a long table keeps the session (review M2 S5)",
   const rows = Array.from({ length: 400 }, (_, i) => `| ${i} | Artikel ${i} |`);
   const markdown = ["| Nr | Name |", "| --- | --- |", ...rows].join("\n");
   live = await liveFixture({ markdown, createCollabServer });
-  const anna = live.open({ cookie: "herd_session=token-a" });
-  const ben = live.open({ cookie: "herd_session=token-b" });
+  const anna = live.open({ grant: "herd_cg_a" });
+  const ben = live.open({ grant: "herd_cg_b" });
   await Promise.all([synced(anna), synced(ben)]);
   const table = anna.doc.getXmlFragment("default").get(0);
   const cell = table.get(1).get(1).get(0).get(0); // row 0, column "Name": its text
@@ -77,8 +77,8 @@ test("a document is measured exactly at most once per interval (review M2 S10, T
   // Near the limit every update needs a measurement of the whole document: one within
   // the interval waits for its end and is measured then, its sender stays (T12).
   live = await liveFixture({ createCollabServer, maxMarkdownChars: 400, measureEveryMs: 600 });
-  const anna = live.open({ cookie: "herd_session=token-a" });
-  const ben = live.open({ cookie: "herd_session=token-b" });
+  const anna = live.open({ grant: "herd_cg_a" });
+  const ben = live.open({ grant: "herd_cg_b" });
   await Promise.all([synced(anna), synced(ben)]);
   type(anna.doc, ` ${"a".repeat(300)}`);
   await until(() => text(ben).includes("a".repeat(300)));
@@ -103,7 +103,7 @@ test("a page whose state is over the limit is not opened", async () => {
     createCollabServer,
     maxStateBytes: 1500,
   });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await until(() => anna.closes.includes(4413));
   assert.equal(anna.provider.synced, false);
   assert.equal(live.api.saves.length, 0);

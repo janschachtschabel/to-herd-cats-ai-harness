@@ -36,7 +36,19 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "replicas": {"type": "integer", "minimum": 0, "description": "Number of API pods"},
+        "replicas": {"type": "integer", "minimum": 0, "description": "Number of API pods; ignored with autoscaling.enabled"},
+        "autoscaling": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A HorizontalPodAutoscaler (autoscaling/v2) on CPU in place of replicas",
+          "properties": {
+            "enabled": {"type": "boolean", "description": "Scale the API pods with a HorizontalPodAutoscaler"},
+            "minReplicas": {"type": "integer", "minimum": 1, "description": "Fewest pods (default 2)"},
+            "maxReplicas": {"type": "integer", "minimum": 1, "description": "Most pods (default 6); not below minReplicas"},
+            "targetCPUUtilizationPercentage": {"type": "integer", "minimum": 1, "maximum": 100, "description": "Average CPU use the autoscaler aims at, percent of the CPU request"}
+          },
+          "required": ["enabled", "minReplicas", "maxReplicas", "targetCPUUtilizationPercentage"]
+        },
         "resources": {
           "type": "object",
           "description": "Kubernetes ResourceRequirements",
@@ -58,15 +70,36 @@
         },
         "cookieSecure": {"type": "boolean", "description": "Session cookie with Secure (HERD_COOKIE_SECURE)"},
         "forwardedAllowIps": {"type": "string", "description": "Trusted reverse proxies (HERD_FORWARDED_ALLOW_IPS); required when ingress.enabled"},
+        "sessionIdleHours": {"type": "integer", "minimum": 0, "maximum": 8760, "description": "Hours without a request after which a login session ends (HERD_SESSION_IDLE_HOURS); 0: no idle limit"},
         "env": {
           "type": "object",
-          "description": "Extra environment variables (name: value)",
-          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE, in any case, are refused: those come from Secrets) and never a name the chart sets itself (the render fails)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Ee][Gg][Rr][Ee][Ss][Ss]_[Pp][Rr][Oo][Xx][Yy]|[Oo][Ff][Ff][Ss][Ii][Tt][Ee]"}},
           "additionalProperties": {"type": "string"}
         }
       },
-      "required": ["replicas", "resources", "cookieSecure", "forwardedAllowIps", "env"],
+      "required": ["replicas", "autoscaling", "resources", "cookieSecure", "forwardedAllowIps", "sessionIdleHours", "env"],
       "description": "The API Deployment (HERD_ROLE=api)"
+    },
+    "writeLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The write limit per person and minute (J10)",
+      "properties": {
+        "perMinute": {"type": "integer", "minimum": 1, "maximum": 100000, "description": "HERD_WRITE_RATE_PER_MINUTE (API and worker)"},
+        "uploadsPerMinute": {"type": "integer", "minimum": 1, "maximum": 100000, "description": "HERD_UPLOAD_RATE_PER_MINUTE (API)"}
+      },
+      "required": ["perMinute", "uploadsPerMinute"]
+    },
+    "virusScan": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The optional virus scan of uploads through a clamd of your own (J11)",
+      "properties": {
+        "clamavAddress": {"type": "string", "pattern": "^(([A-Za-z0-9.-]+|\\[[0-9A-Fa-f:.]+\\]):[0-9]{1,5})?$", "description": "HERD_CLAMAV_ADDRESS (API): host:port; empty: no scan"},
+        "egress": {"type": "array", "description": "NetworkPolicyEgressRules of the API pods alone to clamd, with networkPolicy.enabled", "items": {"type": "object"}}
+      },
+      "required": ["clamavAddress", "egress"]
     },
     "publicUrl": {"type": "string", "pattern": "^(https?://[^/?#\\s]+)?$", "description": "The address browsers use (HERD_PUBLIC_URL), scheme://host[:port]; empty: derived from the Ingress"},
     "persistence": {
@@ -87,12 +120,105 @@
       "required": ["enabled", "existingClaim", "size", "storageClass", "accessModes"],
       "description": "The files volume (attachments) of the API pods"
     },
+    "s3": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "HERD_STORAGE=s3 for the API, worker and backup pods"},
+        "endpoint": {"type": "string", "maxLength": 2048, "pattern": "^(https?://[A-Za-z0-9.:\\[\\]-]+/?)?$", "description": "HERD_S3_ENDPOINT: scheme://host[:port], no path, no credentials"},
+        "region": {"type": "string", "pattern": "^[a-z0-9-]{1,32}$", "description": "HERD_S3_REGION"},
+        "bucket": {"type": "string", "pattern": "^([a-z0-9][a-z0-9.-]{1,61}[a-z0-9])?$", "description": "HERD_S3_BUCKET; required with s3.enabled"},
+        "prefix": {"type": "string", "maxLength": 512, "pattern": "^/?([a-z0-9][a-z0-9_-]*(/[a-z0-9][a-z0-9_-]*)*/?)?$", "description": "HERD_S3_PREFIX: lower-case segments separated by /"},
+        "existingSecret": {"type": "string", "maxLength": 253, "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$", "description": "A Secret with the keys access-key-id and secret-access-key; required with s3.enabled"},
+        "egress": {
+          "type": "array",
+          "description": "NetworkPolicyEgressRules of the API, worker and backup pods to the store, with networkPolicy.enabled",
+          "items": {"type": "object"}
+        }
+      },
+      "required": ["enabled", "endpoint", "region", "bucket", "prefix", "existingSecret", "egress"],
+      "description": "Attachments in an S3-compatible store"
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "Run the backup CronJob (python -m app.ops backup run --scheduled); needs persistence.enabled or s3.enabled"},
+        "schedule": {"type": "string", "pattern": "^\\S+( \\S+){4}$", "description": "Cron schedule of the CronJob, five fields, Etc/UTC"},
+        "keepDaily": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_DAILY"},
+        "keepWeekly": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_WEEKLY"},
+        "keepMonthly": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_MONTHLY"},
+        "alertAfterHours": {"type": "number", "exclusiveMinimum": 0, "maximum": 1440, "description": "HERD_BACKUP_ALERT_AFTER_HOURS (worker): HerdBackupTooOld"},
+        "uploadMaxBytes": {"type": "integer", "minimum": 1, "description": "HERD_BACKUP_UPLOAD_MAX_BYTES (API): largest archive an owner may upload"},
+        "tmpSizeLimit": {"type": "string", "pattern": "^[0-9]+(Ki|Mi|Gi|Ti)$", "description": "sizeLimit of the backup pod's /tmp emptyDir (restic's cache; the dump goes to the backups claim)"},
+        "resources": {
+          "type": "object",
+          "description": "Kubernetes ResourceRequirements",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            }
+          }
+        },
+        "persistence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingClaim": {"type": "string", "maxLength": 253, "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$", "description": "Existing PersistentVolumeClaim; empty: the chart creates one"},
+            "size": {"type": "string", "minLength": 1, "description": "Size of the created claim"},
+            "storageClass": {"type": "string", "description": "Storage class; empty: cluster default"},
+            "accessModes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string", "enum": ["ReadWriteOnce", "ReadWriteMany", "ReadWriteOncePod"]},
+              "description": "Access modes of the created claim"
+            }
+          },
+          "required": ["existingClaim", "size", "storageClass", "accessModes"],
+          "description": "The archives' PersistentVolumeClaim on /backups"
+        },
+        "offsite": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {"type": "string", "maxLength": 253, "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$", "description": "Existing Secret with HERD_BACKUP_OFFSITE_REPOSITORY, HERD_BACKUP_OFFSITE_PASSWORD and the storage's credentials, for the backup job alone; empty: no offsite copy"},
+            "egress": {"type": "array", "description": "NetworkPolicyEgressRules of the backup pods to the offsite storage", "items": {"type": "object"}}
+          },
+          "required": ["existingSecret", "egress"],
+          "description": "Offsite copies with restic"
+        }
+      },
+      "required": ["enabled", "schedule", "keepDaily", "keepWeekly", "keepMonthly", "alertAfterHours", "uploadMaxBytes", "tmpSizeLimit", "resources", "persistence", "offsite"],
+      "description": "The backup CronJob, its claim and the offsite copy"
+    },
     "worker": {
       "type": "object",
       "additionalProperties": false,
       "description": "The worker Deployment (HERD_ROLE=worker, the outbox dispatcher)",
       "properties": {
-        "replicas": {"type": "integer", "minimum": 0, "description": "Number of worker pods; more than one is safe"},
+        "replicas": {"type": "integer", "minimum": 0, "description": "Number of worker pods; more than one is safe; ignored with autoscaling.enabled"},
+        "autoscaling": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A HorizontalPodAutoscaler (autoscaling/v2) on CPU in place of replicas",
+          "properties": {
+            "enabled": {"type": "boolean", "description": "Scale the worker pods with a HorizontalPodAutoscaler"},
+            "minReplicas": {"type": "integer", "minimum": 1, "description": "Fewest pods (default 1)"},
+            "maxReplicas": {"type": "integer", "minimum": 1, "description": "Most pods (default 3); not below minReplicas"},
+            "targetCPUUtilizationPercentage": {"type": "integer", "minimum": 1, "maximum": 100, "description": "Average CPU use the autoscaler aims at, percent of the CPU request"}
+          },
+          "required": ["enabled", "minReplicas", "maxReplicas", "targetCPUUtilizationPercentage"]
+        },
         "resources": {
           "type": "object",
           "description": "Kubernetes ResourceRequirements",
@@ -104,12 +230,12 @@
         },
         "env": {
           "type": "object",
-          "description": "Extra environment variables (name: value)",
-          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE, in any case, are refused: those come from Secrets) and never a name the chart sets itself (the render fails)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Ee][Gg][Rr][Ee][Ss][Ss]_[Pp][Rr][Oo][Xx][Yy]|[Oo][Ff][Ff][Ss][Ii][Tt][Ee]"}},
           "additionalProperties": {"type": "string"}
         }
       },
-      "required": ["replicas", "resources", "env"]
+      "required": ["replicas", "autoscaling", "resources", "env"]
     },
     "ai": {
       "type": "object",
@@ -148,11 +274,44 @@
       "required": ["ratePerMinute", "allowedHosts", "catalogConfigMap", "maxCallsPerRun"],
       "description": "The MCP endpoint and its access tokens"
     },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowedHosts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9.:/-]+$", "minLength": 1, "maxLength": 253},
+          "description": "HERD_OIDC_ALLOWED_HOSTS (API): host names or private networks (CIDR)"
+        },
+        "ratePerMinute": {"type": "integer", "minimum": 1, "maximum": 10000, "description": "HERD_OIDC_RATE_PER_MINUTE (API)"},
+        "existingSecret": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$",
+          "description": "A Secret with HERD_OIDC_<NAME> client secrets for the API pods; empty: none"
+        },
+        "egress": {"type": "array", "description": "NetworkPolicyEgressRules of the API pods alone to the identity providers, with networkPolicy.enabled", "items": {"type": "object"}}
+      },
+      "required": ["allowedHosts", "ratePerMinute", "existingSecret", "egress"],
+      "description": "Sign-in through OIDC providers"
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "A PodDisruptionBudget for api and worker when they run at least two pods"},
+        "maxUnavailable": {"type": "integer", "minimum": 1, "description": "Pods of one component a voluntary disruption may take at once"}
+      },
+      "required": ["enabled", "maxUnavailable"],
+      "description": "PodDisruptionBudgets (policy/v1)"
+    },
     "collab": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean", "description": "Run the collab process (live editing)"},
+        "replicas": {"type": "integer", "minimum": 1, "description": "Collab pods; from 2 each page is bound to one of them (RollingUpdate, PodDisruptionBudget)"},
         "resources": {
           "type": "object",
           "description": "Kubernetes ResourceRequirements",
@@ -174,8 +333,8 @@
         },
         "env": {
           "type": "object",
-          "description": "Extra environment variables (name: value)",
-          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE, in any case, are refused: those come from Secrets) and never a name the chart sets itself (the render fails)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Ee][Gg][Rr][Ee][Ss][Ss]_[Pp][Rr][Oo][Xx][Yy]|[Oo][Ff][Ff][Ss][Ii][Tt][Ee]"}},
           "additionalProperties": {"type": "string"}
         },
         "internalToken": {
@@ -187,8 +346,8 @@
           "required": ["existingSecret"]
         }
       },
-      "required": ["enabled", "resources", "env", "internalToken"],
-      "description": "The collab Deployment (HERD_ROLE=collab), always one replica"
+      "required": ["enabled", "replicas", "resources", "env", "internalToken"],
+      "description": "The collab Deployment (HERD_ROLE=collab)"
     },
     "secrets": {
       "type": "object",
@@ -204,17 +363,31 @@
       "additionalProperties": false,
       "properties": {
         "url": {"type": "string", "description": "External PostgreSQL URL without the password"},
-        "existingSecret": {"type": "string", "description": "Existing Secret with the database password under the key \"password\""}
+        "existingSecret": {"type": "string", "description": "Existing Secret with the database password under the key \"password\"; with the bundled PostgreSQL also \"owner-password\" (the app's role herd_owner; \"password\" is the superuser's)"},
+        "sslMode": {"type": "string", "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"], "description": "HERD_DATABASE_SSLMODE (libpq's sslmode); empty: the URL's own"},
+        "migrate": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Separate database roles (J14): the schema owner for migration and backup",
+          "properties": {
+            "url": {"type": "string", "description": "HERD_MIGRATE_DATABASE_URL: the schema owner's URL without the password; empty: one role"},
+            "existingSecret": {"type": "string", "maxLength": 253, "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$", "description": "Existing Secret with the owner's password under the key \"password\""},
+            "runtimeRole": {"type": "string", "pattern": "^([a-z_][a-z0-9_]{0,62})?$", "description": "HERD_DATABASE_RUNTIME_ROLE: the role of database.url, data rights only"}
+          },
+          "required": ["url", "existingSecret", "runtimeRole"]
+        },
+        "caSecret": {"type": "string", "maxLength": 253, "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$", "description": "Existing Secret with the database's CA certificate under the key \"ca.crt\" (HERD_DATABASE_SSLROOTCERT)"}
       },
-      "required": ["url", "existingSecret"],
+      "required": ["url", "existingSecret", "sslMode", "caSecret", "migrate"],
       "description": "External database"
     },
     "postgresql": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {"type": "boolean", "description": "Run the bundled single-pod PostgreSQL (test and staging only)"},
+        "enabled": {"type": "boolean", "description": "Run the bundled single-pod PostgreSQL (test and staging only); the app connects to it as herd_owner (owner of the database, no superuser), made by the migration job's db-owner step"},
         "image": {"type": "string", "description": "PostgreSQL (pgvector) image", "minLength": 1},
+        "maxConnections": {"type": "integer", "minimum": 20, "maximum": 10000, "description": "max_connections of the bundled PostgreSQL; must cover 16 per API and worker pod plus 10"},
         "storage": {
           "type": "object",
           "additionalProperties": false,
@@ -244,7 +417,7 @@
           }
         }
       },
-      "required": ["enabled", "image", "storage", "resources"],
+      "required": ["enabled", "image", "maxConnections", "storage", "resources"],
       "description": "Bundled PostgreSQL"
     },
     "ingress": {
@@ -382,5 +555,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "publicUrl", "persistence", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "writeLimit", "virusScan", "publicUrl", "persistence", "s3", "backup", "podDisruptionBudget", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

@@ -1,0 +1,212 @@
+# to-herd-cats-ai for the Hostinger Docker Manager ("Compose from URL"), step by step in
+# docs/HOSTINGER.md. Also runs with plain `docker compose up -d` on any server whose
+# Traefik serves ports 80 and 443. The build and reference variant (own ports, offsite
+# backups, several API nodes) is deploy/compose/.
+#
+# The first deploy needs no value at all: the service init generates every secret once
+# into the volumes secrets and db-secret (read through *_FILE, never env values) and
+# skips what still lacks a value. db-owner then makes the app's database role herd_owner
+# (owner of the database, no superuser; the superuser herd serves only the database
+# itself), on every deploy. Then fill .env (DOMAIN, ADMIN_EMAIL, ADMIN_PASSWORD)
+# and deploy again. HTTPS comes from Hostinger's Traefik through the labels of app; no
+# port of this stack is published.
+#
+# app runs every role in one container (HERD_ROLE=all): migrations at the start, the
+# API with the SPA, the worker (outbox, agent runs, automations) and the live-editing
+# process as a child on 127.0.0.1, which the API relays under /collab; so one Traefik
+# router serves everything. backup makes the backups into the volume backups; app
+# mounts it too, for the administration's page (Verwaltung → Sicherung).
+# Every deploy pulls the image (pull_policy: always), so a redeploy brings the newest
+# image of HERD_IMAGE_TAG (1.0: the newest 1.0.x).
+
+services:
+  init:
+    image: ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}
+    pull_policy: always
+    entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.stack"]
+    command: ["init", "--secrets", "/secrets", "--db-secret", "/db-secret"]
+    environment:
+      DOMAIN: ${DOMAIN:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - secrets:/secrets
+      - db-secret:/db-secret
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  db:
+    image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+    depends_on:
+      init:
+        condition: service_completed_successfully
+        restart: true
+    environment:
+      POSTGRES_USER: herd
+      POSTGRES_DB: herd
+      POSTGRES_PASSWORD_FILE: /run/herd-db/db_password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - db-secret:/run/herd-db:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U herd -d herd"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # The app's database role (docs/HOSTINGER.md, "Datenbankrolle"): herd_owner owns the
+  # database, its schema and every object in it and is no superuser, so an archive
+  # restored under Verwaltung -> Sicherung cannot run programs on the database host.
+  # Made by the superuser herd on every deploy (a database that served herd moves by
+  # itself); its password comes from init. It ends with exit 0.
+  db-owner:
+    image: ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}
+    pull_policy: always
+    entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.stack"]
+    command: ["db-owner", "--superuser-password-file", "/db-secret/db_password", "--owner-password-file", "/secrets/db_owner_password"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+        restart: true
+      db:
+        condition: service_healthy
+    volumes:
+      - secrets:/secrets:ro
+      - db-secret:/db-secret:ro
+    networks:
+      - internal
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  app:
+    image: ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}
+    pull_policy: always
+    depends_on:
+      init:
+        condition: service_completed_successfully
+        restart: true
+      db:
+        condition: service_healthy
+      db-owner:
+        condition: service_completed_successfully
+    environment:
+      HERD_ROLE: all
+      HERD_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+      HERD_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
+      HERD_SECRET_KEY_FILE: /secrets/secret_key
+      HERD_INTERNAL_TOKEN_FILE: /secrets/internal_token
+      # The first owner, created only while nobody exists; init checked both values and
+      # empties the password file once ADMIN_PASSWORD is cleared in .env.
+      HERD_BOOTSTRAP_ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE: /secrets/bootstrap_admin_password
+      # Without DOMAIN nobody reaches the app; localhost keeps the setting a valid origin.
+      HERD_PUBLIC_URL: https://${DOMAIN:-localhost}
+      HERD_COOKIE_SECURE: "true"
+      # Hostinger's Traefik runs in the host's network: requests come from the Docker
+      # network's gateway, a private address.
+      HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}
+      HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
+      HERD_COLLAB_MEMORY_BUDGET_MB: ${HERD_COLLAB_MEMORY_BUDGET_MB:-400}
+      HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
+      HERD_BACKUP_ALERT_AFTER_HOURS: ${HERD_BACKUP_ALERT_AFTER_HOURS:-26}
+      HERD_BACKUP_UPLOAD_MAX_BYTES: ${HERD_BACKUP_UPLOAD_MAX_BYTES:-2147483648}
+    volumes:
+      - app-data:/data
+      - backups:/backups
+      - secrets:/secrets:ro
+    networks:
+      - default
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-herd-web}"
+      - "traefik.http.routers.herd-app.rule=Host(`${DOMAIN:-}`)"
+      - "traefik.http.routers.herd-app.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.herd-app.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.herd-app.service=herd-app"
+      - "traefik.http.services.herd-app.loadbalancer.server.port=8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  # Backups (docs/SICHERUNG.md): database and attachments on HERD_BACKUP_SCHEDULE (cron,
+  # UTC) into the volume backups, checked, the newest of the last days, weeks and months
+  # kept. By hand: docker compose exec backup python -m app.ops backup run (or list).
+  backup:
+    image: ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}
+    pull_policy: always
+    entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.ops"]
+    command: ["backup", "schedule"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+        restart: true
+      db:
+        condition: service_healthy
+      db-owner:
+        condition: service_completed_successfully
+    environment:
+      HERD_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+      HERD_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
+      # Only its key id goes into the archive, for the restore's check.
+      HERD_SECRET_KEY_FILE: /secrets/secret_key
+      HERD_BACKUP_SCHEDULE: ${HERD_BACKUP_SCHEDULE:-30 2 * * *}
+      HERD_BACKUP_KEEP_DAILY: ${HERD_BACKUP_KEEP_DAILY:-7}
+      HERD_BACKUP_KEEP_WEEKLY: ${HERD_BACKUP_KEEP_WEEKLY:-4}
+      HERD_BACKUP_KEEP_MONTHLY: ${HERD_BACKUP_KEEP_MONTHLY:-6}
+      HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
+    volumes:
+      - app-data:/data:ro
+      - backups:/backups
+      - secrets:/secrets:ro
+    networks:
+      - internal
+    # The image's own check asks the API; this one asks whether the backup directory is
+    # there and writable (the scheduler itself is the container's process). A disabled
+    # check would fail `docker compose up --wait` ("no healthcheck configured").
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, sys; d = os.environ.get('HERD_BACKUP_DIR', '/backups'); sys.exit(0 if os.path.isdir(d) and os.access(d, os.W_OK | os.X_OK) else 1)"]
+      interval: 10s
+      timeout: 3s
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+networks:
+  # The network Traefik reaches the app on: created when missing, shared when it exists.
+  default:
+    name: ${TRAEFIK_NETWORK:-herd-web}
+  # The database's own network, without a way out.
+  internal:
+    internal: true
+
+volumes:
+  db-data:
+  app-data:
+  backups:
+  secrets:
+  db-secret:

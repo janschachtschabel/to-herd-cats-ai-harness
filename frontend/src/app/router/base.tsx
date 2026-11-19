@@ -8,8 +8,9 @@ import {
 } from '@tanstack/react-router'
 import { AppShell } from '@/app/shell/AppShell'
 import { meQuery } from '@/features/auth/queries'
+import { MaintenanceGate } from '@/features/shared/MaintenancePage'
 import { NotFoundPage } from './NotFoundPage'
-import { safeRedirect } from './search'
+import { safeRedirect, secondFactor, signInError, type LoginSearch } from './search'
 
 const LoginPage = lazyRouteComponent(() => import('@/features/auth/LoginPage'), 'LoginPage')
 
@@ -18,17 +19,25 @@ export interface RouterContext {
 }
 
 export const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: Outlet,
+  // In maintenance (a request answered 503 `maintenance.active`) the whole window waits.
+  component: () => (
+    <MaintenanceGate>
+      <Outlet />
+    </MaintenanceGate>
+  ),
   notFoundComponent: NotFoundPage,
 })
 
 export const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
-    const target = safeRedirect(search.redirect)
-    return target ? { redirect: target } : {}
-  },
+  // Every key always comes back, undefined when refused: TanStack Router lays the result
+  // over the raw search, so a key left out would keep its unchecked value.
+  validateSearch: (search: Record<string, unknown>): LoginSearch => ({
+    redirect: safeRedirect(search.redirect),
+    error: signInError(search.error),
+    second_factor: secondFactor(search.second_factor),
+  }),
   beforeLoad: async ({ context, search }) => {
     const me = await context.queryClient.ensureQueryData(meQuery)
     if (me) throw redirect({ to: search.redirect ?? '/spaces' })

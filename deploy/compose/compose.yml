@@ -4,12 +4,34 @@
 # that child keeps its live documents under HERD_COLLAB_MEMORY_BUDGET_MB, 400 by
 # default, and needs up to about 800 MB with it, docs/WIKI.md. If the child dies, the
 # app exits and `restart: unless-stopped` starts it again).
-# compose.nodes.yml runs the roles in separate containers instead (two API nodes).
+# compose.nodes.yml runs the roles in separate containers instead (two API nodes);
+# compose.roles.yml separates the database roles (schema owner and runtime role).
+# The app never connects as the bundled PostgreSQL's superuser `herd`: the service
+# db-owner makes the role herd_owner (owner of the database and its schema, no
+# superuser) before the app on every start and generates its password once into the
+# volume secrets (docs/SICHERUNG.md, "Was ein Archiv ausführen darf").
 # Secrets come from .env next to this file (see .env.example), the AI keys from the
 # optional ai.env (see ai.env.example; agent runs work in the same process). Only the public port
 # 8080 is published; 9090 (probes, metrics, the collab process's internal API) and
-# the collab port stay inside. Attachments live on the volume app-data (/data).
+# the collab port stay inside. Attachments live on the volume app-data (/data), or
+# with HERD_STORAGE=s3 in an S3-compatible store (compose.s3.yml runs SeaweedFS).
+# The service backup makes the backups (docs/SICHERUNG.md): on HERD_BACKUP_SCHEDULE
+# into the volume backups (/backups), with retention and, with the optional
+# backup.env (see backup.env.example), a restic copy offsite.
 name: to-herd-cats-ai
+
+# Where attachments live (docs/SICHERUNG.md, "Anhänge in S3"): `local` (the volume
+# app-data) or `s3`. For s3 set the endpoint (scheme://host[:port]), the bucket and its
+# keys in .env; keys go under HERD_S3_PREFIX inside the bucket. Moving existing files:
+# `docker compose exec app python -m app.ops storage copy --to s3`.
+x-storage: &storage
+  HERD_STORAGE: ${HERD_STORAGE:-local}
+  HERD_S3_ENDPOINT: ${HERD_S3_ENDPOINT:-}
+  HERD_S3_REGION: ${HERD_S3_REGION:-us-east-1}
+  HERD_S3_BUCKET: ${HERD_S3_BUCKET:-}
+  HERD_S3_ACCESS_KEY_ID: ${HERD_S3_ACCESS_KEY_ID:-}
+  HERD_S3_SECRET_ACCESS_KEY: ${HERD_S3_SECRET_ACCESS_KEY:-}
+  HERD_S3_PREFIX: ${HERD_S3_PREFIX:-}
 
 services:
   db:
@@ -27,6 +49,35 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # The app's database role (review M9b F2-1): herd_owner owns the database, its schema
+  # and every object in it and is no superuser, so an archive restored in the
+  # administration cannot run programs on the database host. Run as `herd` on every
+  # start; an installation that ran as `herd` moves by itself. Its password is
+  # generated once into the volume secrets and never replaced. It ends (exit 0).
+  db-owner:
+    image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.stack"]
+    command: ["db-owner"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HERD_DB_SUPERUSER_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - secrets:/secrets
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
   app:
     image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
     build:
@@ -35,20 +86,46 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-owner:
+        condition: service_completed_successfully
     environment:
+      <<: *storage
       HERD_ROLE: all
-      # The password is kept out of the URL; the app merges it in (escaped).
-      HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
-      HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      # The role db-owner made; its password from a file (never an env value).
+      HERD_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+      HERD_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
+      # TLS to an external database: libpq's sslmode (verify-full recommended) and the
+      # CA file to check its certificate against (mount it). Empty: the URL's own
+      # setting; the bundled db speaks no TLS (same host, no network in between).
+      HERD_DATABASE_SSLMODE: ${HERD_DATABASE_SSLMODE:-}
+      HERD_DATABASE_SSLROOTCERT: ${HERD_DATABASE_SSLROOTCERT:-}
+      # Separate database roles (docs/SICHERUNG.md; compose.roles.yml sets them up):
+      # the schema owner for migrations, backups and restores, and the role of
+      # HERD_DATABASE_URL that gets data rights only. Empty: one role, as by default.
+      HERD_MIGRATE_DATABASE_URL: ${HERD_MIGRATE_DATABASE_URL:-}
+      HERD_MIGRATE_DATABASE_PASSWORD: ${HERD_MIGRATE_DATABASE_PASSWORD:-}
+      HERD_DATABASE_RUNTIME_ROLE: ${HERD_DATABASE_RUNTIME_ROLE:-}
       HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
       HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
       # Shared by the API and the collab process (live editing); at least 32 characters.
       HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}
+      # During a rotation of the token: the old one, still accepted (docs/WIKI.md).
+      HERD_INTERNAL_TOKEN_PREVIOUS: ${HERD_INTERNAL_TOKEN_PREVIOUS:-}
       # The address browsers use, e.g. https://wiki.example; WebSocket Origins must
       # match it. Empty: they must match the host the request came to.
       HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
       HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
       HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
+      # A login session ends after this many hours without a request (0: no idle
+      # limit; it still ends after 7 days). docs/ANMELDUNG.md.
+      HERD_SESSION_IDLE_HOURS: ${HERD_SESSION_IDLE_HOURS:-24}
+      # Writes per person (and per agent) and minute, uploads apart; beyond: 429.
+      HERD_WRITE_RATE_PER_MINUTE: ${HERD_WRITE_RATE_PER_MINUTE:-120}
+      HERD_UPLOAD_RATE_PER_MINUTE: ${HERD_UPLOAD_RATE_PER_MINUTE:-30}
+      # Optional virus scan of attachments and imports: a clamd of your own as
+      # host:port (e.g. clamav:3310, see the example below); empty: no scan. Set, it
+      # fails closed: a scanner that cannot answer refuses uploads (503).
+      HERD_CLAMAV_ADDRESS: ${HERD_CLAMAV_ADDRESS:-}
       HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
       # AI and agents (docs/AGENTEN.md): test call timeout, personal agents and
       # automations per person, hours a run waits for a release or an answer, runs at
@@ -68,9 +145,20 @@ services:
       HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
       HERD_MCP_CATALOG_DIR: ${HERD_MCP_CATALOG_DIR:-}
       HERD_MCP_MAX_CALLS_PER_RUN: ${HERD_MCP_MAX_CALLS_PER_RUN:-20}
+      # Backups (docs/SICHERUNG.md): the worker exports the age of the last good backup
+      # at which HerdBackupTooOld fires, in hours. The administration's page (owners)
+      # lists, makes, checks and restores archives on the volume backups; an uploaded
+      # archive may be this large (bytes, default 2 GiB; a proxy in front needs as much).
+      HERD_BACKUP_ALERT_AFTER_HOURS: ${HERD_BACKUP_ALERT_AFTER_HOURS:-26}
+      HERD_BACKUP_UPLOAD_MAX_BYTES: ${HERD_BACKUP_UPLOAD_MAX_BYTES:-2147483648}
+      # Sign-in through OIDC (docs/ANMELDUNG.md): private hosts (names or CIDR, comma
+      # separated) an identity provider may run on (empty: public ones only); starts
+      # and callbacks per client address and minute. HERD_PUBLIC_URL must be set.
+      HERD_OIDC_ALLOWED_HOSTS: ${HERD_OIDC_ALLOWED_HOSTS:-}
+      HERD_OIDC_RATE_PER_MINUTE: ${HERD_OIDC_RATE_PER_MINUTE:-30}
     # HERD_SECRET_KEY, HERD_SECRET_KEY_PREVIOUS, HERD_AI_EGRESS_PROXY and the provider
-    # keys (env:HERD_AI_<NAME>); never listed under environment, where an empty
-    # default would hide them.
+    # keys (env:HERD_AI_<NAME>), OIDC client secrets (env:HERD_OIDC_<NAME>); never
+    # listed under environment, where an empty default would hide them.
     env_file:
       - path: ai.env
         required: false
@@ -79,14 +167,93 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    # backups: the administration's archives ("Jetzt sichern" runs in the worker,
+    # downloads, uploads, checks and a restore in the API).
     volumes:
       - app-data:/data
+      - backups:/backups
+      - secrets:/secrets:ro
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
     stop_grace_period: 30s
     restart: unless-stopped
 
+  # Backups (plan M9, docs/SICHERUNG.md): `python -m app.ops backup schedule` makes an
+  # archive (database dump and attachments) on HERD_BACKUP_SCHEDULE (cron, UTC), checks
+  # it, keeps the newest of the last days, weeks and months on the volume backups, and
+  # with HERD_BACKUP_OFFSITE_REPOSITORY (in backup.env) copies it with restic. It reads
+  # the attachments (the volume or the S3 store), never writes them. HERD_SECRET_KEY (ai.env) only names its key id
+  # in the archive, for the restore's check; restic gets none of the app's environment.
+  # By hand: docker compose exec backup python -m app.ops backup run (or list).
+  backup:
+    image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.ops"]
+    command: ["backup", "schedule"]
+    depends_on:
+      db:
+        condition: service_healthy
+      db-owner:
+        condition: service_completed_successfully
+    environment:
+      <<: *storage
+      HERD_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+      HERD_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
+      HERD_DATABASE_SSLMODE: ${HERD_DATABASE_SSLMODE:-}
+      HERD_DATABASE_SSLROOTCERT: ${HERD_DATABASE_SSLROOTCERT:-}
+      HERD_MIGRATE_DATABASE_URL: ${HERD_MIGRATE_DATABASE_URL:-}
+      HERD_MIGRATE_DATABASE_PASSWORD: ${HERD_MIGRATE_DATABASE_PASSWORD:-}
+      HERD_DATABASE_RUNTIME_ROLE: ${HERD_DATABASE_RUNTIME_ROLE:-}
+      HERD_BACKUP_SCHEDULE: ${HERD_BACKUP_SCHEDULE:-30 2 * * *}
+      HERD_BACKUP_KEEP_DAILY: ${HERD_BACKUP_KEEP_DAILY:-7}
+      HERD_BACKUP_KEEP_WEEKLY: ${HERD_BACKUP_KEEP_WEEKLY:-4}
+      HERD_BACKUP_KEEP_MONTHLY: ${HERD_BACKUP_KEEP_MONTHLY:-6}
+      HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
+    # ai.env for HERD_SECRET_KEY; backup.env for HERD_BACKUP_OFFSITE_REPOSITORY,
+    # HERD_BACKUP_OFFSITE_PASSWORD and the storage's credentials (AWS_*, B2_*, ...).
+    env_file:
+      - path: ai.env
+        required: false
+      - path: backup.env
+        required: false
+    # It serves no port, so the image's health check (port 9090) does not apply. A
+    # disabled check would fail `docker compose up --wait` at once ("no healthcheck
+    # configured"); this one asks whether the backup directory is there and writable
+    # (the volume mounted for uid 10001). The scheduler itself is the container's process.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, sys; d = os.environ.get('HERD_BACKUP_DIR', '/backups'); sys.exit(0 if os.path.isdir(d) and os.access(d, os.W_OK | os.X_OK) else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    read_only: true
+    # /tmp holds restic's cache only (the dump goes to /backups): capped, it is RAM.
+    tmpfs:
+      - /tmp:size=1g
+    volumes:
+      - app-data:/data:ro
+      - backups:/backups
+      - secrets:/secrets:ro
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  # Example only, not shipped with the app: a clamd for HERD_CLAMAV_ADDRESS=clamav:3310
+  # (docs/WIKI.md). Set StreamMaxLength in its clamd.conf to at least the import limit
+  # (HERD_IMPORT_MAX_BYTES, 100 MiB by default), or large uploads are refused (503).
+  # clamav:
+  #   image: clamav/clamav:stable
+  #   volumes:
+  #     - ./clamd.conf:/etc/clamav/clamd.conf:ro
+  #   restart: unless-stopped
+
 volumes:
   db-data:
   app-data:
+  backups:
+  # The password of herd_owner (db-owner writes it once; app and backup read it).
+  secrets:

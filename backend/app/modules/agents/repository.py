@@ -12,6 +12,7 @@ from app.core.principal import PrincipalType
 from app.modules.agents.models import Agent, AgentKind, AgentStatus, AgentTool
 from app.modules.agents.run_models import Run
 from app.modules.ai.models import AiConnection
+from app.modules.calendars.attendee_models import CalendarEventAttendee
 from app.modules.messaging.models import ConversationParticipant
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
 from app.modules.tokens.models import AccessToken
@@ -61,9 +62,18 @@ class AgentRepository:
         return agent
 
     async def delete(self, agent: Agent) -> None:
+        """The agent and where it stands: its memberships and its invitations to
+        calendar events (they name it without a foreign key; review M10 task 4, R4-4)."""
         await self.session.execute(
             delete(SpaceMember).where(
                 SpaceMember.member_type == PrincipalType.AGENT, SpaceMember.member_id == agent.id
+            )
+        )
+        await self.session.execute(
+            delete(CalendarEventAttendee).where(
+                CalendarEventAttendee.org_id == self.org_id,
+                CalendarEventAttendee.principal_type == PrincipalType.AGENT,
+                CalendarEventAttendee.principal_id == agent.id,
             )
         )
         await self.session.delete(agent)

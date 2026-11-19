@@ -123,6 +123,24 @@ describe('administration', () => {
     )
   })
 
+  test('an admin signs a person out everywhere', async () => {
+    const lea = makeUser({ name: 'Lea Löwe', version: 2 })
+    const api = mockApi({
+      'GET /api/auth/me': makeMe(ADMIN_PERMISSIONS),
+      'GET /api/spaces': page([]),
+      'GET /api/admin/users': page([lea]),
+      'POST /api/admin/users/:id/sign-out': { status: 204 },
+    })
+    const { user } = await renderApp('/admin/users')
+    await user.click(await screen.findByRole('button', { name: 'Lea Löwe überall abmelden' }))
+    const confirm = await screen.findByRole('dialog', { name: 'Überall abmelden?' })
+    await user.click(within(confirm).getByRole('button', { name: 'Abmelden' }))
+    await waitFor(() =>
+      expect(api.find('POST', `/api/admin/users/${lea.id}/sign-out`)).toHaveLength(1),
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
   test('an admin editing their own account sees the change as themselves', async () => {
     let me = makeMe(ADMIN_PERMISSIONS)
     mockApi({

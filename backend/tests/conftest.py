@@ -13,6 +13,7 @@ from sqlalchemy import MetaData, text  # noqa: E402
 from sqlalchemy.engine import Connection  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession  # noqa: E402
 
+from app import launch  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import get_session, make_engine  # noqa: E402
 from app.core.logging import configure_logging  # noqa: E402
@@ -39,6 +40,7 @@ from tests.factories_ai import (  # noqa: E402, F401
     stub_egress,
     stub_network,
 )
+from tests.factories_calendar import private_event  # noqa: E402, F401
 from tests.factories_catalog import catalog_dir  # noqa: E402, F401
 from tests.factories_collab import collab, internal, internal_token  # noqa: E402, F401
 from tests.factories_connectors import ai_people, secret_key  # noqa: E402, F401
@@ -56,9 +58,14 @@ from tests.factories_oauth import (  # noqa: E402, F401
     oauth_units,
     public_url,
 )
+from tests.factories_oidc import _oidc_stub, oidc_egress, oidc_stub  # noqa: E402, F401
+from tests.factories_restore import target  # noqa: E402, F401
+from tests.factories_s3 import _s3_stub, s3_storage, s3_stub  # noqa: E402, F401
+from tests.factories_sessions import session_time  # noqa: E402, F401
 from tests.factories_skills import lab  # noqa: E402, F401
 from tests.factories_spaces import make_space, open_space, team_space  # noqa: E402, F401
 from tests.factories_tickets import desk  # noqa: E402, F401
+from tests.factories_totp import totp_time  # noqa: E402, F401
 from tests.factories_wiki import wiki  # noqa: E402, F401
 from tests.factories_writing import work  # noqa: E402, F401
 from tests.live_people import live, pair  # noqa: E402, F401
@@ -107,6 +114,14 @@ def _drop_everything(connection: Connection) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_heap_freeze(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`launch.serve` freezes the heap of the process it runs in; in a test that would
+    be the whole pytest process (review M10 task 4, R4-5). `test_launch.py` sees that
+    serving calls it; `test_heap.py` calls the function itself and unfreezes."""
+    monkeypatch.setattr(launch, "freeze_startup_heap", lambda: None)
+
+
+@pytest.fixture(autouse=True)
 def data_dir(tmp_path, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
     """Files (attachments) of each test go to a directory of its own."""
     path = tmp_path / "data"
@@ -147,7 +162,8 @@ MakeClient = Callable[..., Awaitable[AsyncClient]]
 async def make_client(session: AsyncSession) -> AsyncIterator[MakeClient]:
     """New clients of one public app, all on the test session; each has its own cookies.
 
-    `csrf=True` sends the `X-Requested-With: herd` header the browser app sends."""
+    `csrf=True` sends the `X-Requested-With: herd` header the browser app sends;
+    `base_url="https://test"` is a browser that reached the app over https."""
     app = create_public_app()
     _session_override = session_override(session)
 
@@ -156,9 +172,9 @@ async def make_client(session: AsyncSession) -> AsyncIterator[MakeClient]:
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     clients: list[AsyncClient] = []
 
-    async def _make(*, csrf: bool = False) -> AsyncClient:
+    async def _make(*, csrf: bool = False, base_url: str = "http://test") -> AsyncClient:
         headers = {"X-Requested-With": "herd"} if csrf else {}
-        client = AsyncClient(transport=transport, base_url="http://test", headers=headers)
+        client = AsyncClient(transport=transport, base_url=base_url, headers=headers)
         clients.append(client)
         return client
 

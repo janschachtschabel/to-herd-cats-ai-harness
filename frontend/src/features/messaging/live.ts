@@ -1,9 +1,13 @@
 import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo } from 'react'
 import type { Conversation, Page } from '@/lib/api'
+import { userKeys } from '@/features/admin/users/queries'
 import { agentKeys } from '@/features/agents/keys'
 import { approvalKeys } from '@/features/approvals/queries'
 import { automationEventKeys, automationKeys } from '@/features/automations/queries'
+import { backupKeys } from '@/features/backup/queries'
+import { calendarKeys } from '@/features/calendars/keys'
+import { calendarEventKeys } from '@/features/calendars/live'
 import { noteRunProgress } from '@/features/agents/live'
 import { proposalEventKeys } from '@/features/proposals/live'
 import { proposalKeys } from '@/features/proposals/queries'
@@ -46,6 +50,8 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
         automationKeys.lists,
         automationKeys.details,
         automationKeys.allFirings,
+        backupKeys.all,
+        calendarKeys.all,
       ]
     case 'access.changed':
       // Reload whatever is shown; what is gone answers 404 and is dropped.
@@ -71,7 +77,9 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
         messagingKeys.message(conversation),
       ]
     case 'conversation.read':
-      return [messagingKeys.unread]
+      return conversation
+        ? [messagingKeys.unread, messagingKeys.readPosition(conversation)]
+        : [messagingKeys.unread]
     case 'channel.changed':
       return conversation
         ? [messagingKeys.channels, messagingKeys.conversation(conversation)]
@@ -79,8 +87,9 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
     case 'dm.inspected':
       return conversation ? [messagingKeys.conversation(conversation)] : []
     case 'notification.created':
-      // A new release card comes with an activity entry for the person asked.
-      return [activityKeys.all, approvalKeys.mine]
+      // A new release card comes with an activity entry for the person asked; an
+      // account awaiting approval with one for each user administrator.
+      return [activityKeys.all, approvalKeys.mine, userKeys.all]
     case 'activity.changed':
       return [activityKeys.all]
     case 'ticket.created':
@@ -99,6 +108,16 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
       return [skillProposalKeys.all, skillKeys.all]
     case 'automation.changed':
       return automationEventKeys(event.automationId ?? null)
+    case 'backup.changed':
+      return [backupKeys.all]
+    case 'calendar.changed':
+      // Ids only: the calendar views refetch what they show (the server judges).
+      return calendarEventKeys(event.spaceId)
+    case 'event.invited':
+      // An invitation reaches someone outside the space too, who gets no
+      // `calendar.changed`: every calendar view refetches; its activity entry comes as
+      // `notification.created`.
+      return [calendarKeys.all]
     case 'card.changed':
       // A run's card was decided, answered or settled (ran or stale): the cards, the
       // run, and their messages.

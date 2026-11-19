@@ -3,11 +3,13 @@ A person's activity view: `activity_repository.py`."""
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.models_base import utcnow
 from app.modules.messaging.models import Message
 from app.modules.messaging.notification_models import Notification, NotificationReason
 
@@ -155,3 +157,81 @@ class NotificationRepository:
         ]
         stmt = insert(Notification).values(rows).returning(Notification)
         return list((await self.session.scalars(stmt)).all())
+
+    async def add_for_account(
+        self, account_id: uuid.UUID, wanted: Sequence[tuple[uuid.UUID, NotificationReason]]
+    ) -> list[Notification]:
+        """Notifications about an account awaiting approval (plan M9 task 5b), those
+        that did not exist yet."""
+        if not wanted:
+            return []
+        rows = [
+            {"org_id": self.org_id, "user_id": user_id, "reason": reason, "account_id": account_id}
+            for user_id, reason in wanted
+        ]
+        stmt = (
+            insert(Notification)
+            .values(rows)
+            .on_conflict_do_nothing(
+                index_elements=["user_id", "account_id", "reason"],
+                index_where=Notification.account_id.is_not(None),
+            )
+            .returning(Notification)
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def renew_about_account(
+        self, user_id: uuid.UUID, account_id: uuid.UUID, reason: NotificationReason
+    ) -> None:
+        """One unread notification about an account for `user_id`, new each time (an
+        earlier one of the same reason goes: the person sees the latest on top)."""
+        await self.session.execute(
+            delete(Notification).where(
+                Notification.org_id == self.org_id,
+                Notification.user_id == user_id,
+                Notification.account_id == account_id,
+                Notification.reason == reason,
+            )
+        )
+        await self.add_for_account(account_id, [(user_id, reason)])
+
+    async def renew_about_event(
+        self,
+        user_id: uuid.UUID,
+        event_id: uuid.UUID,
+        reason: NotificationReason,
+        cause_at: datetime,
+    ) -> Notification | None:
+        """The one notification about a calendar event for `user_id` and `reason`,
+        renewed for a cause written at `cause_at` (unread, on top: an earlier one goes)
+        unless the stored one is not older than the cause (a redelivered cause leaves it
+        as it is, read or not: review M10 task 4, R4-2); None if nothing new was written
+        (that, or a concurrent delivery wrote it first). A new one is dated no earlier
+        than its cause, so a node whose clock is behind still sees it as current."""
+        await self.session.execute(
+            delete(Notification).where(
+                Notification.org_id == self.org_id,
+                Notification.user_id == user_id,
+                Notification.calendar_event_id == event_id,
+                Notification.reason == reason,
+                Notification.created_at < cause_at,
+            )
+        )
+        row = {
+            "org_id": self.org_id,
+            "user_id": user_id,
+            "reason": reason,
+            "calendar_event_id": event_id,
+            "created_at": max(utcnow(), cause_at),
+        }
+        stmt = (
+            insert(Notification)
+            .values([row])
+            .on_conflict_do_nothing(
+                index_elements=["user_id", "calendar_event_id", "reason"],
+                index_where=Notification.calendar_event_id.is_not(None),
+            )
+            .returning(Notification)
+        )
+        renewed: Notification | None = await self.session.scalar(stmt)
+        return renewed

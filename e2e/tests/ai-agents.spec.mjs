@@ -64,7 +64,9 @@ test("the admin sets up AI and an agent; a person asks it and gets an answer mar
   await standard.getByRole("button", { name: "Speichern" }).click();
   await expect(standard.getByRole("status")).toHaveText("Gespeichert.");
 
-  await admin.getByRole("link", { name: "Agenten" }).click();
+  // Saving the standard gives Anna AI too, so once /auth/me is fetched again her
+  // sidebar also shows "Meine Agenten": name the administration's link exactly.
+  await admin.getByRole("link", { name: "Agenten", exact: true }).click();
   await admin.getByRole("button", { name: "Agent anlegen" }).click();
   const form = admin.getByRole("dialog");
   await form.getByLabel("Name", { exact: true }).fill("Hilda");

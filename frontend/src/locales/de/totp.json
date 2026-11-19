@@ -1,0 +1,96 @@
+{
+  "errors": {
+    "auth": {
+      "second_factor_invalid": "Der Code stimmt nicht oder wurde schon verwendet.",
+      "second_factor_expired": "Die Anmeldung ist abgelaufen. Bitte melde dich noch einmal mit deinem Passwort an.",
+      "second_factor_required": "Bitte gib einen aktuellen Code aus deiner Authenticator-App ein.",
+      "second_factor_locked": "Nach zu vielen falschen Codes ist die Zwei-Faktor-Anmeldung für eine Stunde gesperrt."
+    },
+    "totp": {
+      "already_enabled": "Die Zwei-Faktor-Anmeldung ist schon eingeschaltet.",
+      "no_setup": "Bitte beginne die Einrichtung noch einmal.",
+      "not_enabled": "Die Zwei-Faktor-Anmeldung ist nicht eingeschaltet.",
+      "no_password": "Die Zwei-Faktor-Anmeldung gibt es nur für Konten mit Passwort.",
+      "no_secret_key": "Die Zwei-Faktor-Anmeldung ist auf dieser Installation nicht verfügbar (kein Geheimschlüssel gesetzt)."
+    }
+  },
+  "totp": {
+    "signIn": {
+      "title": "Zweiter Faktor",
+      "hint": "Gib den sechsstelligen Code aus deiner Authenticator-App ein.",
+      "code": "Code aus der Authenticator-App",
+      "codeHint": "Der Code wechselt alle 30 Sekunden.",
+      "recoveryCode": "Wiederherstellungscode",
+      "recoveryHint": "Jeder Wiederherstellungscode gilt nur einmal.",
+      "useRecovery": "Wiederherstellungscode verwenden",
+      "useCode": "Code aus der App verwenden",
+      "submit": "Bestätigen",
+      "submitting": "Wird geprüft …",
+      "restart": "Zurück zur Anmeldung"
+    },
+    "profile": {
+      "title": "Zwei-Faktor-Anmeldung",
+      "description": "Mit einem zweiten Faktor brauchst du bei der Anmeldung zusätzlich einen Code aus einer Authenticator-App (TOTP). Freiwillig.",
+      "off": "Ausgeschaltet.",
+      "on": "Eingeschaltet seit {{date}}.",
+      "codesLeft_one": "Noch {{count}} Wiederherstellungscode übrig.",
+      "codesLeft_other": "Noch {{count}} Wiederherstellungscodes übrig.",
+      "noPassword": "Dein Konto meldet sich über einen Anbieter an; dort gilt dessen Zwei-Faktor-Anmeldung.",
+      "noSecretKey": "Auf dieser Installation nicht verfügbar: Der Betrieb hat keinen Geheimschlüssel gesetzt.",
+      "setUp": "Einrichten",
+      "disable": "Ausschalten",
+      "renew": "Neue Wiederherstellungscodes"
+    },
+    "setup": {
+      "title": "Zwei-Faktor-Anmeldung einrichten",
+      "passwordHint": "Bestätige zuerst mit deinem Passwort.",
+      "password": "Aktuelles Passwort",
+      "next": "Weiter",
+      "scan": "Scanne den QR-Code mit deiner Authenticator-App oder gib den Schlüssel von Hand ein. Er wird nur jetzt angezeigt.",
+      "qr": "QR-Code für die Authenticator-App",
+      "secret": "Schlüssel",
+      "code": "Code aus der App",
+      "codeHint": "Gib den Code ein, den die App jetzt zeigt; erst dann ist der zweite Faktor eingeschaltet.",
+      "confirm": "Einschalten",
+      "done": "Die Zwei-Faktor-Anmeldung ist eingeschaltet. Deine anderen Sitzungen wurden beendet."
+    },
+    "codes": {
+      "title": "Wiederherstellungscodes",
+      "hint": "Bewahre diese Codes sicher auf (etwa im Passwortmanager). Jeder gilt einmal, wenn du dein Gerät nicht zur Hand hast. Sie werden nur jetzt angezeigt.",
+      "list": "Deine Wiederherstellungscodes",
+      "copy": "Kopieren",
+      "close": "Gespeichert, schließen"
+    },
+    "disable": {
+      "title": "Zwei-Faktor-Anmeldung ausschalten?",
+      "hint": "Bestätige mit einem aktuellen Code oder einem Wiederherstellungscode. Danach meldest du dich nur mit dem Passwort an.",
+      "code": "Code oder Wiederherstellungscode",
+      "submit": "Ausschalten"
+    },
+    "renew": {
+      "title": "Neue Wiederherstellungscodes",
+      "hint": "Die bisherigen Codes werden ungültig. Bestätige mit einem aktuellen Code aus der App.",
+      "code": "Code aus der App",
+      "submit": "Neue Codes erzeugen"
+    },
+    "admin": {
+      "badge": "2FA",
+      "badgeLabel": "Zwei-Faktor-Anmeldung eingeschaltet",
+      "reset": "Zwei-Faktor zurücksetzen",
+      "resetTitle": "Zwei-Faktor-Anmeldung von {{name}} zurücksetzen?",
+      "resetText": "Nur wenn du sicher weißt, dass wirklich {{name}} fragt (etwa persönlich oder über einen bekannten Rückrufweg). Danach meldet sich die Person nur mit dem Passwort an, bis sie den zweiten Faktor neu einrichtet. Der Vorgang wird protokolliert.",
+      "resetConfirm": "Zurücksetzen",
+      "resetNamed": "Zwei-Faktor von {{name}} zurücksetzen"
+    },
+    "token": {
+      "code": "Code aus der Authenticator-App",
+      "codeHint": "Für ein neues Token brauchst du deinen zweiten Faktor."
+    }
+  },
+  "activity": {
+    "reasons": {
+      "totp_locked": "Zwei-Faktor-Anmeldung gesperrt"
+    },
+    "totpLocked": "Nach zehn falschen Codes ist deine Zwei-Faktor-Anmeldung für eine Stunde gesperrt. Warst du das nicht, kennt jemand vielleicht dein Passwort: Ändere es."
+  }
+}

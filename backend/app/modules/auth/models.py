@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,5 +21,19 @@ class UserSession(UuidPk, OrgScoped, Base):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), index=True, nullable=False
     )
+    # The last request the session made (J7, HERD_SESSION_IDLE_HOURS): written when
+    # it opens and then at most once a minute (`SessionRepository.touch`).
+    last_used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    # For the person's list of her sessions (J8): when it opened, and which browser on
+    # which system (`device.device_hint`, no version; None for an unknown client).
+    signed_in_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    device: Mapped[str | None] = mapped_column(String(64))
+    # When the session was opened by a sign-in through a provider (J9): linking a new
+    # account within 10 minutes of it needs no password (`reauth.py`). None otherwise.
+    reauth_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped[User] = relationship(lazy="joined")

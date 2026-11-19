@@ -12,11 +12,20 @@ from app.core.db import get_session
 from app.core.errors import Forbidden, Unauthorized
 from app.core.logging import bind_request_fields, log_context
 from app.modules.auth.context import AuthContext
+from app.modules.auth.cookies import session_token
 from app.modules.auth.service import AuthService
 
 CSRF_HEADER = "x-requested-with"
 CSRF_VALUE = "herd"
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+# Opening the live stream (`messaging/router_live.py`) is no use of the session (J7):
+# an open tab must not keep an unattended session alive.
+LIVE_STREAM_PATH = "/api/stream"
+# The SPA marks the requests no person caused (a refetch after a live event or on an
+# interval, sent when the tab saw no input for a while; `frontend/src/lib/attention.ts`)
+# with this header; they are no use of the session either (R18-1). The mark only has to
+# be honest in an honest browser, the case the idle limit is for.
+UNATTENDED_HEADER = "x-herd-unattended"
 
 # scope="function": the session's exit (commit or rollback) runs when the endpoint
 # returns, before the response is sent. With the default scope it would run after the
@@ -32,11 +41,14 @@ async def current_auth(
     request: Request, session: SessionDep, settings: SettingsDep
 ) -> AsyncIterator[AuthContext]:
     """The caller, from the session cookie; every log line of the request names them,
-    the request line included."""
-    token = request.cookies.get(settings.session_cookie_name)
+    the request line included. The request is a use of the session (J7), except the
+    opening of the live stream and a request marked unattended, which only check it."""
+    token = session_token(request, settings)
     if not token:
         raise Unauthorized(code="auth.required")
-    ctx = await AuthService(session, settings).resolve(token)
+    unattended = request.headers.get(UNATTENDED_HEADER) == "1"
+    use = request.url.path != LIVE_STREAM_PATH and not unattended
+    ctx = await AuthService(session, settings).resolve(token, use=use, settle=True)
     if ctx is None:
         raise Unauthorized(code="auth.session_invalid")
     fields = {"org_id": str(ctx.org_id), "actor": str(ctx.principal)}
