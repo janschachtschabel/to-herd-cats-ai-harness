@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.modules.calendars.ical import opaque, reading, writing
+from app.modules.calendars.ical import opaque, reading, writing, zone_names
 from app.modules.calendars.ical.drafts import (
     AttendeeDraft,
     Content,
@@ -121,3 +121,43 @@ def test_an_override_is_written_with_its_own_stamp() -> None:
     data = writing.event_ics(event, now=utc(2026, 11, 19))
     stamps = [line for line in data.decode().split("\r\n") if line.startswith("DTSTAMP")]
     assert stamps == ["DTSTAMP:20261101T000000Z", "DTSTAMP:20261118T070000Z"]
+
+
+def _fixed(tzid: str, offset: str, location: str = "") -> str:
+    hint = f"X-LIC-LOCATION:{location}\r\n" if location else ""
+    return (
+        f"BEGIN:VTIMEZONE\r\nTZID:{tzid}\r\n{hint}BEGIN:STANDARD\r\nDTSTART:19700101T000000\r\n"
+        f"TZOFFSETFROM:{offset}\r\nTZOFFSETTO:{offset}\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\n"
+    )
+
+
+def _zone_of(tzid: str, offset: str, location: str = "") -> str | None:
+    body = f'DTSTART;TZID="{tzid}":20260710T090000'
+    parsed = _parse(_calendar(_fixed(tzid, offset, location), _event("u", body)))
+    return parsed.events[0].series.tzid if parsed.events else None
+
+
+@pytest.mark.parametrize("hours", [*range(-11, 0), *range(1, 15)])
+def test_a_fixed_offset_means_a_canonical_zone_never_etc_or_a_link(hours: int) -> None:
+    """RC7a-10: of the zones that fit a definition without changes, a canonical IANA
+    zone is chosen; `Etc/…` and links kept for old names (`backward`) only if none
+    fits."""
+    offset = f"{'+' if hours > 0 else '-'}{abs(hours):02d}00"
+    found = _zone_of("Customized Time Zone", offset)
+    if found is None:
+        pytest.skip(f"no zone has {offset} in 2026")
+    assert not found.startswith("Etc/")
+    assert found not in zone_names.links()
+
+
+def test_a_city_or_location_that_names_a_link_means_its_canonical_zone() -> None:
+    assert _zone_of("(UTC+08:00) Beijing, Chongqing, Hong Kong", "+0800") == "Asia/Shanghai"
+    assert _zone_of("India", "+0530", location="Asia/Calcutta") == "Asia/Kolkata"
+    assert _zone_of("Tasmania", "+1000") != "Australia/Tasmania"
+
+
+def test_the_links_are_read_from_tzdata() -> None:
+    links = zone_names.links()
+    assert links["Asia/Calcutta"] == "Asia/Kolkata"
+    assert links["US/Eastern"] == "America/New_York"
+    assert "Europe/Berlin" not in links

@@ -11,11 +11,10 @@ through `icalendar`'s process-wide zone cache:
    (`years`), so a series that began before today's rules still finds its zone. Of the
    zones that fit and have the definition's offset at the event's own times, the one
    wins that fits the most of those years, then one the definition names (its
-   `X-LIC-LOCATION`, or a city the TZID names), then the table's Windows zones (one
-   well-known city per region) before other regional zones before the rest (`Etc/…`,
-   `CET`), then the one that has followed the definition in the most weeks of
-   `REFERENCE_YEARS` (US Eastern rules: `America/New_York`, not `Grand_Turk`), then
-   by name: the same choice every time.
+   `X-LIC-LOCATION`, or a city the TZID names), then by `zone_names.ranks` (canonical
+   zones before links, `Etc/…` last: RC7a-10), then the one that has followed the
+   definition in the most weeks of `REFERENCE_YEARS` (US Eastern rules:
+   `America/New_York`, not `Grand_Turk`), then by name: the same choice every time.
 
 A TZID longer than `MAX_TZID` characters or of more than `MAX_TZID_SEGMENTS` parts is
 never looked up (`ical.time_zone_too_large`, re-check RC7a-3): an IANA name has at most
@@ -26,7 +25,6 @@ so one file gets at most `MAX_COMPARISONS` of them (one per TZID and year); beyo
 zone stays unknown. Every comparison is charged to the parse's budget.
 """
 
-import re
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
@@ -36,7 +34,7 @@ from zoneinfo import ZoneInfo
 from icalendar.timezone.windows_to_olson import WINDOWS_TO_OLSON
 
 from app.modules.calendars import zones
-from app.modules.calendars.ical import lines, problems
+from app.modules.calendars.ical import lines, problems, zone_names
 from app.modules.calendars.ical.budget import Budget
 from app.modules.calendars.ical.problems import Skip
 from app.modules.calendars.ical.vtimezone import Definition, definition
@@ -58,12 +56,6 @@ LAST_COMPARED_YEAR = 2040
 REFERENCE_YEARS = range(1981, 2038)
 _NOON = 12
 _WEEKS = 53
-# Areas whose names are a city, never a link kept for old names (`US/Eastern`).
-_AREAS = frozenset(
-    {"Africa", "America", "Antarctica", "Arctic", "Asia", "Atlantic", "Australia"}
-    | {"Europe", "Indian", "Pacific"}
-)
-_NOT_LETTERS = re.compile(r"[^a-z]+")
 
 
 def too_large(tzid: str) -> bool:
@@ -110,21 +102,8 @@ def years(first: int, last: int) -> tuple[int, ...]:
 
 
 @lru_cache(maxsize=1)
-def _ranks() -> dict[str, tuple[int, int]]:
-    """Every zone's group (0: the table's Windows zones, 1: other regional zones, 2: the
-    rest) and its place in the order of trial."""
-    known = zones.names()
-    windows = sorted(set(WINDOWS_TO_OLSON.values()) & known)
-    regional = sorted(n for n in known - set(windows) if "/" in n and not n.startswith("Etc/"))
-    rest = sorted(known - set(windows) - set(regional))
-    groups = ((0, windows), (1, regional), (2, rest))
-    ordered = [(group, name) for group, names in groups for name in names]
-    return {name: (group, index) for index, (group, name) in enumerate(ordered)}
-
-
-@lru_cache(maxsize=1)
 def _zones() -> tuple[tuple[str, ZoneInfo], ...]:
-    ranks = _ranks()
+    ranks = zone_names.ranks()
     return tuple((name, ZoneInfo(name)) for name in sorted(ranks, key=lambda n: ranks[n][1]))
 
 
@@ -135,22 +114,6 @@ def _samples(year: int) -> list[datetime]:
         for week in range(_WEEKS)
         if (first + timedelta(weeks=week)).year == year
     ]
-
-
-def _words(tzid: str) -> str:
-    """The TZID's words, each between spaces (`(UTC+01:00) Amsterdam, Berlin, …`)."""
-    return f" {_NOT_LETTERS.sub(' ', tzid.lower()).strip()} "
-
-
-def _named(words: str, found: Definition, name: str) -> bool:
-    """Whether the definition names the zone: its `X-LIC-LOCATION`, or the city in the
-    TZID (its `_words`)."""
-    if name == found.location:
-        return True
-    area, _, city = name.rpartition("/")
-    if area.split("/")[0] not in _AREAS:
-        return False
-    return f" {_NOT_LETTERS.sub(' ', city.lower()).strip()} " in words
 
 
 class Resolver:
@@ -245,11 +208,12 @@ class Resolver:
     def _ranked(
         self, tzid: str, found: Definition, fits: Counter[str], budget: Budget
     ) -> list[str]:
-        ranks = _ranks()
+        ranks = zone_names.ranks()
         budget.spend(1 + 3 * len(fits))
-        words = _words(tzid)
+        words = zone_names.words(tzid)
         keys = {
-            name: (-fits[name], not _named(words, found, name), ranks[name][0]) for name in fits
+            name: (-fits[name], not zone_names.named(words, found.location, name), ranks[name][0])
+            for name in fits
         }
         ranked = sorted(fits, key=lambda name: (keys[name], ranks[name][1]))
         lead = [name for name in ranked if keys[name] == keys[ranked[0]]]
