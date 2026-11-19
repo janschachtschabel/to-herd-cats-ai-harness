@@ -136,7 +136,13 @@ async def test_hostile_cursors_answer_422_everywhere(
     token = await owner.post(
         "/api/tokens", json={"name": "t", "mode": "read", "expires_in_days": 1}
     )
+    calendar = await owner.post(f"/api/spaces/{space_id}/calendars", json={"name": "K"})
+    event = await owner.post(
+        f"/api/calendars/{calendar.json()['id']}/events",
+        json={"title": "T", "starts_at": "2026-11-23T10:00:00Z", "ends_at": "2026-11-23T11:00:00Z"},
+    )
     ids = {
+        "{event_id}": event.json()["id"],
         "{number}": str(ticket.json()["number"]),
         "{category}": "open",
         "{status_id}": ticket.json()["status"]["id"],
