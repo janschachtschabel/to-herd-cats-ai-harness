@@ -1,6 +1,7 @@
 """Calendar writes count towards the person's write limit (plan M9 task 18, J10;
 `auth/write_limits.COUNTED`): making, renaming and archiving a calendar are content
-writes like pages and messages; reading calendars never counts."""
+writes like pages and messages, and so is making an event; reading calendars and
+events never counts."""
 
 from typing import Any
 
@@ -10,7 +11,7 @@ from httpx import AsyncClient
 from app.core.config import get_settings
 from app.core.metrics import REGISTRY
 from tests.factories import MakeUser, login
-from tests.factories_calendar import new_calendar
+from tests.factories_calendar import new_calendar, new_event
 from tests.factories_spaces import MakeSpace
 
 
@@ -56,3 +57,31 @@ async def _other(make_client: Any, email: str) -> AsyncClient:
     client: AsyncClient = await make_client(csrf=True)
     await login(client, email)
     return client
+
+
+async def test_making_events_counts_reading_them_does_not(
+    make_client: Any, make_user: MakeUser, make_space: MakeSpace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    moderator = await make_user()
+    team = await make_space("team", members=[(moderator, "moderator")])
+    mod = await _other(make_client, moderator.email)
+    calendar = await new_calendar(mod, team.id, "Termine")
+    monkeypatch.setattr(get_settings(), "write_rate_per_minute", 2)
+    made = await new_event(mod, calendar["id"])  # the calendar and this: 2
+    for _ in range(3):
+        assert (await mod.get(f"/api/events/{made['id']}")).status_code == 200
+        r = await mod.get(
+            "/api/calendar/events",
+            params={"from": "2026-11-23T00:00:00Z", "to": "2026-11-24T00:00:00Z"},
+        )
+        assert r.status_code == 200
+    _refused(
+        await mod.post(
+            f"/api/calendars/{calendar['id']}/events",
+            json={
+                "title": "X",
+                "starts_at": "2026-11-23T10:00:00Z",
+                "ends_at": "2026-11-23T11:00:00Z",
+            },
+        )
+    )

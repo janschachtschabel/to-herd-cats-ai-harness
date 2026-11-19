@@ -13,7 +13,8 @@ reaches only by naming the space (`list_in`, `readable`), which goes through
 At most `MAX_CALENDARS_PER_SPACE` calendars that are not archived per space (409
 `calendar.limit`), counted under the space's row lock. Every change names the version
 it read (409 `calendar.version_conflict`). A default calendar cannot be archived (409
-`calendar.default_kept`).
+`calendar.default_kept`). A calendar's `time_zone` (IANA; 422
+`calendar.invalid_time_zone` otherwise) is the zone of a new event that names none.
 
 Known gap (review M10 task 1, R1-M2; shared with tickets and sprints): `require`
 writes an admin's `admin.access` in the request's transaction, so a refused change
