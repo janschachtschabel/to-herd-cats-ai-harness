@@ -142,14 +142,16 @@ class EventOut(BaseModel):
     """`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`
     and of the day after `last_day`). `recurs_until`: when the last occurrence ends
     (null: endless). `series_id`: for an override (one occurrence changed on its own),
-    the series it belongs to; null otherwise. `time_zone`: the zone its series runs
-    in (null for all-day). `redacted`: the caller sees only times and "busy"; content
-    fields are null."""
+    the series it belongs to, and `recurrence_id` the occurrence it takes the place of
+    (its wall time in the series, ISO 8601 without offset); null otherwise.
+    `time_zone`: the zone its series runs in (null for all-day). `redacted`: the caller
+    sees only times and "busy"; content fields are null."""
 
     id: uuid.UUID
     calendar_id: uuid.UUID
     space_id: uuid.UUID
     series_id: uuid.UUID | None
+    recurrence_id: str | None
     uid: str | None
     title: str | None
     description: str | None
@@ -180,6 +182,7 @@ class EventOut(BaseModel):
             calendar_id=event.calendar_id,
             space_id=event.space_id,
             series_id=event.series_id,
+            recurrence_id=event.recurrence_id.isoformat() if event.recurrence_id else None,
             uid=event.uid if full else None,
             title=event.title if full else None,
             description=event.description if full else None,
