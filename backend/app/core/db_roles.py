@@ -55,6 +55,19 @@ _OWNS_SCHEMA = text(
 )
 
 
+_SUPERUSER = text("SELECT rolsuper FROM pg_roles WHERE rolname = current_user")
+SUPERUSER_REFUSED = "restore.superuser_refused"
+
+
+async def superuser_problem(conn: AsyncConnection) -> str | None:
+    """`restore.superuser_refused` when this connection's role is a superuser (review
+    M9b F2-1): an archive's definitions are text that runs as the restoring role, and
+    a superuser may run programs on the database host (`COPY … TO PROGRAM`). The
+    administration never replaces as one; the command line only when told
+    (`--allow-superuser`)."""
+    return SUPERUSER_REFUSED if await conn.scalar(_SUPERUSER) else None
+
+
 async def schema_owner_problem(conn: AsyncConnection) -> str | None:
     """`restore.not_schema_owner` when this connection's role could not restore (the
     runtime role of separate roles); a restore needs the migration role."""

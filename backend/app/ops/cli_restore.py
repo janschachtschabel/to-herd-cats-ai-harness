@@ -1,6 +1,8 @@
 """`python -m app.ops restore check|apply` (plan M9 tasks 2 and 12): into an empty
 installation (`restore.py`), or with `--replace --confirm "<organisation name>"` in
-place of a running one (`replace.py`)."""
+place of a running one (`replace.py`). A replace as a superuser role is refused
+(`restore.superuser_refused`) unless `--allow-superuser` says the operator trusts the
+archive like her shell (review M9b F2-1)."""
 
 import argparse
 from pathlib import Path
@@ -8,6 +10,8 @@ from typing import Any
 
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.core.db import make_engine
+from app.core.db_roles import superuser_problem
 from app.ops import replace
 from app.ops.restore import RestoreFailed, RestoreRefused, restore_into_empty
 from app.ops.restore_checks import check_restore
@@ -35,6 +39,12 @@ def add_commands(areas: Any) -> None:
     )
     apply.add_argument(
         "--confirm", metavar="NAME", help="with --replace: the organisation's name, exactly"
+    )
+    apply.add_argument(
+        "--allow-superuser",
+        action="store_true",
+        help="with --replace: run the archive's dump although the database role is a "
+        "superuser (it may then run programs on the database host; docs/SICHERUNG.md)",
     )
     apply.set_defaults(handler=_apply)
 
@@ -71,6 +81,9 @@ async def _replace(args: argparse.Namespace, settings: Settings, clock: Clock) -
     if not args.confirm:
         print("restore.confirm_missing")
         return 1
+    if not args.allow_superuser and (problem := await _superuser_problem(settings)):
+        print(problem)
+        return 1
     try:
         report = await replace.replace_running(
             settings,
@@ -92,3 +105,14 @@ async def _replace(args: argparse.Namespace, settings: Settings, clock: Clock) -
         f"safety archive {report.safety_archive.name}"
     )
     return 0
+
+
+async def _superuser_problem(settings: Settings) -> str | None:
+    """`restore.superuser_refused` when the role a replace uses (the migration role with
+    separate roles) is a superuser (review M9b F2-1)."""
+    engine = make_engine(settings.migrate_database(), settings=settings)
+    try:
+        async with engine.connect() as conn:
+            return await superuser_problem(conn)
+    finally:
+        await engine.dispose()

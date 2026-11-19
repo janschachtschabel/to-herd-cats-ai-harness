@@ -138,7 +138,8 @@
         "tool_missing": "pg_restore oder psql fehlt auf dem Server.",
         "target_not_empty": "Die Zieldatenbank ist nicht leer.",
         "backup_running": "Eine Sicherung läuft gerade; danach noch einmal versuchen.",
-        "confirm_missing": "Der Name der Organisation fehlt (--confirm)."
+        "confirm_missing": "Der Name der Organisation fehlt (--confirm).",
+        "superuser_refused": "Die App verbindet sich mit einer Superuser-Rolle der Datenbank; aus der Verwaltung wird dann nicht eingespielt. Die App mit einer Rolle ohne Superuser-Recht betreiben oder auf der Kommandozeile einspielen (docs/SICHERUNG.md)."
       },
       "backup": {
         "interrupted": "Der Prozess endete vor dem Abschluss.",
@@ -168,6 +169,9 @@
       "archive_invalid": "Die Datei ist kein gültiges Sicherungsarchiv.",
       "upload_too_large": "Das Archiv ist größer, als diese Installation annimmt (HERD_BACKUP_UPLOAD_MAX_BYTES).",
       "not_found": "Dieses Archiv gibt es nicht (mehr)."
+    },
+    "restore": {
+      "superuser_refused": "Die App verbindet sich mit einer Superuser-Rolle der Datenbank; aus der Verwaltung wird dann nicht eingespielt. Die App mit einer Rolle ohne Superuser-Recht betreiben oder auf der Kommandozeile einspielen (docs/SICHERUNG.md)."
     }
   }
 }

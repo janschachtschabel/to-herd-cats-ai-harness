@@ -10,8 +10,9 @@ audited with the person as actor, names and figures only.
   `backup.busy` while another request holds it), so two at once start one.
 - `archives`, `download`, `upload`: the archives in HERD_BACKUP_DIR (`archives.py`).
 - `check`: an archive against the installation (`checking.py`).
-- `replace`: the organisation's exact name (422 `backup.confirm_mismatch`), no backup
-  running, no replace under way or being started in this process (409
+- `replace`: the organisation's exact name (422 `backup.confirm_mismatch`), a database
+  role that is no superuser (409 `restore.superuser_refused`, review M9b F2-1), no
+  backup running, no replace under way or being started in this process (409
   `backup.restore_running`, or `backup.busy` while another request checks; the
   runner's claim spans the check), and a clean check (409 `backup.replace_refused`
   with the problems); then, after the commit, the replace in this process
@@ -32,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Actor
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.config import Settings
+from app.core.db_roles import superuser_problem
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import (
     Page,
@@ -133,6 +135,10 @@ class BackupAdmin:
             raise ValidationFailed(
                 "The organisation's name does not match", code="backup.confirm_mismatch"
             )
+        # The request's role is the one the replace uses; with separate roles (the
+        # runtime role here) the check below refuses it anyway (`not_schema_owner`).
+        if problem := await superuser_problem(await self.session.connection()):
+            raise Conflict(code=problem)
         await self._claim()
         if await self.runs_repo.any_running(actor.org_id):
             raise Conflict(code="backup.already_running")

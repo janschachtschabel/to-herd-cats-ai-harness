@@ -29,6 +29,10 @@ from tests.factories_restore import (
 from tests.real_db import MakeRealClient, RealDb
 
 
+async def _no_problem(conn: object) -> None:
+    return None
+
+
 def _flip(path: Path, offset: int) -> None:
     data = bytearray(path.read_bytes())
     data[offset] ^= 0xFF
@@ -45,6 +49,10 @@ async def _audit(real_db: RealDb, action: str) -> list[AuditLog]:
 async def archive(
     real_db: RealDb, tmp_path: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Path:
+    # The test database's role may be a superuser, which the administration refuses
+    # (review M9b F2-1, test_review2_m9b_dump_allowed_entry.py); these tests are about
+    # everything after that.
+    monkeypatch.setattr("app.modules.backups.service.superuser_problem", _no_problem)
     await add_encrypted_connection(real_db, monkeypatch)  # an `enc:` value under KEY
     path = await make_archive(source_settings(tmp_path, data_dir))
     monkeypatch.setattr(get_settings(), "backup_dir", path.parent)

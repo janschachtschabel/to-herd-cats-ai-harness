@@ -34,7 +34,9 @@ async def test_the_command_line_replaces_with_the_name(
     archive = await make_archive(source_settings(tmp_path, data_dir))
     await running(target, archive)
     clock = SettableClock(AT)
-    argv = ["restore", "apply", str(archive), "--replace"]
+    # The test database's role may be a superuser: allowed explicitly (review M9b
+    # F2-1; the refusal itself: test_review2_m9b_dump_allowed_entry.py).
+    argv = ["restore", "apply", str(archive), "--replace", "--allow-superuser"]
     assert await run(argv, target.settings, clock) == 1
     assert printed(capsys) == "restore.confirm_missing"
     assert await marked(target.settings) == 1

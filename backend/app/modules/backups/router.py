@@ -125,6 +125,7 @@ async def replace_installation(
 ) -> ReplaceOut:
     """Replace the whole installation with the archive (a safety archive first, then
     maintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409
+    `restore.superuser_refused` (the app's database role is a superuser),
     `backup.already_running`, `backup.busy`, `backup.restore_running`,
     `backup.replace_refused`."""
     archive = await BackupAdmin(session, settings).replace(actor, name, body.confirm)

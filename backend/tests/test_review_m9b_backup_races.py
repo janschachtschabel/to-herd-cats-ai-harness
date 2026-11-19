@@ -19,6 +19,10 @@ from tests.factories_restore import make_archive, source_settings
 from tests.real_db import MakeRealClient, RealDb
 
 
+async def _no_problem(conn: object) -> None:
+    return None
+
+
 async def test_two_requests_at_once_make_one_backup_request(
     real_db: RealDb, make_real_client: MakeRealClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -68,6 +72,8 @@ async def test_two_replaces_at_once_start_one(
     shutdown) no longer see the first."""
     archive = await make_archive(source_settings(tmp_path, data_dir))
     monkeypatch.setattr(get_settings(), "backup_dir", archive.parent)
+    # A superuser test role is refused before the claim (review M9b F2-1).
+    monkeypatch.setattr("app.modules.backups.service.superuser_problem", _no_problem)
     release = asyncio.Event()
     started: list[Path] = []
 

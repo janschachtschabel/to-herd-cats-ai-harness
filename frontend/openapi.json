@@ -24953,7 +24953,7 @@
     },
     "/api/backups/archives/{name}/replace": {
       "post": {
-        "description": "Replace the whole installation with the archive (a safety archive first, then\nmaintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409\n`backup.already_running`, `backup.busy`, `backup.restore_running`,\n`backup.replace_refused`.",
+        "description": "Replace the whole installation with the archive (a safety archive first, then\nmaintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409\n`restore.superuser_refused` (the app's database role is a superuser),\n`backup.already_running`, `backup.busy`, `backup.restore_running`,\n`backup.replace_refused`.",
         "operationId": "replace_installation_api_backups_archives__name__replace_post",
         "parameters": [
           {

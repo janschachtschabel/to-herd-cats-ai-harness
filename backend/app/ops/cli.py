@@ -9,6 +9,7 @@
     python -m app.ops restore check ARCHIVE       # problem codes and warnings, or "ok"
     python -m app.ops restore apply ARCHIVE [--without-secrets]   # empty installation
     python -m app.ops restore apply ARCHIVE --replace --confirm "<organisation name>"
+                                                  [--allow-superuser]
                                                   # in place of the running installation
                                                   # (safety archive, maintenance meanwhile)
     python -m app.ops maintenance status|off      # whether in maintenance; end it
