@@ -412,9 +412,10 @@ Ziele nach außen trägt nur die Verwaltung ein; die Egress-Sperre lässt nur ht
 Alle Abhängigkeiten sind mit Hashes gesperrt (`backend/uv.lock`, die `package-lock.json`
 von frontend, collab und e2e), ihre Lizenzen prüft `backend/scripts/check_licenses.py`.
 Die CI führt bei jedem Lauf `pip-audit`, `npm audit --audit-level=high` und Trivy für
-das Image aus. Stand 15.11.2026 (lokal ausgeführt, die CI startet derzeit kontoseitig
+das Image aus. Stand 15.11.2026 (lokal ausgeführt, damals startete die CI kontoseitig
 keine Jobs): `pip-audit` für die Laufzeitabhängigkeiten ohne Befund, `npm audit` in
-allen drei Paketen 0 Schwachstellen.
+allen drei Paketen 0 Schwachstellen. Am 19.11.2026 bestand ein Lauf der CI alle Jobs, `pip-audit`, `npm audit` und Trivy eingeschlossen (Lauf
+44428037881 auf `94e4c3a`).
 
 **Fristen (von Jan bestätigt, 16.11.2026):** eine bekannte Schwachstelle in einer
 Laufzeitabhängigkeit oder dem Image wird behoben – kritisch (CVSS ≥ 9) binnen 7 Tagen,
