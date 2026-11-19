@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints
 
 from app.core.principal import PrincipalType
 from app.modules.calendars.event_models import (
@@ -42,8 +42,8 @@ class EventCreate(BaseModel):
     description: Annotated[str, StringConstraints(max_length=DESCRIPTION_MAX)] = ""
     location: Annotated[str, StringConstraints(strip_whitespace=True, max_length=LOCATION_MAX)] = ""
     all_day: bool = False
-    starts_at: datetime | None = None
-    ends_at: datetime | None = None
+    starts_at: AwareDatetime | None = None
+    ends_at: AwareDatetime | None = None
     first_day: date | None = None
     last_day: date | None = None
     tzid: Annotated[str, StringConstraints(max_length=TZID_MAX)] | None = None

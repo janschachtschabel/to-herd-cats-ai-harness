@@ -4,5 +4,10 @@
       "personal": "My calendar",
       "general": "General"
     }
+  },
+  "errors": {
+    "calendar": {
+      "window_out_of_range": "The calendar spans the years 1900 to 2399."
+    }
   }
 }

@@ -113,7 +113,9 @@ async def test_times_the_api_cannot_read_answer_422_never_500(
     """R3a-3: `starts_at`/`ends_at` are plain `datetime`s in `EventCreate`; a bound
     without an offset is compared with the other (TypeError), and an end near year
     9999 with a negative offset leaves `datetime` when brought to UTC (OverflowError):
-    500 `internal` each."""
+    500 `internal` each. (Fix wave: the API takes aware instants only, so a bound
+    without an offset is the request's 422 `validation_failed`; the service's own
+    answer, `event.invalid_time`, is held in `test_events.py`.)"""
     client, calendar = await _calendar(make_client, make_user, make_space)
     url = f"/api/calendars/{calendar['id']}/events"
     cases = {
@@ -126,8 +128,8 @@ async def test_times_the_api_cannot_read_answer_422_never_500(
         r = await client.post(url, json={"title": "X", "starts_at": starts_at, "ends_at": ends_at})
         got[name] = (r.status_code, r.json()["error"]["code"])
     assert got == {
-        "end without offset": (422, "event.invalid_time"),
-        "start without offset": (422, "event.invalid_time"),
+        "end without offset": (422, "validation_failed"),
+        "start without offset": (422, "validation_failed"),
         "end beyond datetime": (422, "event.time_out_of_range"),
     }
 

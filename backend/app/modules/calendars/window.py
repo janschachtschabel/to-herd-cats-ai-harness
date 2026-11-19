@@ -12,6 +12,8 @@ of the events the caller may list, by (start, event id), a page at a time.
   occurrence. All-day events float on their days: they are loaded 14 hours to either
   side and compared in the viewer's zone `viewer_zone` (default UTC), so a viewer in
   UTC+13 or UTC−11 sees the day's event and not the neighbours'.
+- Its bounds lie in the years 1900 to 2399 as sent (422
+  `calendar.window_out_of_range`), `from` before `to` (`calendar.invalid_window`).
 - At most `MAX_OCCURRENCES` occurrences (and `MAX_CANDIDATES` events) per call;
   beyond, 422 `calendar.window_too_dense`, counted.
 """
@@ -42,6 +44,8 @@ logger = logging.getLogger(__name__)
 MAX_OCCURRENCES = recurrence.DEFAULT_LIMIT  # 2,000
 MAX_CANDIDATES = 2 * MAX_OCCURRENCES
 VIEWER_ZONE = "UTC"
+FIRST_WALL = datetime(recurrence.FIRST_YEAR, 1, 1)
+LAST_WALL = datetime(recurrence.LAST_YEAR + 1, 1, 1)
 
 type Found = tuple[Occurrence, CalendarEvent, Sight]
 
@@ -64,6 +68,8 @@ async def list_window(
     params: PageParams,
     viewer_zone: str | None = None,
 ) -> pagination.Page[OccurrenceOut]:
+    if not (_in_years(start) and _in_years(end)):
+        raise ValidationFailed(code="calendar.window_out_of_range")
     if end <= start:
         raise ValidationFailed(code="calendar.invalid_window")
     zone = viewer_zone or VIEWER_ZONE
@@ -117,6 +123,12 @@ async def list_window(
         items=[OccurrenceOut.of(event, occurrence, seen) for occurrence, event, seen in page],
         next_cursor=encode_cursor(page[-1][0].start, page[-1][1].id) if more else None,
     )
+
+
+def _in_years(bound: datetime) -> bool:
+    """Whether the aware `bound`, read in the offset it came with, lies in the years
+    events may (1900 to 2399; the end of 2399 included as a window's end)."""
+    return FIRST_WALL <= bound.replace(tzinfo=None) <= LAST_WALL
 
 
 def _expand(

@@ -212,8 +212,20 @@ async def test_window_bounds_are_checked(
         {"from": "2026-11-23T00:00:00Z", "to": "2026-11-24T00:00:00Z", "limit": 101},
     ):
         assert (await client.get("/api/calendar/events", params=params)).status_code == 422
-    far = await window(client, "0001-01-01T00:00:00Z", "9999-12-31T00:00:00Z")
-    assert far == []  # nothing there, and no overflow
+    for start, end in (
+        ("0001-01-01T00:00:00Z", "2026-11-24T00:00:00Z"),
+        ("2026-11-23T00:00:00Z", "9999-12-31T00:00:00Z"),
+        ("1899-12-31T23:59:59+00:00", "1900-01-02T00:00:00Z"),
+        ("2399-12-31T00:00:00Z", "2400-01-01T00:00:01+00:00"),
+        ("0001-01-01T00:00:00+14:00", "9999-12-31T23:59:59-12:00"),
+    ):
+        r = await client.get("/api/calendar/events", params={"from": start, "to": end})
+        assert (r.status_code, r.json()["error"]["code"]) == (
+            422,
+            "calendar.window_out_of_range",
+        ), (start, end)
+    # The calendar's years, 1900 to 2399, read in the offset each bound was sent with.
+    assert await window(client, "1900-01-01T00:00:00+14:00", "2400-01-01T00:00:00-12:00") == []
 
 
 async def test_window_takes_only_the_calendars_asked_for(

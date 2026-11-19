@@ -4,5 +4,10 @@
       "personal": "Mein Kalender",
       "general": "Allgemein"
     }
+  },
+  "errors": {
+    "calendar": {
+      "window_out_of_range": "Der Kalender reicht von 1900 bis 2399."
+    }
   }
 }

@@ -9,6 +9,8 @@ event as the `Series` it is expanded from (plan M10 decisions 5 and 6).
   day and of the day after the last (`zones.all_day_bounds`), without a zone.
 - RDATEs and EXDATEs are wall times (naive) of the series; no RDATE lies before the
   start (the window loads a series from its start on).
+- Instants are aware (naive: `event.invalid_time`) and lie in the years 1900 to 2399
+  as sent (`event.time_out_of_range`), so nothing overflows.
 - Every write path checks its series here (`recurrence.check_series`); a problem is
   422 with the problem's code (`event.invalid_time`, `event.invalid_time_zone`,
   `event.time_out_of_range`, `event.rrule_invalid`, `event.rrule_unsupported`).
@@ -20,7 +22,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from app.core.errors import ValidationFailed
 from app.modules.calendars import recurrence, zones
 from app.modules.calendars.event_models import CalendarEvent
-from app.modules.calendars.recurrence import Series
+from app.modules.calendars.recurrence import FIRST_YEAR, LAST_YEAR, Series
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,18 +69,28 @@ def _bounds(times: Times, default_zone: str) -> tuple[datetime, datetime, dateti
         except OverflowError:
             raise invalid("event.time_out_of_range") from None
         return starts_at, ends_at, starts_at.replace(tzinfo=None), None
-    if times.first_day or times.last_day or not times.starts_at or not times.ends_at:
+    starts_at, ends_at = times.starts_at, times.ends_at
+    if times.first_day or times.last_day or not starts_at or not ends_at:
         raise invalid("event.invalid_time")
-    if times.ends_at < times.starts_at:
+    if starts_at.tzinfo is None or ends_at.tzinfo is None:
+        raise invalid("event.invalid_time")  # an instant names its offset
+    if not (in_years(starts_at) and in_years(ends_at)):
+        raise invalid("event.time_out_of_range")
+    if ends_at < starts_at:
         raise invalid("event.invalid_time")
     tzid = times.tzid or default_zone
     try:
-        wall = zones.wall(times.starts_at, tzid)
+        wall = zones.wall(starts_at, tzid)
     except zones.ZoneUnknown:
         raise invalid("event.invalid_time_zone") from None
-    except ValueError:  # beyond the range of datetime
-        raise invalid("event.time_out_of_range") from None
-    return times.starts_at.astimezone(UTC), times.ends_at.astimezone(UTC), wall, tzid
+    return starts_at.astimezone(UTC), ends_at.astimezone(UTC), wall, tzid
+
+
+def in_years(moment: datetime) -> bool:
+    """Whether the aware `moment`, read in the offset it came with, lies in the years
+    a series may (1900 to 2399; `recurrence_series`): within a day of them in UTC, so
+    no arithmetic on it leaves `datetime`."""
+    return FIRST_YEAR <= moment.year <= LAST_YEAR
 
 
 def check(times: Times, default_zone: str) -> Checked:
