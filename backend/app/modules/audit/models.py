@@ -11,6 +11,8 @@ from app.core.models_base import Base, OrgScoped, UuidPk, utcnow
 
 ADMIN_ACCESS = "space.admin_access"
 AGENT_ADMIN_ACCESS = "agent.admin_access"  # someone else's personal agent (plan M6)
+# A private calendar event's content read by admin power alone (plan M10, R3a-4).
+CALENDAR_PRIVATE_READ = "calendar.private_read"
 
 
 class AuditLog(UuidPk, OrgScoped, Base):
@@ -37,6 +39,15 @@ class AuditLog(UuidPk, OrgScoped, Base):
             text("((created_at AT TIME ZONE 'UTC')::date)"),
             unique=True,
             postgresql_where=text(f"action = '{AGENT_ADMIN_ACCESS}'"),
+        ),
+        # At most one entry per admin, private calendar event and UTC day.
+        Index(
+            "uq_audit_log_calendar_private_read_daily",
+            "actor_id",
+            "target_id",
+            text("((created_at AT TIME ZONE 'UTC')::date)"),
+            unique=True,
+            postgresql_where=text(f"action = '{CALENDAR_PRIVATE_READ}'"),
         ),
     )
 

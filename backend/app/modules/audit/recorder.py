@@ -12,7 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import Actor
 from app.core.request_context import client_ip
-from app.modules.audit.models import ADMIN_ACCESS, AGENT_ADMIN_ACCESS, AuditLog
+from app.modules.audit.models import (
+    ADMIN_ACCESS,
+    AGENT_ADMIN_ACCESS,
+    CALENDAR_PRIVATE_READ,
+    AuditLog,
+)
 from app.modules.audit.repository import AuditRepository
 
 
@@ -89,6 +94,25 @@ async def record_agent_admin_access(
             "details": None,
         }
         for agent_id in sorted(set(agent_ids))
+    ]
+    await AuditRepository(session).add_many_unless_present(rows)
+
+
+async def record_private_event_reads(
+    session: AsyncSession, actor: Actor, events: Iterable[tuple[uuid.UUID, uuid.UUID, uuid.UUID]]
+) -> None:
+    """An admin read private calendar events by admin power alone (plan M10, review
+    task 3a R3a-4): one entry per admin, event and UTC day, in one statement; `events`
+    are (event, space, calendar) ids, the only details."""
+    rows = [
+        {
+            **_who(actor),
+            "action": CALENDAR_PRIVATE_READ,
+            "target_type": "calendar_event",
+            "target_id": event_id,
+            "details": {"space_id": str(space_id), "calendar_id": str(calendar_id)},
+        }
+        for event_id, space_id, calendar_id in sorted(set(events))
     ]
     await AuditRepository(session).add_many_unless_present(rows)
 

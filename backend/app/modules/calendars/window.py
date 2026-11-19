@@ -6,7 +6,8 @@ of the events the caller may list, by (start, event id), a page at a time.
   way, through `access.require(calendar.read)` (an admin's look into a foreign team or
   personal space is audited), the events of that space alone. `mine`: only those the
   caller organises (task 4 adds those it is invited to). `query`: a title search among
-  the events the caller sees in full, so hidden content answers nothing.
+  the events the caller sees in full, so hidden content answers nothing. The private
+  events a page shows by admin power alone are audited (`calendar.private_read`).
 - One statement loads every event that can reach the window (`recurs_until`), without
   its description; `expansion.effective` expands them (overrides take the place of
   their occurrence; all-day events by the viewer's days in `viewer_zone`, default UTC,
@@ -29,6 +30,7 @@ from app.core import pagination
 from app.core.access import Action, Actor, require
 from app.core.errors import ValidationFailed
 from app.core.pagination import PageParams, decode_cursor, encode_cursor
+from app.modules.audit.recorder import record_private_event_reads
 from app.modules.calendars import expansion, recurrence, sight, zones
 from app.modules.calendars.event_models import CalendarEvent
 from app.modules.calendars.event_repository import EventRepository
@@ -116,6 +118,16 @@ async def list_window(
         found = [f for f in found if (f[0].start, f[1].id) > after]
     page = found[: params.limit]
     more = len(found) > params.limit
+    shown_by_power = [
+        (event.id, event.space_id, event.calendar_id)
+        for _, event, event_sight in page
+        if event_sight is Sight.FULL
+        and sight.by_admin_power(
+            actor, event, reads=True, attends=sight.attends(actor, event), named=named
+        )
+    ]
+    if shown_by_power:
+        await record_private_event_reads(session, actor, shown_by_power)
     return pagination.Page[OccurrenceOut](
         items=[OccurrenceOut.of(event, occurrence, seen) for occurrence, event, seen in page],
         next_cursor=encode_cursor(page[-1][0].start, page[-1][1].id) if more else None,

@@ -43,18 +43,29 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   als Zeitpunkte und seine Zone (sonst die des Kalenders); ein ganztägiger nennt ersten
   und letzten Tag und liegt „schwebend“ auf diesen Tagen. Ganztägige Termine sind im
   Standard „frei“, alle anderen „belegt“. Titel ≤ 300 Zeichen, Ort ≤ 500, Text ≤ 20.000
-  (reiner Text, nie als HTML gezeigt).
+  (reiner Text, nie als HTML gezeigt). Zeitpunkte tragen immer ihren Versatz (ohne:
+  422) und liegen in den Jahren 1900 bis 2399 (sonst 422 `event.time_out_of_range`).
+  Ein Termin dauert höchstens 366 Tage (422 `event.too_long`).
 - **Serien** nach RFC 5545: Regel ab `DAILY` (stündlich und feiner antwortet 422
   `event.rrule_unsupported`), dazu einzelne Zusatz- und Ausnahmetermine als Ortszeit der
   Zone. Entfaltet wird beim Lesen in der Ortszeit: 09:00 bleibt über die Zeitumstellung
-  09:00. Fehler antworten 422 mit Code (`event.invalid_time`, `event.invalid_time_zone`,
-  `event.time_out_of_range`, `event.rrule_invalid`).
+  09:00. Kein Vorkommen dauert über den Anfang des nächsten hinaus (422
+  `event.series_overlaps`; gemessen an der Uhr der Zone, so bleibt eine tägliche
+  24-Stunden-Schicht über die Zeitumstellung erlaubt). Geprüft werden die ersten 1.000
+  Vorkommen (eine gezählte Serie ganz) und die Umgebung jedes späteren Zusatztermins.
+  Fehler antworten 422 mit Code (`event.invalid_time`, `event.invalid_time_zone`,
+  `event.time_out_of_range`, `event.too_long`, `event.series_overlaps`,
+  `event.rrule_invalid`).
 - **Eine UID je Kalender:** Zwei Termine mit derselben UID in einem Kalender gibt es
   nicht (409 `event.uid_taken`); ein gelöschter Termin blockiert seine UID nicht.
 - **Das Fenster** (`GET /api/calendar/events?from&to`) liefert jedes Vorkommen im
   Zeitraum, nach Anfang sortiert und seitenweise (höchstens 100 je Seite, höchstens
   2.000 Vorkommen je Abfrage, sonst 422 `calendar.window_too_dense`, gezählt in
-  `herd_calendar_window_too_dense_total`). `tz` nennt die Zone der Betrachterin: Dort
+  `herd_calendar_window_too_dense_total`). Dieselbe Antwort gibt es, wenn die gezählte
+  Arbeit des Entfaltens 500.000 Schritte übersteigt (je geladener Termin 40, je
+  Kandidat einer Regel 1; etwa 12.500 Serien): Serien, die im Zeitraum nicht vorkommen,
+  kosten nur ihren Schritt. Die Grenzen `from` und `to` liegen in den Jahren 1900 bis
+  2399 (422 `calendar.window_out_of_range`). `tz` nennt die Zone der Betrachterin: Dort
   beginnen die Tage ganztägiger Termine (Standard UTC). `calendar_ids` filtert, `q`
   sucht im Titel.
 - **Wer was sieht:** Wer den Bereich des Kalenders lesen darf, sieht seine Termine; die
@@ -81,6 +92,12 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   Termine sieht ein Admin über das Fenster mit `space_id=<Bereich>` oder den Abruf
   eines Termins per ID; nur dort sieht er auch den Inhalt privater Termine (E4), und
   das Öffnen eines fremden Team- oder persönlichen Bereichs steht im Audit.
+- **Private Termine kraft Admin-Recht stehen immer im Audit:** Zeigt der Einzelabruf
+  oder das Fenster mit `space_id=` einem Admin den Inhalt eines privaten Termins, den er
+  ohne Admin-Recht nur als „Belegt“ sähe, entsteht `calendar.private_read` (Ziel der
+  Termin, dazu nur die IDs von Bereich und Kalender; einmal je Admin, Termin und Tag).
+  Das gilt auch, wenn er Mitglied des Bereichs ist oder der Bereich offen ist. Eigene
+  Rechte (Organisatorin, gewöhnliche Leser) schreiben nie einen Eintrag.
 - **Bekannte Lücke:** Wird die Änderung eines Admins in einem fremden Bereich abgelehnt
   (409 wegen veralteter Version, der Grenze oder eines Standardkalenders), rollt die
   Anfrage samt ihrem `admin.access`-Eintrag zurück. Das gilt heute ebenso für Tickets und

@@ -3,7 +3,10 @@
 - `FULL`: its organiser (task 4: and its attendees), whatever space it lies in; an
   admin on the named way (the call names the space or the event and went through
   `access.require`, which audits a foreign team or personal space; E4); and, for an
-  event that is not private, whoever reads its calendar's space.
+  event that is not private, whoever reads its calendar's space. A `FULL` that comes
+  from admin power alone (`by_admin_power`: a private event of someone else, a member
+  admin and an open space included) is audited by the caller, one
+  `calendar.private_read` per admin, event and UTC day.
 - `BUSY`: anyone else who reads the calendar's space, for a private event: times and
   "busy", never its title, place, text, UID or organiser (`redacted`).
 - `NONE`: everyone else; such an event answers like an unknown id.
@@ -45,6 +48,15 @@ def of(actor: Actor, event: CalendarEvent, *, reads: bool, attends: bool, named:
     if not reads:
         return Sight.NONE
     return Sight.FULL if event.visibility == EventVisibility.DEFAULT else Sight.BUSY
+
+
+def by_admin_power(
+    actor: Actor, event: CalendarEvent, *, reads: bool, attends: bool, named: bool
+) -> bool:
+    """Whether `of` gives `FULL` only by admin power (it would give less without):
+    such a read is audited (`calendar.private_read`, review M10 task 3a R3a-4)."""
+    full = of(actor, event, reads=reads, attends=attends, named=named) is Sight.FULL
+    return full and of(actor, event, reads=reads, attends=attends, named=False) is not Sight.FULL
 
 
 def attends(actor: Actor, event: CalendarEvent) -> bool:

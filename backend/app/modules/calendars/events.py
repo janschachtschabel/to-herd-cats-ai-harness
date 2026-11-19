@@ -7,7 +7,8 @@
   calendar (409 `event.uid_taken`).
 - Reading one by id is the named way (decision 3): its organiser sees it whatever its
   space; anyone else through `access.require(calendar.read)` on its space, which an
-  admin outside it passes audited (spec 5.5). How much: `sight.of`. An event the
+  admin outside it passes audited (spec 5.5). How much: `sight.of`; content shown by
+  admin power alone is audited (`calendar.private_read`). An event the
   caller may not see answers 404 `event.not_found`, by the same statement as an
   unknown id (`EventRepository.find`).
 - Every change writes one outbox event with ids only (`calendar_event.created`).
@@ -23,6 +24,7 @@ from uuid_utils.compat import uuid7
 from app.core.access import Action, Actor, require, visible_space_ids
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.outbox import emit
+from app.modules.audit.recorder import record_private_event_reads
 from app.modules.calendars import sight
 from app.modules.calendars.event_models import CalendarEvent, EventStatus, EventVisibility
 from app.modules.calendars.event_repository import EventRepository, UidTaken
@@ -129,4 +131,8 @@ class EventService:
         found = sight.of(actor, event, reads=True, attends=False, named=True)
         if found is Sight.NONE:
             raise event_not_found()
+        if sight.by_admin_power(actor, event, reads=True, attends=False, named=True):
+            await record_private_event_reads(
+                self.session, actor, [(event.id, event.space_id, event.calendar_id)]
+            )
         return Seen(event, found)

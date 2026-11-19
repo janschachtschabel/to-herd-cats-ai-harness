@@ -3,9 +3,11 @@ a calendar and its space, by the foreign key `(calendar_id, space_id)`; its seri
 rule, RDATEs and EXDATEs in wall time, `recurs_until` for the window; overrides as
 rows of their own; one live master per UID and calendar, a tombstone blocking
 nothing: `NULLS NOT DISTINCT`, Postgres 15 or later) and `calendar.time_zone` (the
-zone of a new event that names none; `Europe/Berlin` for existing rows).
+zone of a new event that names none; `Europe/Berlin` for existing rows); a partial
+unique index on `audit_log` keeping one `calendar.private_read` entry per admin,
+event and UTC day (review M10 task 3a, R3a-4).
 
-Expand only: one new table and one new column with a server default. The previous
+Expand only: one new table, one new column with a server default, one new index. The previous
 release (1.0.0) neither reads nor writes them.
 
 Revision ID: c5e8a1d4f7b2
@@ -120,9 +122,21 @@ def upgrade() -> None:
         postgresql_where=sa.text("deleted_at IS NULL"),
         postgresql_nulls_not_distinct=True,
     )
+    op.create_index(
+        "uq_audit_log_calendar_private_read_daily",
+        "audit_log",
+        ["actor_id", "target_id", sa.text("((created_at AT TIME ZONE 'UTC')::date)")],
+        unique=True,
+        postgresql_where=sa.text("action = 'calendar.private_read'"),
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(
+        "uq_audit_log_calendar_private_read_daily",
+        table_name="audit_log",
+        postgresql_where=sa.text("action = 'calendar.private_read'"),
+    )
     op.drop_index(
         "uq_calendar_event_uid",
         table_name="calendar_event",
