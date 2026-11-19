@@ -9,8 +9,10 @@ person is an active person, no guest. Limits are capped (25 steps, 10 minutes). 
 level (1 to 4, default 2) above 2 only from an admin or someone who manages every
 space of the agent (403 `agent.level_denied`, `toolbox/policy.py`). An
 agent that took part in a conversation or ran is not deleted (409 `agent.in_use`):
-it is paused, so its answers stay attributed. Every change is audited (without the
-instructions' text, which may be long; their length instead).
+it is paused, so its answers stay attributed. Deleting one takes its memberships
+and its invitations to calendar events along (like a membership, an invitation is
+where it stands, not something it made: review M10 task 4, R4-4). Every change is
+audited (without the instructions' text, which may be long; their length instead).
 
 An external agent (plan M8 decision 11, `kind = external`) is made only with
 `agent.manage`: no connection or model, never personal, level at most 2 (422
