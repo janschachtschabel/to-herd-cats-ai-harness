@@ -1,6 +1,7 @@
 """Who sees an event, and how much (plan M10 decision 3): the one rule.
 
-- `FULL`: its organiser (task 4: and its attendees), whatever space it lies in; an
+- `FULL`: its organiser (task 4: and its attendees), whatever space it lies in (an
+  actor with a read scope, a run: only inside it, as `core/access.py` holds it); an
   admin on the named way (the call names the space or the event and went through
   `access.require`, which audits a foreign team or personal space; E4); and, for an
   event that is not private, whoever reads its calendar's space. A `FULL` that comes
@@ -60,15 +61,23 @@ def by_admin_power(
 
 
 def attends(actor: Actor, event: CalendarEvent) -> bool:
+    """Whether the actor organises the event (task 4: or is invited), inside its read
+    scope if it has one (a run sees no event outside its scope, organised or not)."""
+    scope = actor.read_scope
+    if scope is not None and event.space_id not in scope.ids():
+        return False
     return event.organizer_type == actor.principal.type and event.organizer_id == actor.principal.id
 
 
 def attends_sql(actor: Actor) -> ColumnElement[bool]:
     """`attends` as SQL."""
-    return and_(
+    clause = and_(
         CalendarEvent.organizer_type == actor.principal.type,
         CalendarEvent.organizer_id == actor.principal.id,
     )
+    if actor.read_scope is not None:
+        clause = and_(clause, CalendarEvent.space_id.in_(actor.read_scope.ids()))
+    return clause
 
 
 def reads_sql(actor: Actor) -> ColumnElement[bool]:
