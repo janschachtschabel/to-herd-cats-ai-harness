@@ -17,7 +17,8 @@ Contract of `effective(rows, taken, start, end, *, viewer_zone, budget)`:
 - Bounded: `TooDense` beyond `budget.occurrences` occurrences, or once the counted
   work passes `budget.work`: each row costs `ROW_WORK`, each candidate a rule
   generates one (`recurrence_jump.Counter`; endless series jump to the window, a
-  counted one runs from its start). A row whose stored series no longer reads (a zone
+  counted one too where its count per period is fixed, else it runs from its start).
+  A row whose stored series no longer reads (a zone
   `tzdata` dropped) is logged by id and skipped.
 """
 

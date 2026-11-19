@@ -105,3 +105,14 @@ def bounded(moment: datetime) -> datetime:
     if moment.tzinfo is None:
         raise ValueError("an instant is aware")
     return min(max(moment, EARLIEST), LATEST)
+
+
+def shift(wall: datetime, delta: timedelta) -> datetime:
+    """The wall time `delta` later, by the clock on the wall (`event.time_out_of_range`
+    beyond `datetime`'s years)."""
+    if wall.tzinfo is not None:
+        raise ValueError("a wall time is naive")
+    try:
+        return wall + delta
+    except OverflowError:
+        raise SeriesInvalid("event.time_out_of_range") from None

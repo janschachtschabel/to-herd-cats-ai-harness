@@ -11,7 +11,8 @@ that imports `dateutil` (`tests/test_calendar_imports.py` allows it here and in
   `UNTIL` is an instant for a start with a zone and a date for an all-day one; it is
   compared as such. RDATEs add, EXDATEs remove (by wall time); a duplicate is one.
 - Occurrences overlap the window `[window_from, window_to)`; more than `limit` raise
-  `TooDense`. An endless rule jumps to the window (`recurrence_jump`). Two occurrences
+  `TooDense`. An endless rule jumps to the window (`recurrence_jump`), a counted one
+  too where its count per period is fixed (`counted_jump`, `recurrence_count`). Two occurrences
   that start at one instant (a gap's moved wall time where the next one is: Pacific/Apia
   on 30 December 2011, or an RDATE beside it) show once, by the earlier recurrence id.
   An occurrence in a gap keeps the wall time the rule names as its id (RFC 5545
@@ -33,7 +34,7 @@ from typing import Any
 
 from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, rrule, weekday
 
-from app.modules.calendars.recurrence_jump import Counter, jump, week_start
+from app.modules.calendars.recurrence_jump import Counter, counted_jump, jump, week_start
 from app.modules.calendars.recurrence_rule import (
     FIRST_YEAR,
     LAST_YEAR,
@@ -49,6 +50,7 @@ from app.modules.calendars.recurrence_series import (
     as_wall,
     bounded,
     instant,
+    shift,
     wall_of,
 )
 
@@ -62,6 +64,7 @@ __all__ = [
     "TooDense",
     "check_rule",
     "recurrence_id_at",
+    "shift",
 ]
 
 DEFAULT_LIMIT = 2000
@@ -163,7 +166,10 @@ def rule_walls(
     if rule is None:
         yield start
         return
-    begin = jump(rule, start, lo)
+    begin, done = jump(rule, start, lo), 0
+    counted = counted_jump(rule, start, lo, lambda until: _between(rule, start, until, counter))
+    if counted is not None:  # `done`: the occurrences before `begin`, DTSTART included
+        begin, done = counted
     counter.jumps += begin != start
     last = _last_instant(series, rule)
     if last is not None:
@@ -174,7 +180,12 @@ def rule_walls(
         if wall != start and (last is None or instant(series, wall) <= last)
     )
     ordered = chain([start] if begin == start else [], matches)
-    yield from islice(ordered, rule.count) if rule.count is not None else ordered
+    yield from islice(ordered, max(rule.count - done, 0)) if rule.count is not None else ordered
+
+
+def _between(rule: ParsedRule, start: datetime, stop: datetime, counter: Counter) -> int:
+    """The rule's matches after DTSTART and before `stop`."""
+    return sum(start < wall < stop for wall in _matches(rule, start, start, stop, counter))
 
 
 def walls(
@@ -300,14 +311,3 @@ def count_before(series: Series, recurrence_id: datetime) -> int:
             break
         count += 1
     return count
-
-
-def shift(wall: datetime, delta: timedelta) -> datetime:
-    """The wall time `delta` later, by the clock on the wall (`event.time_out_of_range`
-    beyond `datetime`'s years)."""
-    if wall.tzinfo is not None:
-        raise ValueError("a wall time is naive")
-    try:
-        return wall + delta
-    except OverflowError:
-        raise SeriesInvalid("event.time_out_of_range") from None

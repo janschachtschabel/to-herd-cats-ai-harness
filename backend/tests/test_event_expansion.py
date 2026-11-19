@@ -25,6 +25,9 @@ from tests.factories_calendar import actor_of, logged_in, new_calendar, new_even
 from tests.factories_spaces import MakeSpace
 
 WEEK = (datetime(2026, 11, 23, tzinfo=UTC), datetime(2026, 11, 30, tzinfo=UTC))
+# Daily, but limited to months: its count per period may vary, so a counted one walks
+# from its start on every read (no counted jump, `recurrence_count.per_block`).
+WALKING_DAILY = "FREQ=DAILY;BYMONTH=1,2,3,4,5,6,7,8,9,10,11,12"
 
 
 def _event(**fields: Any) -> CalendarEvent:
@@ -78,9 +81,12 @@ def test_effective_occurrences_skip_deleted_and_overridden_ones() -> None:
 
 
 def test_work_beyond_the_budget_is_too_dense() -> None:
-    """A counted series runs from its start (it never jumps): its candidates up to
-    the window count, and so does every row."""
-    counted = _event(starts_at=datetime(2015, 1, 1, 9, tzinfo=UTC), rrule="FREQ=DAILY;COUNT=5000")
+    """A counted series whose count per period may vary runs from its start (a daily
+    rule limited to months does not jump): its candidates up to the window count, and
+    so does every row."""
+    counted = _event(
+        starts_at=datetime(2015, 1, 1, 9, tzinfo=UTC), rrule=f"{WALKING_DAILY};COUNT=5000"
+    )
     spent = Budget()
     effective([counted], set(), *WEEK, viewer_zone="UTC", budget=spent)
     assert spent.spent() > 4000
@@ -103,7 +109,7 @@ async def test_the_window_answers_too_dense_beyond_its_work_bound(
             calendar["id"],
             starts_at="2026-01-01T10:00:00+01:00",
             ends_at="2026-01-01T11:00:00+01:00",
-            rrule="FREQ=DAILY;COUNT=400",
+            rrule=f"{WALKING_DAILY};COUNT=400",
         )
     params = {"from": "2026-11-23T00:00:00Z", "to": "2026-11-24T00:00:00Z"}
     assert len((await client.get("/api/calendar/events", params=params)).json()["items"]) == 3

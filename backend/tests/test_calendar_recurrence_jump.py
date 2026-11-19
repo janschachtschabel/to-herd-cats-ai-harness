@@ -185,7 +185,8 @@ def test_a_window_far_ahead_of_an_endless_series_generates_few_candidates() -> N
     # (offsets of a zone differ by up to a day) and the one past the end that stops it
     assert counter.candidates <= 1 + 7 + 2 * 2 + 1
     assert counter.jumps == 1
-    # a counted series cannot jump: it is counted from DTSTART, and stays right
+    # a counted series with one occurrence a day jumps too, counting the days it skipped
+    # (plan M10 Task 3c; `test_calendar_recurrence_counted.py`), and stays right
     counted = Series(
         datetime(2020, 1, 1, 9),
         timedelta(hours=1),
@@ -212,8 +213,8 @@ def test_a_window_far_ahead_of_an_endless_series_generates_few_candidates() -> N
         "2033-09-07",
         "2033-09-08",
     ]  # the 5,000th is 8 September 2033
-    assert counter.jumps == 0
-    assert counter.candidates >= 4999
+    assert counter.jumps == 1
+    assert counter.candidates <= 1 + 14 + 2 * 2 + 1
 
 
 @pytest.mark.parametrize(
