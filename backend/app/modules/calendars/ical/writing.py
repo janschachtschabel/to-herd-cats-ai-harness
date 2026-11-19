@@ -16,6 +16,8 @@
   tombstone must free the time; tentative is not told) and a DTSTAMP of the moment of
   writing (`now`), never the last change. A redacted series is written under the
   caller's opaque UID (`ExportEvent.opaque_uid`, R7a-5), its overrides too.
+- A parameter value that holds a backslash (an attendee's name) is quoted, `^` and `"`
+  are written by RFC 6868 (re-check RC7a-7).
 - Texts lose control characters; U+2028, U+2029 and U+0085 become line breaks
   (escaped `\\n`), so no reader that splits lines on them sees a property begin (R7a-12);
   a UID is one line.
@@ -49,6 +51,7 @@ _PARTSTAT = {
     Response.DECLINED: "DECLINED",
 }
 _END = b"END:VCALENDAR\r\n"
+_QUOTED_IN_CN = " '\\"  # icalendar's own (space, apostrophe) and a backslash
 
 
 def calendar_ics(events: Iterable[ExportEvent], *, name: str, now: datetime) -> Iterator[bytes]:
@@ -188,6 +191,9 @@ def _attendee(attendee: AttendeeDraft) -> vCalAddress | None:
         return None  # nothing that is no address goes out
     address = vCalAddress(f"mailto:{email}")
     if name := lines.one_line(attendee.name or ""):
+        # quoted where it holds a backslash, read verbatim inside quotes (RC7a-7);
+        # `^` and `"` are written by RFC 6868 either way
+        address.params.quote_also = {"CN": _QUOTED_IN_CN}
         address.params["CN"] = name
     optional = attendee.role is Role.OPTIONAL
     address.params["ROLE"] = "OPT-PARTICIPANT" if optional else "REQ-PARTICIPANT"

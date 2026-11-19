@@ -11,7 +11,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 
-from icalendar.parser import Contentline, Contentlines
+from icalendar.parser import Contentline, Contentlines, rfc_6868_unescape
 from icalendar.parser.property import unescape_backslash
 
 from app.modules.calendars.ical import problems
@@ -31,6 +31,12 @@ _BREAKS = re.compile(r"[\t\n]")
 # RFC 5545 3.1: a line break followed by a space or tab continues the line.
 _FOLD = re.compile(rb"\r?\n[ \t]")
 _FOLD_TEXT = re.compile(r"\r?\n[ \t]")
+# RFC 5545 3.1, 3.2: a parameter value is a quoted string, read verbatim but for RFC
+# 6868's carets (RC7a-7), or unquoted text without `";:,` (backslash escapes that some
+# producers write resolved). A line these do not take is split by `icalendar`.
+_VALUE = r'(?:"[^"]*"|(?:\\.|[^";:,\\])*)'
+_LINE_NAME = re.compile(r"[ \t]*([A-Za-z0-9-]+)[ \t]*")
+_PARAM = re.compile(rf"[ \t]*;[ \t]*([A-Za-z0-9-]+)[ \t]*=[ \t]*({_VALUE})(?:,{_VALUE})*[ \t]*")
 # A calendar needs three levels (VCALENDAR, VEVENT or VTIMEZONE, VALARM or an
 # observance); a little more for producers' own components, nothing deeper.
 MAX_DEPTH = 6
@@ -90,12 +96,37 @@ class Component:
 
 
 def _prop(line: Contentline) -> Prop:
-    name, params, raw = line.raw_parts()
-    flat = {
-        str(key).upper(): str(value[0] if isinstance(value, list) and value else value)
-        for key, value in params.items()
-    }
-    return Prop(str(name).upper(), flat, str(raw), unescape_backslash(str(raw)))
+    split = _split(str(line))
+    if split is None:
+        name, params, raw = line.raw_parts()
+        flat = {
+            str(key).upper(): str(value[0] if isinstance(value, list) and value else value)
+            for key, value in params.items()
+        }
+        return Prop(str(name).upper(), flat, str(raw), unescape_backslash(str(raw)))
+    name, flat, raw = split
+    return Prop(name, flat, raw, unescape_backslash(raw))
+
+
+def _split(line: str) -> tuple[str, dict[str, str], str] | None:
+    """Name (upper case), parameters (each list's first value) and value as written;
+    None for a line these rules do not take."""
+    found = _LINE_NAME.match(line)
+    if found is None:
+        return None
+    name, at = found.group(1).upper(), found.end()
+    params: dict[str, str] = {}
+    while (param := _PARAM.match(line, at)) is not None:
+        value = param.group(2)
+        if value[:1] == '"':
+            value = value[1:-1]
+        else:
+            value = unescape_backslash(value)
+        params[param.group(1).upper()] = rfc_6868_unescape(value)
+        at = param.end()
+    if line[at : at + 1] != ":":
+        return None
+    return name, params, line[at + 1 :]
 
 
 def read(data: bytes) -> tuple[list[Component], Counter[str]]:

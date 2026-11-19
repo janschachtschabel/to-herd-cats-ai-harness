@@ -5,8 +5,8 @@ these, before anything else can break quietly."""
 from importlib.metadata import version
 
 import icalendar
-from icalendar import Timezone
-from icalendar.parser import Contentline, Contentlines
+from icalendar import Timezone, vCalAddress
+from icalendar.parser import Contentline, Contentlines, rfc_6868_unescape
 from icalendar.parser.property import unescape_backslash
 from icalendar.prop import vInline
 from icalendar.timezone.windows_to_olson import WINDOWS_TO_OLSON
@@ -31,6 +31,15 @@ def test_lines_split_into_name_parameters_and_value() -> None:
     name, params, value = lines[1].raw_parts()
     assert value == "a\\nb\\\\nc\\, dfolded"
     assert unescape_backslash(value) == "a\nb\\nc, dfolded"  # `\n` a break, `\\n` text
+    assert rfc_6868_unescape("a^'b^^c^nd") == 'a"b^c\nd'  # `lines._split` (RC7a-7)
+
+
+def test_a_parameter_quoted_for_a_backslash_is_written() -> None:
+    """`writing._attendee`: a per-instance `quote_also` quotes a CN that holds one."""
+    address = vCalAddress("mailto:x@y.org")
+    address.params.quote_also = {"CN": "\\"}
+    address.params["CN"] = "end\\"
+    assert address.params.to_ical() == b'CN="end\\"'
 
 
 def test_the_windows_table_maps_names_to_iana_zones() -> None:
