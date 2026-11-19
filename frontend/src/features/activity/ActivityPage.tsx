@@ -1,6 +1,8 @@
 import {
   AtSign,
+  CalendarCheck,
   CalendarClock,
+  CalendarPlus,
   Check,
   CheckCheck,
   ClipboardCheck,
@@ -23,6 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AgentBadge } from '@/features/agents/AgentBadge'
 import { useMe } from '@/features/auth/queries'
+import { CalendarDetails, CalendarSentence } from './CalendarSentences'
 import { AutomationSentence, ReviewDueSentence } from './Sentences'
 import { signupText } from './wording'
 import { conversationLabel } from '@/features/messaging/display'
@@ -128,6 +131,8 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   review_due: ClipboardCheck,
   signup: UserPlus,
   totp_locked: ShieldAlert,
+  invitation: CalendarPlus,
+  invite_reply: CalendarCheck,
 }
 
 /** Where an entry happened, for its sentence: its conversation, or where a proposal
@@ -215,6 +220,8 @@ function ActivityItem({
             signupText(t, entry)
           ) : entry.reason === 'totp_locked' ? (
             t('activity.totpLocked')
+          ) : entry.reason === 'invitation' || entry.reason === 'invite_reply' ? (
+            <CalendarSentence entry={entry} />
           ) : (
             <>
               <span className="font-medium">{author ?? t('messaging.message.unknownAuthor')}</span>{' '}
@@ -227,6 +234,7 @@ function ActivityItem({
             </>
           )}
         </p>
+        <CalendarDetails entry={entry} />
         {entry.snippet && (
           <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
             {plainMentions(entry.snippet)}

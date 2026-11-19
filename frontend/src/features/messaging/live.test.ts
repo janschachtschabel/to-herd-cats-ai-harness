@@ -217,6 +217,13 @@ describe('live invalidation', () => {
     ])
   })
 
+  test('an invitation refreshes the calendar views too (plan M10 task 4)', () => {
+    expect(staleAfter({ type: 'event.invited', eventId: 'e1' })).toEqual([
+      'calendars',
+      'calendarWindow',
+    ])
+  })
+
   test('a sprint event refreshes the sprints, boards and lists of its space (plan M4b)', () => {
     expect(staleAfter({ type: 'sprint.changed', spaceId: 'space' })).toEqual([
       'board',

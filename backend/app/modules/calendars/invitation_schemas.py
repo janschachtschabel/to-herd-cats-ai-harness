@@ -61,7 +61,7 @@ class AttendeeOut(BaseModel):
     """`principal_id` for a person or agent, `email` for an address (a person's
     address is never shown); `name` the person's, agent's or the address's display
     name. `delivery`: `internal` (the activity view), `not_sent` (an address: pass the
-    event's `.ics` on), `provider` (sent by a linked calendar)."""
+    event's `.ics` on)."""
 
     id: uuid.UUID
     type: Kind

@@ -20,7 +20,29 @@
       "occurrence_required": "Welches Vorkommen? Bitte eines der Serie wählen.",
       "occurrence_unknown": "Dieses Vorkommen gibt es in der Serie nicht (mehr).",
       "scope_invalid": "Das passt nicht zu diesem Termin: einzelne Termine und einzeln geänderte Vorkommen sind keine Serie.",
-      "too_many_dates": "Eine Serie hat höchstens 500 gelöschte Vorkommen."
+      "too_many_dates": "Eine Serie hat höchstens 500 gelöschte Vorkommen.",
+      "not_invited": "Du bist zu diesem Termin nicht eingeladen.",
+      "attendee_unknown": "Unter den Eingeladenen ist jemand, den du nicht einladen kannst.",
+      "attendee_duplicate": "Jemand steht doppelt auf der Liste der Eingeladenen.",
+      "too_many_attendees": "Ein Termin hat höchstens 100 Eingeladene."
+    }
+  },
+  "activity": {
+    "reasons": {
+      "invitation": "Einladung",
+      "invite_reply": "Antwort auf eine Einladung"
+    },
+    "invitation": {
+      "invited": "Du bist zu „{{title}}“ eingeladen.",
+      "cancelled": "„{{title}}“ wurde abgesagt.",
+      "replied": "Für „{{title}}“ hat jemand abgesagt oder „vielleicht“ geantwortet.",
+      "answer": "Deine Antwort: {{answer}}",
+      "answers": {
+        "needs_action": "noch offen",
+        "accepted": "zugesagt",
+        "tentative": "vielleicht",
+        "declined": "abgesagt"
+      }
     }
   }
 }

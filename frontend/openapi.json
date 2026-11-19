@@ -149,6 +149,60 @@
         "title": "ActivityAutomation",
         "type": "object"
       },
+      "ActivityCalendarEvent": {
+        "description": "The calendar event an `invitation` or `invite_reply` is about (plan M10 task 4;\nits address: `/api/events/{id}`); shown only while the person attends it, so in\nfull. `cancelled`: called off or deleted; `response`: the person's own answer\n(null when she organises it).",
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "starts_at",
+          "ends_at",
+          "all_day",
+          "cancelled",
+          "response"
+        ],
+        "title": "ActivityCalendarEvent",
+        "type": "object"
+      },
       "ActivityConversation": {
         "description": "`name` is null for a direct message and a page or ticket thread; `page_id` names\na page thread's page, `ticket_number` a ticket thread's ticket (null for other\nkinds; the ticket's address is `/tickets/<number>`).",
         "properties": {
@@ -238,7 +292,7 @@
         "type": "object"
       },
       "ActivityOut": {
-        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); a\n`skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`\nthe automation (plan M7), a `signup` the waiting account (plan M9); `author` may be\nan agent (`type`).",
+        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); a\n`skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`\nthe automation (plan M7), a `signup` the waiting account (plan M9), an\n`invitation` or `invite_reply` the calendar event (plan M10); `author` may be an\nagent (`type`).",
         "properties": {
           "account": {
             "anyOf": [
@@ -264,6 +318,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ActivityAutomation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "calendar_event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityCalendarEvent"
               },
               {
                 "type": "null"
@@ -1966,6 +2030,162 @@
           "version"
         ],
         "title": "AttachmentOut",
+        "type": "object"
+      },
+      "AttendeeIn": {
+        "additionalProperties": false,
+        "description": "A person (`type` `user`) or agent (`agent`) of the system by `id`, or an address\n(`email`, with an optional display `name`).",
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AttendeeRole",
+            "default": "required"
+          },
+          "type": {
+            "$ref": "#/components/schemas/Kind"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "AttendeeIn",
+        "type": "object"
+      },
+      "AttendeeOut": {
+        "description": "`principal_id` for a person or agent, `email` for an address (a person's\naddress is never shown); `name` the person's, agent's or the address's display\nname. `delivery`: `internal` (the activity view), `not_sent` (an address: pass the\nevent's `.ics` on).",
+        "properties": {
+          "delivery": {
+            "$ref": "#/components/schemas/Delivery"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "principal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Principal Id"
+          },
+          "response": {
+            "$ref": "#/components/schemas/Response"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AttendeeRole"
+          },
+          "type": {
+            "$ref": "#/components/schemas/Kind"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "principal_id",
+          "email",
+          "name",
+          "role",
+          "response",
+          "delivery"
+        ],
+        "title": "AttendeeOut",
+        "type": "object"
+      },
+      "AttendeeRole": {
+        "enum": [
+          "required",
+          "optional"
+        ],
+        "title": "AttendeeRole",
+        "type": "string"
+      },
+      "AttendeesIn": {
+        "additionalProperties": false,
+        "description": "The whole list of attendees (at most 100) at the event's `version` read.",
+        "properties": {
+          "attendees": {
+            "items": {
+              "$ref": "#/components/schemas/AttendeeIn"
+            },
+            "maxItems": 100,
+            "title": "Attendees",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "attendees"
+        ],
+        "title": "AttendeesIn",
+        "type": "object"
+      },
+      "AttendeesSetOut": {
+        "description": "The event's version after the change.",
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "AttendeesSetOut",
         "type": "object"
       },
       "AuditOut": {
@@ -4937,6 +5157,15 @@
         "title": "DefaultIn",
         "type": "object"
       },
+      "Delivery": {
+        "description": "How an invitation reaches its attendee: `internal` (a person or agent of the\nsystem: the activity view), `not_sent` (an address: nothing sends it; the `.ics`\nfile is for passing on). Task 16 adds addresses a linked calendar sends to.",
+        "enum": [
+          "internal",
+          "not_sent"
+        ],
+        "title": "Delivery",
+        "type": "string"
+      },
       "DiffOut": {
         "description": "Line by line from `from_number` to `to_number`; a changed line is a `delete`\nfollowed by an `insert`.",
         "properties": {
@@ -7074,6 +7303,15 @@
         "title": "InstallOut",
         "type": "object"
       },
+      "Kind": {
+        "enum": [
+          "user",
+          "agent",
+          "email"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
       "LastRunOut": {
         "description": "The latest term: how it went (`outcome`), its run and how that ended.",
         "properties": {
@@ -8373,7 +8611,9 @@
           "automation",
           "review_due",
           "signup",
-          "totp_locked"
+          "totp_locked",
+          "invitation",
+          "invite_reply"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -9294,6 +9534,33 @@
           "items"
         ],
         "title": "Page[AttachmentOut]",
+        "type": "object"
+      },
+      "Page_AttendeeOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AttendeeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[AttendeeOut]",
         "type": "object"
       },
       "Page_AuditOut_": {
@@ -12438,6 +12705,35 @@
           "archive_name"
         ],
         "title": "ReplaceOut",
+        "type": "object"
+      },
+      "Response": {
+        "enum": [
+          "needs_action",
+          "accepted",
+          "tentative",
+          "declined"
+        ],
+        "title": "Response",
+        "type": "string"
+      },
+      "ResponseIn": {
+        "additionalProperties": false,
+        "description": "An answer (`accepted`, `tentative` or `declined`) at the event's `version`\nread.",
+        "properties": {
+          "response": {
+            "$ref": "#/components/schemas/Response"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "response",
+          "version"
+        ],
+        "title": "ResponseIn",
         "type": "object"
       },
       "RestoreAttemptOut": {
@@ -25851,7 +26147,7 @@
     },
     "/api/calendar/events": {
       "get": {
-        "description": "Every occurrence overlapping `[from, to)` of the events one may list (member\nspaces and one's own; another space's only by naming it with `space_id`), by\nstart. Private events of others come `redacted`; `q` searches titles one sees. A\ncursor holds `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).",
+        "description": "Every occurrence overlapping `[from, to)` of the events one may list (member\nspaces and the events one organises or is invited to; another space's only by\nnaming it with `space_id`; `mine`: only one's own and those one is invited to), by\nstart. Private events of others come `redacted`; `q` searches titles one sees. A\ncursor holds `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).",
         "operationId": "list_events_api_calendar_events_get",
         "parameters": [
           {
@@ -25977,6 +26273,18 @@
               ],
               "description": "the viewer's zone (all-day days), default UTC",
               "title": "Time Zone"
+            }
+          },
+          {
+            "description": "my events: only those I organise or am invited to",
+            "in": "query",
+            "name": "mine",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "my events: only those I organise or am invited to",
+              "title": "Mine",
+              "type": "boolean"
             }
           }
         ],
@@ -27309,6 +27617,184 @@
           }
         },
         "summary": "Update Event",
+        "tags": [
+          "calendar events"
+        ]
+      }
+    },
+    "/api/events/{event_id}/attendees": {
+      "get": {
+        "description": "The event's attendees (full sight of the event; 403 `event.private` with \"busy\"\nsight).",
+        "operationId": "list_attendees_api_events__event_id__attendees_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AttendeeOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Attendees",
+        "tags": [
+          "calendar events"
+        ]
+      },
+      "put": {
+        "description": "Sets the event's attendees (`calendar.write` and full sight, at the version\nread: 409 `event.version_conflict`); on a series, who comes and who goes reaches\nits overrides too. New people are told in their activity view.",
+        "operationId": "set_attendees_api_events__event_id__attendees_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendeesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendeesSetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Attendees",
+        "tags": [
+          "calendar events"
+        ]
+      }
+    },
+    "/api/events/{event_id}/response": {
+      "post": {
+        "description": "One's answer to the event (403 `event.not_invited` without an invitation), at\nthe event's version read (409 after a change).",
+        "operationId": "respond_api_events__event_id__response_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResponseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendeeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Respond",
         "tags": [
           "calendar events"
         ]

@@ -2469,7 +2469,8 @@ export interface paths {
         /**
          * List Events
          * @description Every occurrence overlapping `[from, to)` of the events one may list (member
-         *     spaces and one's own; another space's only by naming it with `space_id`), by
+         *     spaces and the events one organises or is invited to; another space's only by
+         *     naming it with `space_id`; `mine`: only one's own and those one is invited to), by
          *     start. Private events of others come `redacted`; `q` searches titles one sees. A
          *     cursor holds `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).
          */
@@ -2773,6 +2774,54 @@ export interface paths {
          *     (`following`: the series is split).
          */
         patch: operations["update_event_api_events__event_id__patch"];
+        trace?: never;
+    };
+    "/api/events/{event_id}/attendees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Attendees
+         * @description The event's attendees (full sight of the event; 403 `event.private` with "busy"
+         *     sight).
+         */
+        get: operations["list_attendees_api_events__event_id__attendees_get"];
+        /**
+         * Set Attendees
+         * @description Sets the event's attendees (`calendar.write` and full sight, at the version
+         *     read: 409 `event.version_conflict`); on a series, who comes and who goes reaches
+         *     its overrides too. New people are told in their activity view.
+         */
+        put: operations["set_attendees_api_events__event_id__attendees_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{event_id}/response": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Respond
+         * @description One's answer to the event (403 `event.not_invited` without an invitation), at
+         *     the event's version read (409 after a change).
+         */
+        post: operations["respond_api_events__event_id__response_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/maintenance": {
@@ -4450,6 +4499,38 @@ export interface components {
             paused_reason: string | null;
         };
         /**
+         * ActivityCalendarEvent
+         * @description The calendar event an `invitation` or `invite_reply` is about (plan M10 task 4;
+         *     its address: `/api/events/{id}`); shown only while the person attends it, so in
+         *     full. `cancelled`: called off or deleted; `response`: the person's own answer
+         *     (null when she organises it).
+         */
+        ActivityCalendarEvent: {
+            /** All Day */
+            all_day: boolean;
+            /** Cancelled */
+            cancelled: boolean;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Response */
+            response: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Title */
+            title: string;
+        };
+        /**
          * ActivityConversation
          * @description `name` is null for a direct message and a page or ticket thread; `page_id` names
          *     a page thread's page, `ticket_number` a ticket thread's ticket (null for other
@@ -4489,13 +4570,15 @@ export interface components {
          *     `author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top
          *     level has no conversation and no message, but `proposal` (plan M6); a
          *     `skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`
-         *     the automation (plan M7), a `signup` the waiting account (plan M9); `author` may be
-         *     an agent (`type`).
+         *     the automation (plan M7), a `signup` the waiting account (plan M9), an
+         *     `invitation` or `invite_reply` the calendar event (plan M10); `author` may be an
+         *     agent (`type`).
          */
         ActivityOut: {
             account?: components["schemas"]["ActivityAccount"] | null;
             author: components["schemas"]["ActivityAuthor"] | null;
             automation?: components["schemas"]["ActivityAutomation"] | null;
+            calendar_event?: components["schemas"]["ActivityCalendarEvent"] | null;
             conversation: components["schemas"]["ActivityConversation"] | null;
             /**
              * Created At
@@ -5240,6 +5323,72 @@ export interface components {
             uploaded_by: components["schemas"]["PrincipalRef"];
             /** Url */
             url: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * AttendeeIn
+         * @description A person (`type` `user`) or agent (`agent`) of the system by `id`, or an address
+         *     (`email`, with an optional display `name`).
+         */
+        AttendeeIn: {
+            /** Email */
+            email?: string | null;
+            /** Id */
+            id?: string | null;
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            /** @default required */
+            role?: components["schemas"]["AttendeeRole"];
+            type: components["schemas"]["Kind"];
+        };
+        /**
+         * AttendeeOut
+         * @description `principal_id` for a person or agent, `email` for an address (a person's
+         *     address is never shown); `name` the person's, agent's or the address's display
+         *     name. `delivery`: `internal` (the activity view), `not_sent` (an address: pass the
+         *     event's `.ics` on).
+         */
+        AttendeeOut: {
+            delivery: components["schemas"]["Delivery"];
+            /** Email */
+            email: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Principal Id */
+            principal_id: string | null;
+            response: components["schemas"]["Response"];
+            role: components["schemas"]["AttendeeRole"];
+            type: components["schemas"]["Kind"];
+        };
+        /**
+         * AttendeeRole
+         * @enum {string}
+         */
+        AttendeeRole: "required" | "optional";
+        /**
+         * AttendeesIn
+         * @description The whole list of attendees (at most 100) at the event's `version` read.
+         */
+        AttendeesIn: {
+            /** Attendees */
+            attendees: components["schemas"]["AttendeeIn"][];
+            /** Version */
+            version: number;
+        };
+        /**
+         * AttendeesSetOut
+         * @description The event's version after the change.
+         */
+        AttendeesSetOut: {
             /** Version */
             version: number;
         };
@@ -6228,6 +6377,14 @@ export interface components {
             version: number;
         };
         /**
+         * Delivery
+         * @description How an invitation reaches its attendee: `internal` (a person or agent of the
+         *     system: the activity view), `not_sent` (an address: nothing sends it; the `.ics`
+         *     file is for passing on). Task 16 adds addresses a linked calendar sends to.
+         * @enum {string}
+         */
+        Delivery: "internal" | "not_sent";
+        /**
          * DiffOut
          * @description Line by line from `from_number` to `to_number`; a changed line is a `delete`
          *     followed by an `insert`.
@@ -7028,6 +7185,11 @@ export interface components {
             server: components["schemas"]["CreatedServerOut"];
         };
         /**
+         * Kind
+         * @enum {string}
+         */
+        Kind: "user" | "agent" | "email";
+        /**
          * LastRunOut
          * @description The latest term: how it went (`outcome`), its run and how that ended.
          */
@@ -7542,7 +7704,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due" | "signup" | "totp_locked";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due" | "signup" | "totp_locked" | "invitation" | "invite_reply";
         /** OAuthSpec */
         OAuthSpec: {
             /** Authorization Endpoint */
@@ -7899,6 +8061,13 @@ export interface components {
         Page_AttachmentOut_: {
             /** Items */
             items: components["schemas"]["AttachmentOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[AttendeeOut] */
+        Page_AttendeeOut_: {
+            /** Items */
+            items: components["schemas"]["AttendeeOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -8930,6 +9099,21 @@ export interface components {
         ReplaceOut: {
             /** Archive Name */
             archive_name: string;
+        };
+        /**
+         * Response
+         * @enum {string}
+         */
+        Response: "needs_action" | "accepted" | "tentative" | "declined";
+        /**
+         * ResponseIn
+         * @description An answer (`accepted`, `tentative` or `declined`) at the event's `version`
+         *     read.
+         */
+        ResponseIn: {
+            response: components["schemas"]["Response"];
+            /** Version */
+            version: number;
         };
         /**
          * RestoreAttemptOut
@@ -16171,6 +16355,8 @@ export interface operations {
                 q?: string | null;
                 /** @description the viewer's zone (all-day days), default UTC */
                 time_zone?: string | null;
+                /** @description my events: only those I organise or am invited to */
+                mine?: boolean;
             };
             header?: never;
             path?: never;
@@ -16919,6 +17105,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_attendees_api_events__event_id__attendees_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AttendeeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_attendees_api_events__event_id__attendees_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttendeesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendeesSetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    respond_api_events__event_id__response_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResponseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendeeOut"];
                 };
             };
             /** @description Validation Error */

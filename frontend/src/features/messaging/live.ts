@@ -110,7 +110,10 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
     case 'backup.changed':
       return [backupKeys.all]
     case 'calendar.changed':
-      // Ids only: every calendar view refetches what it shows (the server judges).
+    case 'event.invited':
+      // Ids only: every calendar view refetches what it shows (the server judges). An
+      // invitation reaches someone outside the space too, who gets no `calendar.changed`;
+      // its activity entry comes as `notification.created`.
       return [calendarKeys.all]
     case 'card.changed':
       // A run's card was decided, answered or settled (ran or stale): the cards, the

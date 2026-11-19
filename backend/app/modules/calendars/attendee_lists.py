@@ -28,12 +28,10 @@ class Kind(StrEnum):
 class Delivery(StrEnum):
     """How an invitation reaches its attendee: `internal` (a person or agent of the
     system: the activity view), `not_sent` (an address: nothing sends it; the `.ics`
-    file is for passing on), `provider` (an address a linked Google calendar sends to:
-    plan M10 task 16)."""
+    file is for passing on). Task 16 adds addresses a linked calendar sends to."""
 
     INTERNAL = "internal"
     NOT_SENT = "not_sent"
-    PROVIDER = "provider"
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +63,7 @@ def key_of(attendee: CalendarEventAttendee) -> Key:
 
 
 def delivery_of(attendee: CalendarEventAttendee) -> Delivery:
-    """How the attendee hears of the event (`provider` comes with task 16)."""
+    """How the attendee hears of the event."""
     return Delivery.INTERNAL if attendee.principal_type is not None else Delivery.NOT_SENT
 
 

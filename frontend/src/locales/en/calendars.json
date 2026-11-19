@@ -20,7 +20,29 @@
       "occurrence_required": "Which occurrence? Please choose one of the series.",
       "occurrence_unknown": "The series has no such occurrence (any more).",
       "scope_invalid": "That does not fit this event: single events and occurrences changed on their own are no series.",
-      "too_many_dates": "A series has at most 500 deleted occurrences."
+      "too_many_dates": "A series has at most 500 deleted occurrences.",
+      "not_invited": "You are not invited to this event.",
+      "attendee_unknown": "Someone on the list is not someone you can invite.",
+      "attendee_duplicate": "Someone is on the list of attendees twice.",
+      "too_many_attendees": "An event has at most 100 attendees."
+    }
+  },
+  "activity": {
+    "reasons": {
+      "invitation": "Invitation",
+      "invite_reply": "Reply to an invitation"
+    },
+    "invitation": {
+      "invited": "You are invited to “{{title}}”.",
+      "cancelled": "“{{title}}” was called off.",
+      "replied": "Someone declined or answered “maybe” for “{{title}}”.",
+      "answer": "Your answer: {{answer}}",
+      "answers": {
+        "needs_action": "not yet given",
+        "accepted": "accepted",
+        "tentative": "maybe",
+        "declined": "declined"
+      }
     }
   }
 }
