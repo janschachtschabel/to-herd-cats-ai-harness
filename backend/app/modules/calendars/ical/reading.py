@@ -13,9 +13,16 @@ from collections import Counter
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 
-from app.modules.calendars import recurrence, zones
+from app.modules.calendars import recurrence, recurrence_ids, zones
 from app.modules.calendars.ical import content, lines, problems, times
-from app.modules.calendars.ical.drafts import MAX_UID, EventDraft, OverrideDraft, Status
+from app.modules.calendars.ical.budget import Budget, OverBudget, check_cost
+from app.modules.calendars.ical.drafts import (
+    MAX_OVERRIDES,
+    MAX_UID,
+    EventDraft,
+    OverrideDraft,
+    Status,
+)
 from app.modules.calendars.ical.problems import Skip
 from app.modules.calendars.ical.zones import Resolver
 from app.modules.calendars.recurrence import Series, SeriesInvalid
@@ -62,14 +69,20 @@ def parse(data: bytes, *, default_zone: str, limit: int) -> Parsed:
         else:
             found[problems.NOT_AN_EVENT] += 1
     resolver = Resolver(timezones)
+    budget = Budget()
     drafts: list[EventDraft] = []
     for uid, group in _groups(events, found).items():
         if len(drafts) >= limit:
             found[problems.OVER_LIMIT] += 1
             continue
+        if budget.exhausted:
+            found[problems.OVER_BUDGET] += 1
+            continue
+        notes: Counter[str] = Counter()
         try:
-            frame = times.Frame.of(default_zone, resolver, group.parts())
-            drafts.append(_draft(uid, group, frame, found))
+            frame = times.Frame.of(default_zone, resolver, group.parts(), budget)
+            drafts.append(_draft(uid, group, frame, notes))
+            found.update(notes)
         except Skip as skip:
             found[skip.code] += 1
         except (ValueError, ArithmeticError, RecursionError):
@@ -105,30 +118,36 @@ def _broken(part: lines.Component) -> int:
     return count
 
 
-def _draft(uid: str, group: _Group, frame: times.Frame, found: Counter[str]) -> EventDraft:
+def _draft(uid: str, group: _Group, frame: times.Frame, notes: Counter[str]) -> EventDraft:
     master = group.master
     if master is None:
-        found[problems.OVERRIDE_UNMATCHED] += len(group.overrides) - 1
+        notes[problems.OVERRIDE_UNMATCHED] += len(group.overrides) - 1
         raise Skip(problems.OVERRIDE_UNMATCHED)
-    notes: Counter[str] = Counter()
     begin, series = _series(master, frame, notes, single=False)
+    parts = group.overrides[:MAX_OVERRIDES]
+    notes[problems.OVER_LIMIT] += len(group.overrides) - len(parts)
+    ids = _recurrence_ids(parts, begin, series, frame, notes)
     overrides: dict[datetime, OverrideDraft] = {}
     cancelled: set[datetime] = set()
-    for part in group.overrides:
+    for part, recurrence_id in zip(parts, ids, strict=True):
+        if recurrence_id is None:
+            continue
         try:
-            recurrence_id, override = _override(part, begin, series, frame, notes)
+            override = _override(part, recurrence_id, frame, notes)
+        except OverBudget:
+            raise
         except Skip as skip:
-            found[skip.code] += 1
+            notes[skip.code] += 1
             continue
         if recurrence_id in overrides or recurrence_id in cancelled:
-            found[problems.DUPLICATE_UID] += 1
+            notes[problems.DUPLICATE_UID] += 1
         elif override is None:
             cancelled.add(recurrence_id)
         else:
             overrides[recurrence_id] = override
     exdates = (set(series.exdates) | cancelled) - set(overrides)
     series = replace(series, exdates=tuple(sorted(exdates)))
-    draft = EventDraft(
+    return EventDraft(
         uid=uid,
         series=series,
         content=content.read(master, all_day=series.all_day, notes=notes),
@@ -136,8 +155,6 @@ def _draft(uid: str, group: _Group, frame: times.Frame, found: Counter[str]) -> 
         overrides=tuple(overrides[key] for key in sorted(overrides)),
         alarms=content.alarms(master, series.duration, notes),
     )
-    found.update(notes)
-    return draft
 
 
 def _series(
@@ -159,40 +176,83 @@ def _series(
             all_day=begin.all_day,
             rrule=rule,
             rdates=tuple(sorted({w for prop in added for w in times.walls(prop, begin, frame)})),
-            exdates=tuple(sorted({w for prop in removed for w in times.walls(prop, begin, frame)})),
         )
     except SeriesInvalid as refused:
         raise Skip(problems.FROM_SERIES.get(refused.code, problems.TIME_INVALID)) from None
-    if series.rrule is not None:
+    parsed_rule = series.rule
+    if parsed_rule is not None:
+        first: datetime | None = None
         try:
-            recurrence.check_series(series)
+            first = recurrence.check_series(series)
         except SeriesInvalid:
             notes[problems.RRULE_NEVER_MATCHES] = 1
             series = replace(series, rrule=None)
+        frame.budget.spend(check_cost(parsed_rule, series.start, first))
+    if removed:
+        values = [m for prop in removed for m in times.moments(prop, begin, frame)]
+        found = _occurrences(series, values, frame)
+        exdates = {found.get(value, value[0]) for value in values}
+        series = replace(series, exdates=tuple(sorted(exdates)))
     return begin, series
 
 
-def _override(
-    part: lines.Component,
+def _recurrence_ids(
+    parts: list[lines.Component],
     begin: times.Start,
     series: Series,
     frame: times.Frame,
     notes: Counter[str],
-) -> tuple[datetime, OverrideDraft | None]:
-    written = part.first("RECURRENCE-ID")
-    if written is None:
-        raise Skip(problems.TIME_INVALID)
-    if (written.param("RANGE") or "").upper() == "THISANDFUTURE":
-        raise Skip(problems.OVERRIDE_UNSUPPORTED)
-    found = times.walls(written, begin, frame)
-    if not found:
-        raise Skip(problems.TIME_INVALID)
-    recurrence_id = found[0]
-    if not recurrence.is_occurrence(series, recurrence_id):
-        raise Skip(problems.OVERRIDE_UNMATCHED)
+) -> list[datetime | None]:
+    """Each override's recurrence id as the series names it, or None (counted): the
+    series is expanded once for all of them (R7a-4)."""
+    values: list[tuple[datetime, datetime | None] | None] = []
+    for part in parts:
+        written = part.first("RECURRENCE-ID")
+        try:
+            if written is None:
+                raise Skip(problems.TIME_INVALID)
+            if (written.param("RANGE") or "").upper() == "THISANDFUTURE":
+                raise Skip(problems.OVERRIDE_UNSUPPORTED)
+            found = times.moments(written, begin, frame)
+            if not found:
+                raise Skip(problems.TIME_INVALID)
+            values.append(found[0])
+        except OverBudget:
+            raise
+        except Skip as skip:
+            notes[skip.code] += 1
+            values.append(None)
+    named = _occurrences(series, [v for v in values if v is not None], frame)
+    ids: list[datetime | None] = []
+    for value in values:
+        if value is not None and value not in named:
+            notes[problems.OVERRIDE_UNMATCHED] += 1
+        ids.append(named.get(value) if value is not None else None)
+    return ids
+
+
+def _occurrences(
+    series: Series, values: list[tuple[datetime, datetime | None]], frame: times.Frame
+) -> dict[tuple[datetime, datetime | None], datetime]:
+    """The recurrence id each value (a wall time, and the instant it was read from, if
+    any) names: the wall time if the series has it, else the occurrence that starts at
+    that instant (one in a gap, R7a-6)."""
+    walls = recurrence_ids.named(series, (wall for wall, _ in values), frame.budget.spend)
+    found = {value: value[0] for value in values if value[0] in walls}
+    moments = {instant for wall, instant in values if instant is not None and wall not in walls}
+    if moments:
+        at = recurrence_ids.ids_at(series, moments, frame.budget.spend)
+        for value in values:
+            instant = value[1]
+            if value not in found and instant is not None and instant in at:
+                found[value] = at[instant]
+    return found
+
+
+def _override(
+    part: lines.Component, recurrence_id: datetime, frame: times.Frame, notes: Counter[str]
+) -> OverrideDraft | None:
     if content.status(part) is Status.CANCELLED:
-        return recurrence_id, None
+        return None
     _, own = _series(part, frame, notes, single=True)
-    return recurrence_id, OverrideDraft(
-        recurrence_id, own, content.read(part, all_day=own.all_day, notes=notes)
-    )
+    return OverrideDraft(recurrence_id, own, content.read(part, all_day=own.all_day, notes=notes))

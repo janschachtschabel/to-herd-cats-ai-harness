@@ -22,6 +22,9 @@ _LARGEST = timedelta.max
 # icalendar writes one observance per kind of change over the years it covers; a
 # definition with more is not compared.
 MAX_OBSERVANCES = 1000
+# Producers write a yearly rule for today's changes and maybe a few for earlier ones;
+# each is asked again at every wall time compared.
+MAX_RULED = 20
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +136,8 @@ def definition(component: lines.Component) -> Definition | None:
     except (Skip, RuleInvalid, ValueError):
         return None
     if not observances or len(observances) > MAX_OBSERVANCES:
+        return None
+    if sum(o.rule is not None for o in observances) > MAX_RULED:
         return None
     location = component.first("X-LIC-LOCATION")
     return Definition.of(observances, location.text.strip() if location else None)

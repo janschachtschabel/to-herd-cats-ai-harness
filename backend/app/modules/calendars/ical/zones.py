@@ -25,6 +25,7 @@ from icalendar.timezone.windows_to_olson import WINDOWS_TO_OLSON
 
 from app.modules.calendars import zones
 from app.modules.calendars.ical import lines, problems
+from app.modules.calendars.ical.budget import Budget, offset_cost
 from app.modules.calendars.ical.problems import Skip
 from app.modules.calendars.ical.vtimezone import Definition, definition
 from app.modules.calendars.recurrence_rule import FIRST_YEAR, LAST_YEAR
@@ -75,9 +76,10 @@ class Resolver:
         self._definitions: dict[str, Definition | None] = {}
         self._candidates: dict[tuple[str, int], list[str]] = {}
 
-    def resolve(self, tzid: str, walls: Sequence[datetime]) -> str:
+    def resolve(self, tzid: str, walls: Sequence[datetime], budget: Budget) -> str:
         """The zone of `tzid`, for an event with the wall times `walls` written in it
-        (the first is its start); `Skip(ical.time_zone_unknown)` if none."""
+        (the first is its start); `Skip(ical.time_zone_unknown)` if none. The work is
+        charged to `budget`."""
         named = by_name(tzid)
         if named is not None:
             return named
@@ -86,8 +88,10 @@ class Resolver:
             raise Skip(problems.TIME_ZONE_UNKNOWN)
         if not FIRST_YEAR <= walls[0].year <= LAST_YEAR:
             raise Skip(problems.TIME_OUT_OF_RANGE)
+        budget.spend(len(walls) * offset_cost(found.ruled))
         expected = [(wall, found.offset_at(wall)) for wall in walls]
-        for name in self._matching(tzid, found, walls[0].year):
+        for name in self._matching(tzid, found, walls[0].year, budget):
+            budget.spend(1 + len(expected) // 4)
             zone = ZoneInfo(name)
             if all(zone.utcoffset(wall) == offset for wall, offset in expected):
                 return name
@@ -99,18 +103,25 @@ class Resolver:
             self._definitions[tzid] = definition(component) if component is not None else None
         return self._definitions[tzid]
 
-    def _matching(self, tzid: str, found: Definition, year: int) -> list[str]:
+    def _matching(self, tzid: str, found: Definition, year: int, budget: Budget) -> list[str]:
         key = (tzid, year)
         if key not in self._candidates:
             if len(self._candidates) >= MAX_COMPARISONS:
                 raise Skip(problems.TIME_ZONE_UNKNOWN)
+            budget.spend(_WEEKS * offset_cost(found.ruled))
             samples = [(s, found.offset_at(s)) for s in _samples(year)]
             ordered = list(_ordered())
             if found.location is not None and found.location in zones.names():
                 ordered.insert(0, (found.location, ZoneInfo(found.location)))
-            self._candidates[key] = [
-                name
-                for name, zone in ordered
-                if all(zone.utcoffset(sample) == offset for sample, offset in samples)
-            ]
+            looked = 0
+            matching = []
+            for name, zone in ordered:
+                for sample, offset in samples:
+                    looked += 1
+                    if zone.utcoffset(sample) != offset:
+                        break
+                else:
+                    matching.append(name)
+            budget.spend(looked // 4)
+            self._candidates[key] = matching
         return self._candidates[key]

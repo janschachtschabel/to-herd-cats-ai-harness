@@ -168,14 +168,15 @@ def rule_walls(
         for wall in _matches(rule, start, begin, stop, counter)
         if wall != start and (last is None or instant(series, wall) <= last)
     )
-    every = chain([start] if begin == start else [], matches)
-    yield from islice(every, rule.count) if rule.count is not None else every
+    ordered = chain([start] if begin == start else [], matches)
+    yield from islice(ordered, rule.count) if rule.count is not None else ordered
 
 
 def walls(
     series: Series, lo: datetime, hi: datetime, counter: Counter, *, keep_exdates: bool = False
 ) -> Iterator[datetime]:
-    """Every occurrence's wall time from `lo` to `hi` (inclusive), in order, once."""
+    """Every occurrence's wall time from `lo` to `hi` (inclusive), in order, once
+    (`keep_exdates`: deleted ones too; `recurrence_ids` asks for many ids at once)."""
     rdates = sorted(wall for wall in set(series.rdates) if wall >= lo)
     exdates = frozenset(() if keep_exdates else series.exdates)
     previous = None
@@ -187,15 +188,17 @@ def walls(
         previous = wall
 
 
-def check_series(series: Series) -> None:
+def check_series(series: Series) -> datetime | None:
     """Refuses a rule that never matches (`event.rrule_invalid`): its every expansion
     would scan to the horizon. Every path that writes a series calls it (Tasks 3a, 3b,
-    7b, 13b); reading never does."""
+    7b, 13b). Returns the rule's first match (how far the check scanned)."""
     rule = series.rule
-    if rule is not None:
-        found = _matches(rule, series.start, series.start, HORIZON, Counter())
-        if next(found, None) is None:
-            raise RuleInvalid("event.rrule_invalid")
+    if rule is None:
+        return None
+    first = next(_matches(rule, series.start, series.start, HORIZON, Counter()), None)
+    if first is None:
+        raise RuleInvalid("event.rrule_invalid")
+    return first
 
 
 def occurrences(

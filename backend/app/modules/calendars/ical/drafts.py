@@ -21,6 +21,7 @@ MAX_DESCRIPTION = 20_000
 MAX_ATTENDEES = 100
 MAX_ALARMS = 3
 MAX_ALARM_MINUTES = 40_320  # four weeks
+MAX_OVERRIDES = 1000  # per series; reading counts the rest as `ical.over_limit`
 
 
 class Status(StrEnum):

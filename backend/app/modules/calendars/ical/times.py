@@ -17,11 +17,12 @@ RECURRENCE-ID as a wall time of the series, whatever form the file wrote them in
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 
 from app.modules.calendars import zones
 from app.modules.calendars.ical import lines, problems
+from app.modules.calendars.ical.budget import Budget, OverBudget
 from app.modules.calendars.ical.problems import Skip
 from app.modules.calendars.ical.zones import Resolver
 from app.modules.calendars.recurrence_rule import FIRST_YEAR, LAST_YEAR
@@ -30,18 +31,31 @@ DAY = timedelta(days=1)
 _UNTIL = re.compile(r"(?i)^(\s*UNTIL\s*=\s*)([0-9]{8}(?:T[0-9]{6}Z?)?)\s*$")
 _EARLIEST = datetime(FIRST_YEAR, 1, 1, tzinfo=UTC)
 _WALL_PROPS = ("DTSTART", "DTEND", "RDATE", "EXDATE", "RECURRENCE-ID")
+# The wall times a VTIMEZONE is checked at for one event (R7a-1): enough to find a
+# definition that departs from a zone at the event's times, not one check per EXDATE.
+MAX_ZONE_WALLS = 32
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class Frame:
-    """What the times of one event (its series and overrides) are read against."""
+    """What the times of one event (its series and overrides) are read against: each
+    TZID resolves once per event (R7a-1), against at most `MAX_ZONE_WALLS` of the wall
+    times written in it (the first written, then a spread of the rest)."""
 
     default_zone: str
     resolver: Resolver
-    walls: dict[str, list[datetime]]  # per TZID, the wall times written in it
+    walls: dict[str, list[datetime]]  # per TZID, the wall times written in it (sampled)
+    budget: Budget
+    _zones: dict[str, str] = field(default_factory=dict)  # a zone, or a problem code
 
     @classmethod
-    def of(cls, default_zone: str, resolver: Resolver, parts: Iterable[lines.Component]) -> "Frame":
+    def of(
+        cls,
+        default_zone: str,
+        resolver: Resolver,
+        parts: Iterable[lines.Component],
+        budget: Budget,
+    ) -> "Frame":
         walls: dict[str, list[datetime]] = {}
         for part in parts:
             for name in _WALL_PROPS:
@@ -54,10 +68,34 @@ class Frame:
                     except Skip:
                         continue
                     walls.setdefault(tzid, []).extend(v for v in values if isinstance(v, datetime))
-        return cls(default_zone, resolver, walls)
+        return cls(default_zone, resolver, {k: _spread(v) for k, v in walls.items()}, budget)
 
     def zone(self, tzid: str) -> str:
-        return self.resolver.resolve(tzid, self.walls.get(tzid, []))
+        if tzid not in self._zones:
+            try:
+                self._zones[tzid] = self.resolver.resolve(
+                    tzid, self.walls.get(tzid, []), self.budget
+                )
+            except Skip as skip:
+                self._zones[tzid] = skip.code
+        found = self._zones[tzid]
+        if found == problems.OVER_BUDGET:
+            raise OverBudget()
+        if found in problems.CODES:
+            raise Skip(found)
+        return found
+
+
+def _spread(walls: list[datetime]) -> list[datetime]:
+    """The first wall time (the start), then at most `MAX_ZONE_WALLS - 1` of the others,
+    spread evenly over them in order."""
+    if len(walls) <= MAX_ZONE_WALLS:
+        return walls
+    rest = sorted(set(walls[1:]))
+    room = MAX_ZONE_WALLS - 1
+    if len(rest) <= room:
+        return [walls[0], *rest]
+    return [walls[0], *(rest[index * (len(rest) - 1) // (room - 1)] for index in range(room))]
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,7 +160,27 @@ def _length(part: lines.Component, begin: Start, frame: Frame) -> timedelta:
 def walls(prop: lines.Prop, begin: Start, frame: Frame) -> list[datetime]:
     """The values of `prop` (RDATE, EXDATE, RECURRENCE-ID) as wall times of the
     series that starts at `begin`."""
-    return [to_wall(value, prop.param("TZID"), begin, frame) for value in lines.date_times(prop)]
+    return [wall for wall, _ in moments(prop, begin, frame)]
+
+
+def moments(prop: lines.Prop, begin: Start, frame: Frame) -> list[tuple[datetime, datetime | None]]:
+    """`walls`, each with the instant it was read from when the file named one (UTC or
+    another zone than the series'): an occurrence in a gap is named by an instant
+    whose wall time is not its recurrence id (R7a-6)."""
+    tzid = prop.param("TZID")
+    return [_moment(value, tzid, begin, frame) for value in lines.date_times(prop)]
+
+
+def _moment(
+    value: date | datetime, tzid: str | None, begin: Start, frame: Frame
+) -> tuple[datetime, datetime | None]:
+    wall = to_wall(value, tzid, begin, frame)
+    if begin.all_day or not isinstance(value, datetime):
+        return wall, None
+    series_zone = begin.tzid or "UTC"
+    if value.tzinfo is None and (tzid is None or frame.zone(tzid) == series_zone):
+        return wall, None
+    return wall, _instant(value, tzid, series_zone, frame)
 
 
 def to_wall(value: date | datetime, tzid: str | None, begin: Start, frame: Frame) -> datetime:
