@@ -20,6 +20,7 @@ from app.modules.calendars.event_models import CalendarEvent
 from app.modules.calendars.event_repository import EventRepository
 from app.modules.calendars.expansion import Budget, effective
 from app.modules.calendars.window import list_window
+from scripts.measure_calendar_seed import BOUND_SERIES
 from tests.factories import MakeUser
 from tests.factories_calendar import actor_of, logged_in, new_calendar, new_event
 from tests.factories_spaces import MakeSpace
@@ -167,3 +168,40 @@ async def test_the_window_spends_from_a_budget_its_caller_hands_over(
     assert budget.rows == 2
     assert budget.counter.candidates >= 1
     assert budget.spent() == 2 * expansion.ROW_WORK + budget.counter.candidates
+
+
+async def test_the_measurement_s_bound_case_fits_the_work_bound(
+    session: AsyncSession, make_client: Any, make_user: MakeUser, make_space: MakeSpace
+) -> None:
+    """The measurement's `bound` case (`measure_calendar_seed.BOUND_SERIES` endless
+    yearly March series, read in a November week) stays just inside `MAX_WORK` under
+    the current counting: a row, the March of the window's year and the next March,
+    which ends the scan (review M10 task 4, R4-6)."""
+    author = await make_user()
+    space = await make_space("team", members=[(author, "moderator")])
+    client = await logged_in(make_client, author)
+    calendar = await new_calendar(client, space.id, "Team")
+    await new_event(
+        client,
+        calendar["id"],
+        starts_at="2012-03-14T10:00:00+01:00",
+        ends_at="2012-03-14T11:00:00+01:00",
+        rrule="FREQ=YEARLY",
+    )
+    budget = Budget()
+    page = await list_window(
+        session,
+        await actor_of(session, author),
+        start=WEEK[0],
+        end=WEEK[1],
+        calendar_ids=None,
+        space_id=None,
+        mine=False,
+        query=None,
+        params=PageParams(limit=100),
+        budget=budget,
+    )
+    assert page.items == []
+    assert budget.spent() == expansion.ROW_WORK + 2
+    work = BOUND_SERIES * budget.spent()
+    assert 0.95 * expansion.MAX_WORK < work < expansion.MAX_WORK

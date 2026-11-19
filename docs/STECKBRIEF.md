@@ -1222,6 +1222,14 @@ zurück.
   max 1,7 s): So lange dauert ein Aufruf an der Arbeitsgrenze auf dieser Maschine,
   darüber bricht er mit 422 ab. Beide ändern die Abhilfen nicht (endlose Serien sprangen
   schon, die Kosten sind die der Zeilen).
+- **Arbeitsgrenze neu angesetzt (Prüfung M10 Task 4, R4-6):** Seit `502089a` zählt die
+  Entfaltung auch den Kandidaten, an dem eine Regel hinter dem Fenster endet (der
+  nächste März; vorher erzeugte `dateutil` ihn ungezählt). Jede dieser Serien kostet in
+  der Novemberwoche damit 42 statt 41: 12.000 ergäben 504.000 und antworten 422
+  `calendar.window_too_dense`, höchstens 11.904 passen. Der Bestand hat darum
+  11.500 solcher Serien (`BOUND_SERIES`, Arbeit 483.000; insgesamt 26.530 Zeilen),
+  `MAX_WORK` bleibt. Gemessen am 19.11.2026 (`b29d055` mit 11.500, nur dieser Fall, 50
+  Aufrufe, Lastmittel 1,0): p50 1.037 ms, p95 1.098 ms, max 1.182 ms, alle 200.
 - **Abfragen:** `list_window` stellt zwei Statements (Termine, Ausnahmen), die Route
   fünf (dazu Sitzung, Person und Mitgliedschaften); unabhängig von der Zahl der Kalender
   und Zeilen.

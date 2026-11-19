@@ -18,7 +18,10 @@ are what production writes.
 - `idle`: 4,001 yearly all-day birthdays in March, endless, in one calendar its own
   viewer reads (review M10 task 3a, R3a-2).
 - `bound`: `BOUND_SERIES` endless yearly March series in one calendar, near the
-  expansion's work bound (`expansion.MAX_WORK`, ≈ 12,500 rows).
+  expansion's work bound (`expansion.MAX_WORK`): in a November week each costs its
+  row (`ROW_WORK`) and two rule candidates, the March of that year and the next one,
+  which ends the scan (counted since `502089a`), so at most 11,904 fit; 11,500 leave a
+  margin (review M10 task 4, R4-6; 12,000 answered 422 with 504,000).
 """
 
 import random
@@ -56,7 +59,7 @@ PEOPLE = 20
 TEAM_SPACES, CALENDARS_PER_SPACE = 4, 5
 SERIES, SINGLES = 500, 5000
 IDLE_SERIES = 4001
-BOUND_SERIES = 12_000
+BOUND_SERIES = 11_500  # × (ROW_WORK + 2) = 483,000 of MAX_WORK 500,000
 
 
 @dataclass
