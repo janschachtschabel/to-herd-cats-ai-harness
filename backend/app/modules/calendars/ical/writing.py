@@ -15,7 +15,9 @@
   `CLASS:PRIVATE`, `STATUS:CONFIRMED` (`CANCELLED` for a cancelled one: a feed's
   tombstone must free the time; tentative is not told) and a DTSTAMP of the moment of
   writing (`now`), never the last change. A redacted series is written under the
-  caller's opaque UID (`ExportEvent.opaque_uid`, R7a-5), its overrides too.
+  caller's opaque UID (`ExportEvent.opaque_uid`, R7a-5), its overrides too. A visible
+  override is stamped with its own last change (`ExportOverride.stamp`), else the
+  series'.
 - A parameter value that holds a backslash (an attendee's name) is quoted, `^` and `"`
   are written by RFC 6868 (re-check RC7a-7).
 - Texts lose control characters; U+2028, U+2029 and U+0085 become line breaks
@@ -98,7 +100,7 @@ def _vevents(event: ExportEvent, now: datetime) -> Iterator[Event]:
             master.add_component(_alarm(minutes, event.content.title))
     yield master
     for override in event.overrides:
-        own = now if event.redacted or override.redacted else event.stamp
+        own = now if event.redacted or override.redacted else override.stamp or event.stamp
         part = _vevent(uid, own, override.series, override.content, override.redacted)
         part.add(*_moment("RECURRENCE-ID", event.series, override.recurrence_id))
         yield part

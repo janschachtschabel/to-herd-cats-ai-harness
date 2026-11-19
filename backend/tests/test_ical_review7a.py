@@ -184,7 +184,9 @@ def _redacted(event: ExportEvent) -> ExportEvent:
         content=event.content,
         stamp=event.stamp,
         redacted=True,
-        opaque_uid=opaque.opaque_uid(event.uid, key=key, audience="feed-1"),
+        opaque_uid=opaque.opaque_uid(
+            event.uid, key=key, purpose=opaque.Purpose.FEED, audience="feed-1"
+        ),
     )
 
 

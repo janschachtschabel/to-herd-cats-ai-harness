@@ -5,12 +5,13 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.modules.calendars.ical import reading, writing
+from app.modules.calendars.ical import opaque, reading, writing
 from app.modules.calendars.ical.drafts import (
     AttendeeDraft,
     Content,
     EventDraft,
     ExportEvent,
+    ExportOverride,
     Response,
 )
 from app.modules.calendars.recurrence import Series
@@ -82,3 +83,41 @@ def test_a_parameter_is_read_verbatim_inside_quotes(written: str, name: str) -> 
     body = f"DTSTART:20260101T100000Z\r\nATTENDEE;{written};PARTSTAT=ACCEPTED:mailto:x@y.org"
     (event,) = _parse(_calendar(_event("u", body))).events
     assert event.content.attendees == (AttendeeDraft("x@y.org", name, response=Response.ACCEPTED),)
+
+
+_KEY = opaque.key_from_secret("an installation's secret key, 32+ characters")
+
+
+def test_an_empty_secret_gives_no_key() -> None:
+    """RC7a-9 (a): an unset `HERD_SECRET_KEY` passed as "" would give a key anyone can
+    compute."""
+    with pytest.raises(ValueError, match="secret"):
+        opaque.key_from_secret("")
+
+
+def test_the_opaque_uid_names_its_purpose_and_audience_apart() -> None:
+    """RC7a-9 (b): a feed's id and a person's id never share a name space, and no
+    audience and UID run into each other (length-prefixed parts)."""
+    feed = opaque.opaque_uid("u", key=_KEY, purpose=opaque.Purpose.FEED, audience="1")
+    export = opaque.opaque_uid("u", key=_KEY, purpose=opaque.Purpose.EXPORT, audience="1")
+    assert feed != export
+    joined = opaque.opaque_uid("b\x00c", key=_KEY, purpose=opaque.Purpose.FEED, audience="a")
+    other = opaque.opaque_uid("c", key=_KEY, purpose=opaque.Purpose.FEED, audience="a\x00b")
+    assert joined != other
+
+
+def test_an_override_is_written_with_its_own_stamp() -> None:
+    """RC7a-9 (c): a visible override's DTSTAMP is its own row's last change."""
+    moved = Series(datetime(2026, 7, 2, 11), timedelta(hours=1), "Europe/Berlin", False)
+    series = Series(
+        datetime(2026, 7, 1, 9), timedelta(hours=1), "Europe/Berlin", False, "FREQ=DAILY"
+    )
+    override = ExportOverride(
+        datetime(2026, 7, 2, 9), moved, Content(title="moved"), stamp=utc(2026, 11, 18, 7)
+    )
+    event = ExportEvent(
+        uid="u", series=series, content=Content(), stamp=utc(2026, 11, 1), overrides=(override,)
+    )
+    data = writing.event_ics(event, now=utc(2026, 11, 19))
+    stamps = [line for line in data.decode().split("\r\n") if line.startswith("DTSTAMP")]
+    assert stamps == ["DTSTAMP:20261101T000000Z", "DTSTAMP:20261118T070000Z"]

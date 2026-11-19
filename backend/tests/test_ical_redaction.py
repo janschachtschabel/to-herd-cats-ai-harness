@@ -74,7 +74,9 @@ def _override(redacted: bool) -> ExportOverride:
 
 
 def test_a_redacted_event_writes_only_what_busy_time_needs() -> None:
-    uid = opaque.opaque_uid("event_305123456@meetup.example", key=KEY, audience="feed-1")
+    uid = opaque.opaque_uid(
+        "event_305123456@meetup.example", key=KEY, purpose=opaque.Purpose.FEED, audience="feed-1"
+    )
     event = _event(redacted=True, opaque_uid=uid, overrides=(_override(True),))
     data = writing.event_ics(event, now=NOW)
     master, override = _vevents(data)
@@ -89,7 +91,7 @@ def test_a_redacted_event_writes_only_what_busy_time_needs() -> None:
 
 def test_a_redacted_tombstone_still_frees_its_time() -> None:
     cancelled = Content(title="Falke", status=Status.CANCELLED)
-    uid = opaque.opaque_uid("u", key=KEY, audience="feed-1")
+    uid = opaque.opaque_uid("u", key=KEY, purpose=opaque.Purpose.FEED, audience="feed-1")
     (master,) = _vevents(
         writing.event_ics(_event(content=cancelled, redacted=True, opaque_uid=uid), now=NOW)
     )
@@ -109,7 +111,9 @@ def test_an_override_has_a_decision_of_its_own() -> None:
     assert set(override) <= BUSY_ONLY and override["DTSTAMP"] == "20261119T080000Z"
     assert override["UID"] == master["UID"] == "event_305123456@meetup.example"
     # the series only busy, one occurrence visible: under the opaque UID, no last change
-    uid = opaque.opaque_uid("event_305123456@meetup.example", key=KEY, audience="feed-1")
+    uid = opaque.opaque_uid(
+        "event_305123456@meetup.example", key=KEY, purpose=opaque.Purpose.FEED, audience="feed-1"
+    )
     data = writing.event_ics(
         _event(redacted=True, opaque_uid=uid, overrides=(_override(False),)), now=NOW
     )
@@ -123,14 +127,20 @@ def test_an_override_has_a_decision_of_its_own() -> None:
 
 def test_the_opaque_uid_is_keyed_per_reader() -> None:
     uid = "event_305123456@meetup.example"
-    first = opaque.opaque_uid(uid, key=KEY, audience="feed-1")
-    assert first == opaque.opaque_uid(uid, key=KEY, audience="feed-1")  # stable
-    assert first != opaque.opaque_uid(uid, key=KEY, audience="feed-2")  # not joinable
+    first = opaque.opaque_uid(uid, key=KEY, purpose=opaque.Purpose.FEED, audience="feed-1")
+    assert first == opaque.opaque_uid(
+        uid, key=KEY, purpose=opaque.Purpose.FEED, audience="feed-1"
+    )  # stable
+    assert first != opaque.opaque_uid(
+        uid, key=KEY, purpose=opaque.Purpose.FEED, audience="feed-2"
+    )  # not joinable
     other = opaque.key_from_secret("another installation's secret key, 32+ chars")
-    assert first != opaque.opaque_uid(uid, key=other, audience="feed-1")
+    assert first != opaque.opaque_uid(
+        uid, key=other, purpose=opaque.Purpose.FEED, audience="feed-1"
+    )
     assert first.endswith("@busy.invalid") and len(first.split("@")[0]) == 32
     with pytest.raises(ValueError):
-        opaque.opaque_uid(uid, key=b"short", audience="feed-1")
+        opaque.opaque_uid(uid, key=b"short", purpose=opaque.Purpose.FEED, audience="feed-1")
 
 
 @pytest.mark.parametrize("separator", [" ", " ", "\x85", "\x0b", "\x0c", "\x1c"])

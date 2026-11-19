@@ -95,12 +95,18 @@ class EventDraft:
 class ExportOverride:
     """An override to write, with its own decision (decision 6, I6: an override is a
     row with its own visibility and attendees): `redacted` writes only its time and
-    "busy", whatever the series shows."""
+    "busy", whatever the series shows; `stamp` is its own row's last change (re-check
+    RC7a-9), the DTSTAMP it is written with when it is not redacted."""
 
     recurrence_id: datetime
     series: Series
     content: Content
     redacted: bool = False
+    stamp: datetime | None = None  # aware: its own last change; None: the series'
+
+    def __post_init__(self) -> None:
+        if self.stamp is not None and self.stamp.tzinfo is None:
+            raise ValueError("the stamp must be aware: it is never read in the process's zone")
 
 
 @dataclass(frozen=True, slots=True)
