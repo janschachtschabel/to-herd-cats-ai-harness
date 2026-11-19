@@ -57,14 +57,15 @@ def test_a_duration_beyond_datetime_is_out_of_range() -> None:
     assert parsed.problems == Counter({"ical.time_out_of_range": 1})
 
 
+@pytest.mark.parametrize("error", [ArithmeticError, IndexError, KeyError, ValueError])
 def test_an_event_the_reader_fails_on_is_counted_and_the_rest_read(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, error: type[Exception]
 ) -> None:
     real = content.read
 
     def failing(part: lines.Component, **kwargs: object) -> object:
         if part.first("SUMMARY") is not None:
-            raise ArithmeticError("a defect nobody has found yet")
+            raise error("a defect nobody has found yet")
         return real(part, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr(content, "read", failing)

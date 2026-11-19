@@ -49,7 +49,7 @@ def parse(data: bytes, *, default_zone: str, limit: int) -> Parsed:
     zones.zone(default_zone)
     try:
         tops, found = lines.read(data)
-    except (ValueError, ArithmeticError, RecursionError):  # the last guard
+    except (ValueError, ArithmeticError, LookupError, RecursionError):  # the last guard
         return Parsed([], Counter({problems.UNREADABLE: 1}))
     if not any(top.name == "VCALENDAR" for top in tops):
         return Parsed([], Counter({problems.UNREADABLE: 1}))
@@ -88,7 +88,7 @@ def parse(data: bytes, *, default_zone: str, limit: int) -> Parsed:
             found.update(notes)
         except Skip as skip:
             found[skip.code] += 1
-        except (ValueError, ArithmeticError, RecursionError):
+        except (ValueError, ArithmeticError, LookupError, RecursionError):
             found[problems.EVENT_UNREADABLE] += 1  # the last guard: never raise for a file
         found[problems.LINE_UNREADABLE] += sum(_broken(part) for part in group.parts())
     return Parsed(drafts, +found)

@@ -6,8 +6,11 @@ and random bytes."""
 import random
 from datetime import UTC, datetime
 
-from app.modules.calendars.ical import reading, writing
+import pytest
+
+from app.modules.calendars.ical import budget, problems, reading, writing
 from app.modules.calendars.ical.drafts import ExportEvent
+from tests.support.ical_hostile import SHAPES
 from tests.support.ical_occurrences import DATA, effective
 
 ROUNDS = 600
@@ -84,3 +87,17 @@ def test_mangled_files_never_raise_and_read_back_alike() -> None:
             )
         read_events += len(parsed.events)
     assert read_events > ROUNDS // 2  # many mangled files still hold events
+
+
+def test_mangled_hostile_files_never_raise(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The review's hostile shapes (`tests/support/ical_hostile.py`), small and mangled
+    the same way: counted by known codes, never raised (R7a-1 to R7a-4). A small work
+    budget, so its end is met often."""
+    monkeypatch.setattr(budget, "WORK_LIMIT", 50_000)
+    rng = random.Random(20261120)
+    shapes = [make(3000) for make in SHAPES.values()]
+    for _ in range(ROUNDS // 2):
+        parsed = reading.parse(
+            _mangle(rng.choice(shapes), rng), default_zone="Europe/Berlin", limit=50
+        )
+        assert set(parsed.problems) <= problems.CODES
