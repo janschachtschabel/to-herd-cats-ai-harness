@@ -8,6 +8,11 @@ are what production writes.
   up to five years back, some EXDATEs and moved occurrences) and 5,000 single events
   (a year to either side of the anchor, some all-day, some private, tentative or
   cancelled).
+- Attendees (plan M10 Task 4): every team and personal event (series and single) has
+  up to four of the 20 people invited; the viewer to one in ten team events and to
+  one in thirty single events of personal calendars she does not read (her window
+  finds those by attending alone; no series there, which would push the month grid
+  past the window's 2,000 occurrences).
 - Availability (`availability_*`): 20 people, each with a personal calendar of 25
   series and 250 single events from the same mixture (500 and 5,000 in all).
 - `idle`: 4,001 yearly all-day birthdays in March, endless, in one calendar its own
@@ -26,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal, SystemRole
+from app.modules.calendars.attendee_models import CalendarEventAttendee
 from app.modules.calendars.event_models import CalendarEvent
 from app.modules.calendars.models import Calendar, CalendarColor
 from app.modules.orgs.models import Organization
@@ -117,13 +123,20 @@ async def seed(session: AsyncSession, password_hash: str) -> Stock:
             for c in range(CALENDARS_PER_SPACE)
         ]
     organisers = [p.id for p in persons]
-    await _events(session, rng, org.id, calendars, organisers, SERIES, SINGLES)
+    invited: list[dict[str, Any]] = []
+    team = await _events(session, rng, org.id, calendars, organisers, SERIES, SINGLES)
+    invited += _attendees(organisers, viewer.id, team, every=10, series=True)
     for person in persons:
         personal = await SpaceRepository(session).get_personal(org.id, person.id)
         assert personal is not None
         stock.people[personal.id] = person.id
         mine = [await _calendar(session, org.id, personal.id, None)]
-        await _events(session, rng, org.id, mine, [person.id], SERIES // PEOPLE, SINGLES // PEOPLE)
+        own = await _events(
+            session, rng, org.id, mine, [person.id], SERIES // PEOPLE, SINGLES // PEOPLE
+        )
+        invited += _attendees(organisers, viewer.id, own, every=30, series=False)
+    for i in range(0, len(invited), 1000):
+        await session.execute(insert(CalendarEventAttendee), invited[i : i + 1000])
     idle_space = await _team_space(session, org.id, "Geburtstage", idle)
     birthdays = await _calendar(session, org.id, idle_space.id, "Geburtstage")
     await _insert(
@@ -166,7 +179,7 @@ async def _events(
     organisers: list[uuid.UUID],
     series: int,
     singles: int,
-) -> None:
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for _ in range(series):
         rows += drawn(
@@ -177,6 +190,38 @@ async def _events(
         for _ in range(singles)
     ]
     await _insert(session, rows)
+    return rows
+
+
+def _attendees(
+    people: list[uuid.UUID],
+    viewer: uuid.UUID,
+    rows: list[dict[str, Any]],
+    *,
+    every: int,
+    series: bool,
+) -> list[dict[str, Any]]:
+    """Up to four people on each master row (overrides keep none of their own: their
+    series' list is what the window reads), the viewer on every `every`-th (on a
+    series only with `series`)."""
+    rng = random.Random(4)  # noqa: S311 - the same attendees every time, no secret
+    out: list[dict[str, Any]] = []
+    for n, row in enumerate(r for r in rows if "series_id" not in r):
+        chosen = rng.sample(people, rng.randint(0, 4))
+        if n % every == 0 and (series or not (row.get("rrule") or row.get("rdates"))):
+            chosen.append(viewer)
+        out += [
+            {
+                "org_id": row["org_id"],
+                "event_id": row["id"],
+                "principal_type": "user",
+                "principal_id": person,
+                "role": "required",
+                "response": rng.choice(["needs_action", "accepted", "tentative", "declined"]),
+            }
+            for person in chosen
+        ]
+    return out
 
 
 async def _insert(session: AsyncSession, rows: list[dict[str, Any]]) -> None:

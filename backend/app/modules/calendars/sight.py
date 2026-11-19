@@ -26,13 +26,15 @@ import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 
-from sqlalchemy import ColumnElement, and_, or_, select, true
+from sqlalchemy import ColumnElement, and_, or_, select, true, union
+from sqlalchemy.orm import aliased
 
 from app.core.access import member_space_ids, visible_space_ids
 from app.core.actor import Actor
 from app.core.permissions import ADMIN_ROLES
 from app.modules.calendars.attendee_models import CalendarEventAttendee
 from app.modules.calendars.event_models import CalendarEvent, EventVisibility
+from app.modules.calendars.models import Calendar
 
 
 class Sight(StrEnum):
@@ -114,6 +116,31 @@ def listed_events_sql(actor: Actor) -> ColumnElement[bool]:
     return or_(reads_sql(actor), attends_sql(actor))
 
 
+def listed_calendars_sql(actor: Actor) -> ColumnElement[bool]:
+    """A guard on the joined `calendar` that `listed_events_sql` implies (it adds no
+    event): the calendars of member spaces and those holding an event the actor
+    organises or is invited to. The window walks events per calendar; without it every
+    calendar of the organisation is walked for the rare attended row."""
+    event = aliased(CalendarEvent)
+    organised = select(event.calendar_id).where(
+        event.org_id == actor.org_id,
+        event.organizer_type == actor.principal.type,
+        event.organizer_id == actor.principal.id,
+        event.deleted_at.is_(None),  # the window lists live rows (and the index is theirs)
+    )
+    invited = (
+        select(event.calendar_id)
+        .join(CalendarEventAttendee, CalendarEventAttendee.event_id == event.id)
+        .where(
+            CalendarEventAttendee.org_id == actor.org_id,
+            CalendarEventAttendee.principal_type == actor.principal.type,
+            CalendarEventAttendee.principal_id == actor.principal.id,
+        )
+    )
+    attended = union(organised, invited)  # each by its own index
+    return or_(Calendar.space_id.in_(member_space_ids(actor)), Calendar.id.in_(attended))
+
+
 def named_events_sql(space_id: uuid.UUID) -> ColumnElement[bool]:
     """The named way: the events of the one space the call named (after `require`)."""
     return CalendarEvent.space_id == space_id
@@ -122,9 +149,13 @@ def named_events_sql(space_id: uuid.UUID) -> ColumnElement[bool]:
 def window_sql(
     actor: Actor, *, space_id: uuid.UUID | None, mine: bool
 ) -> tuple[ColumnElement[bool], ColumnElement[bool]]:
-    """(rule, reads) of a window: the named space's events, all read (after `require`),
-    or the lists' rule with `reads_sql` per row; `mine` keeps what the actor attends."""
-    rule = listed_events_sql(actor) if space_id is None else named_events_sql(space_id)
+    """(rule, reads) of a window (whose statement joins `calendar`): the named space's
+    events, all read (after `require`), or the lists' rule with its calendar guard and
+    `reads_sql` per row; `mine` keeps what the actor attends."""
+    if space_id is None:
+        rule = and_(listed_events_sql(actor), listed_calendars_sql(actor))
+    else:
+        rule = named_events_sql(space_id)
     reads: ColumnElement[bool] = reads_sql(actor) if space_id is None else true()
     return (and_(rule, attends_sql(actor)) if mine else rule), reads
 
