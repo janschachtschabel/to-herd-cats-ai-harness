@@ -32,6 +32,7 @@ ATTENDEE_DROPPED = "ical.attendee_dropped"  # no mailto address, or beyond the l
 ALARM_UNSUPPORTED = "ical.alarm_unsupported"  # after the start, absolute, too early
 TEXT_CUT = "ical.text_cut"  # a title, place or text beyond its length
 TEXT_REPLACED = "ical.text_replaced"  # no UTF-8: broken characters replaced (once)
+SEQUENCE_CAPPED = "ical.sequence_capped"  # a SEQUENCE beyond 2^31 - 1, read as that
 
 CODES = frozenset(
     {
@@ -57,6 +58,7 @@ CODES = frozenset(
         ALARM_UNSUPPORTED,
         TEXT_CUT,
         TEXT_REPLACED,
+        SEQUENCE_CAPPED,
     }
 )
 

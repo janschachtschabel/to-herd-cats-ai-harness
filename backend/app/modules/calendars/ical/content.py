@@ -8,6 +8,8 @@ interpreted), attendees are addresses, alarms become minutes before the start.
 - TRANSP: OPAQUE is busy, TRANSPARENT free; none: busy unless all-day (decision 3).
 - ATTENDEE: a `mailto:` address, its CN, ROLE (OPT- and NON-PARTICIPANT are optional)
   and PARTSTAT (DELEGATED and others: needs action); one per address, at most 100.
+- SEQUENCE: a whole number up to 2^31 - 1; a larger one is read as that and counted
+  (`ical.sequence_capped`); anything else is 0.
 - VALARM: a TRIGGER before the start (or before the end, `RELATED=END`), at most four
   weeks; the three nearest the start, each once.
 """
@@ -33,6 +35,7 @@ from app.modules.calendars.ical.drafts import (
 from app.modules.calendars.ical.problems import Skip
 
 _MAX_SEQUENCE = 2**31 - 1
+_SEQUENCE_DIGITS = len(str(_MAX_SEQUENCE))
 _RESPONSES = {
     "ACCEPTED": Response.ACCEPTED,
     "TENTATIVE": Response.TENTATIVE,
@@ -49,7 +52,7 @@ def read(part: lines.Component, *, all_day: bool, notes: Counter[str]) -> Conten
         status=status(part),
         visibility=_visibility(part.first("CLASS")),
         busy=_busy(part.first("TRANSP"), all_day),
-        sequence=_sequence(part.first("SEQUENCE")),
+        sequence=_sequence(part.first("SEQUENCE"), notes),
         attendees=_attendees(part.all("ATTENDEE"), notes),
     )
 
@@ -124,11 +127,17 @@ def _busy(prop: lines.Prop | None, all_day: bool) -> bool:
     return not all_day
 
 
-def _sequence(prop: lines.Prop | None) -> int:
-    value = prop.raw.strip() if prop else ""
+def _sequence(prop: lines.Prop | None, notes: Counter[str]) -> int:
+    """SEQUENCE as written; beyond 2^31 - 1 that (the largest, so a later version stays
+    later), counted: its length is compared before any `int()`, which refuses more
+    than 4,300 digits (re-check RC7a-8)."""
+    value = prop.raw.strip().lstrip("0") if prop else ""
     if not value.isascii() or not value.isdigit():
         return 0
-    return min(int(value), _MAX_SEQUENCE)
+    if len(value) > _SEQUENCE_DIGITS or int(value) > _MAX_SEQUENCE:
+        notes[problems.SEQUENCE_CAPPED] = 1
+        return _MAX_SEQUENCE
+    return int(value)
 
 
 def _attendees(props: list[lines.Prop], notes: Counter[str]) -> tuple[AttendeeDraft, ...]:
