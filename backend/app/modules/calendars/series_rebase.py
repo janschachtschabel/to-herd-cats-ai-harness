@@ -7,7 +7,8 @@ same wall time in another zone is no move), its EXDATEs, its RDATEs and the recu
 id of each override move by the same wall-time difference, so deleted occurrences
 stay deleted and overrides stay. An RDATE or EXDATE list the change names itself is
 taken as named. Then whatever no longer names an occurrence of the new series is
-dropped: overrides become tombstones, EXDATEs go (`Rebased.counts`).
+dropped: overrides become tombstones (also one whose occurrence an EXDATE deletes:
+review M10 task 3b, R3b-8), EXDATEs go (`Rebased.counts`).
 `move_overrides` writes that, one override at a time in the order that keeps every
 (UID, recurrence id) unique on the way.
 """
@@ -53,6 +54,12 @@ class Rebased:
 
     def counts(self) -> Dropped:
         return Dropped(len(self.dropped), self.dropped_exdates)
+
+    def written(self, *, rehomed: bool = False) -> list[CalendarEvent]:
+        """The overrides `move_overrides` writes: those it drops and those whose
+        recurrence id moves (all kept ones when they go to another series)."""
+        moving = [o for o, wall in self.moved if rehomed or wall != o.recurrence_id]
+        return [*self.dropped, *moving]
 
 
 def safely[T](compute: Callable[..., T], *args: Any) -> T:
@@ -133,10 +140,12 @@ def rebase(
     dropped_exdates = len(checked.exdates) - len(kept)
     if dropped_exdates:
         checked = check(replace(times, exdates=kept), zone)
+    # An override names a live occurrence: one its EXDATE deletes goes too (R3b-8).
+    live = found - set(checked.exdates)
     return Rebased(
         checked=checked,
-        moved=[(o, wall) for o, wall in moved if wall in found],
-        dropped=[o for o, wall in moved if wall not in found],
+        moved=[(o, wall) for o, wall in moved if wall in live],
+        dropped=[o for o, wall in moved if wall not in live],
         dropped_exdates=dropped_exdates,
     )
 

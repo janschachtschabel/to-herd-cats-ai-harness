@@ -83,6 +83,21 @@ class EventRepository:
             stmt = stmt.where(CalendarEvent.recurrence_id >= since)
         return list((await self.session.scalars(stmt)).all())
 
+    async def override_at(self, series_id: uuid.UUID, wall: datetime) -> CalendarEvent | None:
+        """The series' live override of its occurrence `wall`, locked."""
+        found: CalendarEvent | None = await self.session.scalar(
+            select(CalendarEvent)
+            .where(
+                CalendarEvent.org_id == self.org_id,
+                CalendarEvent.deleted_at.is_(None),
+                CalendarEvent.series_id == series_id,
+                CalendarEvent.recurrence_id == wall,
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return found
+
     async def calendar_zone(self, calendar_id: uuid.UUID) -> str:
         """The zone of the event's calendar, for times sent without one."""
         stmt = select(Calendar.time_zone).where(

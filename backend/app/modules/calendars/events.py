@@ -24,20 +24,19 @@
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, require, visible_space_ids
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.modules.audit.recorder import record_private_event_reads
-from app.modules.calendars import series, series_split, sight
+from app.modules.calendars import sight
+from app.modules.calendars.event_change import edit, event_not_found, lock_for_write, remove
 from app.modules.calendars.event_models import CalendarEvent, EventStatus, EventVisibility
 from app.modules.calendars.event_repository import EventRepository, UidTaken
-from app.modules.calendars.event_times import Times, check, invalid
+from app.modules.calendars.event_times import Times, check
 from app.modules.calendars.event_writes import (
     CREATED,
-    DELETED,
     Change,
     Scope,
     announce,
@@ -46,10 +45,9 @@ from app.modules.calendars.event_writes import (
     refusals_roll_back,
     require_version,
     require_writable,
-    tombstone,
 )
 from app.modules.calendars.repository import CalendarRepository
-from app.modules.calendars.series_rebase import stored_series
+from app.modules.calendars.series_reach import require_full_sight
 from app.modules.calendars.service import calendar_not_found
 from app.modules.calendars.sight import Seen, Sight
 
@@ -75,10 +73,6 @@ class Changed:
     sight: Sight
     dropped_overrides: int
     dropped_exdates: int
-
-
-def event_not_found() -> NotFound:
-    return NotFound(code="event.not_found")
 
 
 class EventService:
@@ -154,10 +148,17 @@ class EventService:
             unhides = change.values.get("visibility", event.visibility) != event.visibility
             await require_writable(self.session, actor, seen, changes_visibility=unhides)
             require_version(event, version)
-            edited = await self._edit(actor, event, change, scope, occurrence, dry_run)
-            if not dry_run:
+            edited = await edit(self.session, actor, event, change, scope, occurrence, dry_run)
+            by_power = require_full_sight(actor, edited.reached)
+            if edited.wrote:
                 await audit_admin_write(
-                    self.session, actor, seen, change="update", scope=scope, fields=edited.fields
+                    self.session,
+                    actor,
+                    seen,
+                    change="update",
+                    scope=scope,
+                    fields=edited.fields,
+                    overrides_by_power=by_power,
                 )
         target = edited.event
         attends = sight.attends(actor, target)
@@ -178,79 +179,27 @@ class EventService:
         async with refusals_roll_back(self.session):
             await require_writable(self.session, actor, seen)
             require_version(event, version)
-            await self._remove(actor, event, scope, occurrence)
+            removed = await remove(self.session, actor, event, scope, occurrence)
+            by_power = require_full_sight(actor, removed.reached)
             await audit_admin_write(
-                self.session, actor, seen, change="delete", scope=scope, fields=()
+                self.session,
+                actor,
+                seen,
+                change="delete",
+                scope=scope,
+                fields=(),
+                overrides_by_power=by_power,
             )
-
-    async def _edit(
-        self,
-        actor: Actor,
-        event: CalendarEvent,
-        change: Change,
-        scope: Scope,
-        occurrence: str | None,
-        dry_run: bool,
-    ) -> series.Edited:
-        if scope is Scope.ALL:
-            if event.series_id is not None and change.names_series():
-                raise invalid("event.scope_invalid")  # an override is no series
-            return await series.change_all(self.session, actor, event, change, dry_run=dry_run)
-        wall = self._occurrence(event, occurrence)
-        if scope is Scope.THIS:
-            return await series.override(self.session, actor, event, wall, change, dry_run=dry_run)
-        if wall == stored_series(event).start:  # splitting at the first: all
-            return await series.change_all(self.session, actor, event, change, dry_run=dry_run)
-        return await series_split.split(self.session, actor, event, wall, change, dry_run=dry_run)
-
-    async def _remove(
-        self, actor: Actor, event: CalendarEvent, scope: Scope, occurrence: str | None
-    ) -> None:
-        repo = EventRepository(self.session, actor.org_id)
-        if event.series_id is not None and event.recurrence_id is not None:
-            if scope is not Scope.ALL:
-                raise invalid("event.scope_invalid")
-            master = await repo.lock(event.series_id)
-            if master is None:  # cannot be: the series' tombstone takes its overrides
-                raise event_not_found()
-            # Deleting an override deletes its occurrence (an EXDATE; it a tombstone).
-            await series.delete_one(self.session, actor, master, event.recurrence_id)
-            return
-        if scope is not Scope.ALL:
-            wall = self._occurrence(event, occurrence)
-            if scope is Scope.THIS:
-                await series.delete_one(self.session, actor, event, wall)
-                return
-            if wall != stored_series(event).start:
-                await series_split.truncate(self.session, actor, event, wall)
-                return
-        for override in await repo.overrides_of(event.id):
-            tombstone(override)
-        tombstone(event)
-        await self.session.flush()
-        await announce(self.session, actor, event, DELETED)
-
-    @staticmethod
-    def _occurrence(event: CalendarEvent, occurrence: str | None) -> datetime:
-        """The named occurrence of a series; `this` and `following` need a series."""
-        if not event.recurring or event.series_id is not None:
-            raise invalid("event.scope_invalid")
-        return series.occurrence_of(event, occurrence)
 
     async def _for_write(self, actor: Actor, event_id: uuid.UUID) -> Seen:
         """The event as the named way sees it, locked (a series before its override)
-        and read afresh."""
+        and read afresh; how much of it the actor sees is judged on that row (review
+        M10 task 3b, R3b-6)."""
         repo = EventRepository(self.session, actor.org_id)
         event = await repo.find(event_id, sight.by_id_sql(actor))
         if event is None:
             raise event_not_found()
-        seen = await self._named(actor, event)
-        if event.series_id is not None:
-            await repo.lock(event.series_id)
-        locked = await repo.lock(event_id)
-        if locked is None:  # deleted meanwhile
-            raise event_not_found()
-        return Seen(locked, seen.sight)
+        return await self._named(actor, await lock_for_write(self.session, event))
 
     async def _named(self, actor: Actor, event: CalendarEvent) -> Seen:
         """How much of the event found by id the actor sees; audited when admin power

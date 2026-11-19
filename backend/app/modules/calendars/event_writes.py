@@ -124,6 +124,15 @@ async def refusals_roll_back(session: AsyncSession) -> AsyncIterator[None]:
         yield
 
 
+# The stored field each API name of a change writes (review M10 task 3b, R3b-11: one
+# naming, the columns', in the audit and the outbox).
+_STORED_NAME = {"first_day": "starts_at", "last_day": "ends_at", "time_zone": "tzid"}
+
+
+def stored_names(values: Iterable[str]) -> list[str]:
+    return sorted({_STORED_NAME.get(name, name) for name in values})
+
+
 def snapshot(event: CalendarEvent) -> dict[str, Any]:
     return {name: getattr(event, name) for name in STORED_FIELDS}
 
@@ -143,11 +152,18 @@ async def announce(
     event: CalendarEvent,
     kind: str,
     fields: Iterable[str] | None = None,
+    *,
+    overrides: Iterable[CalendarEvent] = (),
 ) -> None:
-    """The outbox event of a change: ids, and for an update the fields' names."""
+    """The outbox event of a change: ids, for an update the fields' names, and for a
+    series the ids of the overrides the change wrote too (moved, re-homed, changed or
+    made tombstones; review M10 task 3b, R3b-12)."""
     payload: dict[str, Any] = {"calendar_id": str(event.calendar_id)}
     if kind == UPDATED:
         payload["fields"] = sorted(fields or ())
+    touched = sorted({str(override.id) for override in overrides})
+    if touched:
+        payload["overrides"] = touched
     await emit(
         session,
         type=kind,
@@ -167,14 +183,18 @@ async def audit_admin_write(
     change: str,
     scope: Scope,
     fields: Iterable[str],
+    overrides_by_power: bool = False,
 ) -> None:
     """One `calendar.admin_write` if the write needed admin power: full sight of a
-    private event of someone else, or `calendar.write` only through the admin role."""
+    private event of someone else (the event, or an override the write reached:
+    `overrides_by_power`), or `calendar.write` only through the admin role."""
     event = seen.event
     attends = sight.attends(actor, event)
-    by_power = sight.by_admin_power(
-        actor, event, reads=True, attends=attends, named=True
-    ) or await held_by_admin_power(session, actor, Action.CALENDAR_WRITE, event.space_id)
+    by_power = (
+        overrides_by_power
+        or sight.by_admin_power(actor, event, reads=True, attends=attends, named=True)
+        or await held_by_admin_power(session, actor, Action.CALENDAR_WRITE, event.space_id)
+    )
     if by_power:
         await record_event_admin_write(
             session,

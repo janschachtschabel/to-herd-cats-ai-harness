@@ -296,7 +296,7 @@ async def test_scope_following_splits_the_series(
     assert (new["title"], new["location"], new["rrule"], new["series_id"]) == (
         "Neu",
         "Raum 1",
-        "FREQ=WEEKLY",
+        "FREQ=WEEKLY;BYDAY=MO",  # the weekday DTSTART gave, written out (R3b-4)
         None,
     )
     assert (new["starts_at"], new["recurs_until"]) == ("2026-12-07T10:00:00Z", None)
@@ -383,7 +383,10 @@ async def test_later_overrides_and_exdates_move_to_the_new_series(
     )
     assert (changed["dropped_overrides"], changed["dropped_exdates"]) == (0, 0)
     new = changed["event"]
-    assert (new["rrule"], new["exdates"]) == ("FREQ=WEEKLY;COUNT=5", ["2026-12-28T10:00:00"])
+    assert (new["rrule"], new["exdates"]) == (
+        "FREQ=WEEKLY;COUNT=5;BYDAY=MO",
+        ["2026-12-28T10:00:00"],
+    )
     old = await _read(client, made)
     assert old["exdates"] == ["2026-11-30T09:00:00"]
     stayed, went = await _read(client, early), await _read(client, late)
