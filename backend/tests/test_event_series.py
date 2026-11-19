@@ -515,3 +515,31 @@ async def test_moving_a_series_by_a_day_moves_neighbouring_overrides(
             (f"2026-11-{start + 4}", "Termin"),
         ]
     )
+
+
+async def test_overrides_and_splits_are_checked_like_new_events(
+    make_client: Any, make_user: MakeUser, make_space: MakeSpace
+) -> None:
+    """The 3a limits hold on every write path: no event over a year and a day, no
+    series on top of itself, times in the calendar's years."""
+    client, calendar_id = await _calendar(make_client, make_user, make_space)
+    made = await _weekly(client, calendar_id, "FREQ=WEEKLY;COUNT=4")
+    this = {"scope": "this", "occurrence": "2026-11-30T09:00:00"}
+    following = {"scope": "following", "occurrence": "2026-11-30T09:00:00"}
+    refused = [
+        await patch(client, made, ends_at="2027-12-02T09:00:00+01:00", query=this),
+        await patch(client, made, starts_at="2400-01-03T09:00:00+01:00", query=this),
+        await patch(
+            client, made, rrule="FREQ=DAILY", ends_at="2026-12-01T12:00:00+01:00", query=following
+        ),
+        await patch(client, made, ends_at="2027-12-02T09:00:00+01:00", query=following),
+    ]
+    assert [_code(r) for r in refused] == [
+        (422, "event.too_long"),
+        (422, "event.time_out_of_range"),
+        (422, "event.series_overlaps"),
+        (422, "event.too_long"),
+    ]
+    master = await _read(client, made)
+    assert (master["version"], master["rrule"]) == (1, "FREQ=WEEKLY;COUNT=4")
+    assert len(await window(client, *NOV)) == 4
