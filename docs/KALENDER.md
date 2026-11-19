@@ -100,20 +100,49 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
     Zeit). Was danach kein Vorkommen der neuen Serie mehr trifft (etwa nach einer neuen
     Regel), entfällt; die Antwort nennt es (`dropped_overrides`, `dropped_exdates`), und
     `dry_run=true` rechnet nur, ohne zu schreiben. Selbst gesendete Listen
-    `rdates`/`exdates` gelten, wie sie sind.
+    `rdates`/`exdates` gelten, wie sie sind; ein gesendetes `exdates`-Datum eines
+    einzeln geänderten Vorkommens löscht auch dessen Ausnahme (sie zählt in
+    `dropped_overrides`). Der Inhalt erreicht die Ausnahmen: Jedes Feld (Titel, Ort,
+    Text, Status, Sichtbarkeit, `busy`), das eine Ausnahme noch mit dem alten Wert der
+    Serie hält, bekommt den neuen; was eine Ausnahme selbst geändert hat, bleibt.
+    `visibility=private` und `status=cancelled` erreichen jede Ausnahme.
   - `scope=this` legt eine Ausnahme an: eine eigene Zeile mit UID, Inhalt und
     Organisatorin der Serie, zur Zeit des Vorkommens, wenn die Änderung keine andere
     nennt; sie ist keine Serie (`rrule`, `rdates`, `exdates` antworten 422
     `event.scope_invalid`), und ein schon einzeln geändertes Vorkommen 409
-    `event.occurrence_overridden`. Löschen mit `scope=this` macht das Vorkommen zu einem
-    gelöschten (höchstens 500, sonst 422 `event.too_many_dates`); eine Ausnahme zu
-    löschen löscht ihr Vorkommen ebenso.
-  - `scope=following` teilt die Serie: Die alte endet eine Sekunde vor dem Vorkommen
-    (ganztägig: am Tag davor; `UNTIL` statt `COUNT`), die neue beginnt dort mit eigener
-    UID, Inhalt und Organisatorin der alten. Eine gezählte Serie behält ihre Summe (die
-    neue zählt den Rest, gelöschte Vorkommen mitgezählt); spätere Ausnahmen, gelöschte
-    Vorkommen und Zusatztermine wandern zur neuen. Am ersten Vorkommen ist das
-    `scope=all`. Löschen mit `scope=following` beendet die Serie dort.
+    `event.occurrence_overridden` (auch mit `dry_run=true`). Eine neue Ausnahme ändert
+    die Version der Serie nicht; wer die Serie vorher gelesen hat, schreibt mit ihrer
+    Version weiter. Löschen mit `scope=this` (mit der Version der Serie) macht das
+    Vorkommen zu einem gelöschten (höchstens 500, sonst 422 `event.too_many_dates`);
+    eine Ausnahme zu löschen löscht ihr Vorkommen ebenso.
+  - `scope=following` teilt die Serie. Die neue beginnt am ersten Vorkommen ab dem
+    genannten, das die Regel selbst nennt und dessen Ortszeit es gibt (der
+    **Ansatzpunkt**: kein bloßer Zusatztermin, keine Uhrzeit in der Lücke der
+    Zeitumstellung), mit eigener UID, Inhalt und Organisatorin der alten und ihrer
+    Regel ausgeschrieben (Wochentag, Monatstag und Monat, die eine Regel sonst vom
+    Anfang nimmt: `FREQ=WEEKLY` wird `FREQ=WEEKLY;BYDAY=MO`), damit sich das Muster
+    nicht ändert. Die alte endet eine Sekunde vor dem Ansatzpunkt (ganztägig: am Tag
+    davor; `UNTIL` statt `COUNT`). Eine gezählte Serie behält ihre Summe (die neue
+    zählt den Rest, gelöschte Vorkommen mitgezählt); spätere Ausnahmen, gelöschte
+    Vorkommen und Zusatztermine wandern zur neuen. Vorkommen zwischen dem genannten und
+    dem Ansatzpunkt (ein Zusatztermin, ein Vorkommen in der Lücke, etwa 02:30 am Tag
+    der Umstellung) bleiben bei der alten Serie und bekommen die Änderung als
+    Ausnahme, unter der Ortszeit, die die Regel ihnen gibt; die übrigen behalten ihre
+    Uhrzeit. Die Zeiten der Änderung sind die des genannten Vorkommens; dieselbe
+    Verschiebung auf der Uhr gilt am Ansatzpunkt und für jedes solche Vorkommen. Der
+    Inhalt erreicht die mitgenommenen Ausnahmen wie bei `scope=all`. Nennt die
+    Änderung eine eigene Regel, beginnt die neue Serie am genannten Vorkommen. Am
+    ersten noch nicht gelöschten Vorkommen ist das `scope=all` (die Zeiten der Änderung
+    gelten dann verschoben für den Anfang der Serie). Löschen mit `scope=following`
+    beendet die Serie dort, am ersten noch nicht gelöschten Vorkommen löscht es sie.
+  - **Ausnahmen, die man nicht voll sieht:** Jede Änderung einer Serie, die eine
+    Ausnahme schreiben würde (löschen, entfallen lassen, verschieben, zur neuen Serie
+    mitnehmen, ihren Inhalt ändern), braucht auch für diese Ausnahme volle Sicht. Sieht
+    die Schreibende eine davon nur als „Belegt“ (eine private Ausnahme einer anderen),
+    antwortet die ganze Änderung 403 `event.private`, ohne zu sagen, welche, auch mit
+    `dry_run=true`, und nichts wird geschrieben.
+  - Bleibt einer Serie kein Vorkommen (alle einzeln gelöscht, oder gesendete
+    `exdates` treffen alle), wird sie samt Ausnahmen zum Grabstein.
   - Ein fehlendes Vorkommen ist 422 `event.occurrence_required`, eines, das es nicht
     (mehr) gibt, 422 `event.occurrence_unknown`; `this`/`following` für einen
     einzelnen Termin oder eine Ausnahme 422 `event.scope_invalid`.
@@ -128,8 +157,10 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   unbekannte ID.
 - **Live:** Jede Änderung meldet `calendar.changed` mit den IDs von Bereich und Kalender
   an die Mitglieder des Bereichs, nie an Admins außerhalb, nie mit Inhalt. Die Outbox
-  trägt `calendar_event.created`, `.updated` (mit den Namen der geänderten Felder) und
-  `.deleted`, nur mit IDs.
+  trägt `calendar_event.created`, `.updated` (mit den Namen der geänderten Spalten,
+  etwa `tzid`) und `.deleted`, nur mit IDs; schreibt eine Änderung der Serie auch
+  Ausnahmen (verschoben, mitgenommen, geändert, gelöscht), nennt ihr Ereignis deren IDs
+  in `overrides`. Eine neue Ausnahme meldet sich mit ihrem eigenen `.created`.
 
 ## Was Admins sehen und was im Audit steht
 
@@ -151,19 +182,21 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   Termin, dazu nur die IDs von Bereich und Kalender; einmal je Admin, Termin und Tag).
   Das gilt auch, wenn er Mitglied des Bereichs ist oder der Bereich offen ist. Eigene
   Rechte (Organisatorin, gewöhnliche Leser) schreiben nie einen Eintrag.
-- **Bekannte Lücke:** Wird die Änderung eines Admins in einem fremden Bereich abgelehnt
-  (409 wegen veralteter Version, der Grenze oder eines Standardkalenders), rollt die
-  Anfrage samt ihrem `admin.access`-Eintrag zurück. Das gilt heute ebenso für Tickets und
-  Sprints. Der Admin erfährt dabei nur, dass es den Kalender gibt, und seine Version;
-  die ID kannte er schon. Termine (M10 Task 3b) behalten ihn: Ändern und Löschen
-  laufen in einem Sicherungspunkt; eine Ablehnung (403, 409, 422) rollt nur diesen
-  zurück und schreibt den Eintrag (und ein `calendar.private_read`) fest, bevor sie
-  antwortet.
+- **Abgelehnte Änderungen behalten das Audit:** Wird die Änderung eines Admins in einem
+  fremden Bereich abgelehnt (403, 409, 422, auch bei Kalendern, Tickets und Sprints)
+  oder scheitert die Anfrage sonst, rollt sie zurück; ihr `admin.access`-Eintrag (und
+  ein `calendar.private_read`) wird danach in einer eigenen kurzen Transaktion noch
+  einmal geschrieben, denn der Blick in den Bereich hat stattgefunden. Die Dienste
+  selbst schreiben nie fest; ein Aufrufer außerhalb einer Anfrage (Import,
+  Agentenschritt) ruft dafür nach seinem Zurückrollen `audit.kept.write` auf.
 - **Schreiben kraft Admin-Recht steht immer im Audit:** Ändert oder löscht ein Admin
   einen Termin, den er ohne Admin-Recht nicht schreiben dürfte (einen privaten Termin
   eines anderen, oder ohne Autorenrecht im Bereich), entsteht je Schreibvorgang
   `calendar.admin_write` (Ziel der Termin; dazu die IDs von Bereich und Kalender, die
-  Art `update`/`delete`, `scope` und die Namen der geänderten Felder, nie ihre Werte).
+  Art `update`/`delete`, `scope` und die Namen der geänderten Spalten, nie ihre Werte).
+  Das gilt auch, wenn erst eine Ausnahme, die die Änderung der Serie mitschreibt, nur
+  kraft Admin-Recht sichtbar ist. Eine Änderung, die nichts ändert, schreibt keinen
+  Eintrag.
 - **Der Schalter für den Abgleich** (`PUT /api/admin/calendar-settings`, Recht
   `calendar.manage`) steht im Audit (`calendar.settings_set`), wenn er sich ändert.
 
