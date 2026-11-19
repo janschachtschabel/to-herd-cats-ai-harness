@@ -150,8 +150,22 @@ async def test_serve_bootstraps_before_serving(monkeypatch):
 
     monkeypatch.setattr(launch, "bootstrap", fake_bootstrap)
     monkeypatch.setattr(launch, "run_servers", fake_run_servers)
+    monkeypatch.setattr(launch, "freeze_startup_heap", lambda: seen.append("freeze"))
     assert await launch.serve(Settings(role="api")) == 0
-    assert seen == ["bootstrap", "run 2"]
+    assert seen == ["bootstrap", "freeze", "run 2"]
+
+
+async def test_a_worker_freezes_its_start_up_heap_before_serving(monkeypatch):
+    seen: list[str] = []
+
+    async def fake_run_servers(servers):
+        seen.append(f"run {len(servers)}")
+        return 0
+
+    monkeypatch.setattr(launch, "run_servers", fake_run_servers)
+    monkeypatch.setattr(launch, "freeze_startup_heap", lambda: seen.append("freeze"))
+    assert await launch.serve(Settings(role="worker")) == 0
+    assert seen == ["freeze", "run 2"]
 
 
 async def test_bootstrap_runs_in_its_own_committed_transaction(monkeypatch):

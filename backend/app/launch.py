@@ -12,9 +12,10 @@
 - `worker`: the outbox dispatcher (`app.worker`) and the internal port only (probes,
   metrics); `all` runs the worker next to the API, in the same event loop.
 
-SIGTERM and SIGINT stop every server in an orderly way (the worker finishes the batch
-in progress); if one ends (for example because its port is taken), the others are
-stopped too.
+Once the servers are built, the start-up heap is frozen (`core/heap.py`: full garbage
+collections no longer walk it). SIGTERM and SIGINT stop every server in an orderly
+way (the worker finishes the batch in progress); if one ends (for example because its
+port is taken), the others are stopped too.
 """
 
 import asyncio
@@ -33,6 +34,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.config import Settings, get_settings
 from app.core.db import get_database
+from app.core.heap import freeze_startup_heap
 from app.core.logging import configure_logging
 from app.core.migrations import upgrade_head
 from app.core.spool import remove_stale_spools
@@ -225,7 +227,9 @@ async def bootstrap(settings: Settings) -> None:
 async def serve(settings: Settings) -> int:
     if settings.role == "worker":
         alone = create_worker(get_database())
-        return await run_servers([_Server(internal_config(settings, alone)), alone])
+        servers_alone: list[Server] = [_Server(internal_config(settings, alone)), alone]
+        freeze_startup_heap()
+        return await run_servers(servers_alone)
     remove_stale_spools(settings.data_dir)
     await bootstrap(settings)
     worker = create_worker(get_database()) if settings.role == "all" else None
@@ -241,6 +245,7 @@ async def serve(settings: Settings) -> int:
         else:
             env = collab_env(settings, host="127.0.0.1")
             servers.append(CollabProcess(collab_command(settings), env))
+    freeze_startup_heap()
     return await run_servers(servers)
 
 

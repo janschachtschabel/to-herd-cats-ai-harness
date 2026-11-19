@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import actor_for
 from app.core.actor import Actor
 from app.core.db import Database, set_database
+from app.core.heap import freeze_startup_heap
 from app.core.migrations import upgrade_head
 from app.core.pagination import PageParams
 from app.core.security import hash_password
@@ -224,6 +225,7 @@ async def window(args: argparse.Namespace) -> dict[str, Any]:
     context = await _context(database, args.head)
     bench, calls, extra = Bench(database, queries), args.calls, args.extra_calls
     client = await _client(database, stock.viewer)
+    freeze_startup_heap()  # as `app.launch` does once its apps exist
     cases: dict[str, list[dict[str, Any]]] = {}
     plan: list[tuple[str, Measured, int]] = [
         ("week", bench.window(actors["viewer"], weeks(), every_page=False), calls),
