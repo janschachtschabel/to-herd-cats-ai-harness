@@ -5,9 +5,12 @@ tombstones and the events of archived calendars; who may see what comes in as SQ
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import ColumnElement, Select, and_, or_, select
+from sqlalchemy import ColumnElement, Select, and_, any_, bindparam, or_, select
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.modules.calendars.event_models import CalendarEvent
 from app.modules.calendars.models import Calendar
@@ -15,6 +18,9 @@ from app.modules.calendars.models import Calendar
 UID_INDEX = "uq_calendar_event_uid"
 # All-day events float on UTC days: a viewer's day lies up to 14 hours to either side.
 ALL_DAY_REACH = timedelta(hours=14)
+# Ids as one array parameter: a window may hand over more series than a statement
+# takes parameters.
+UUID_ARRAY = ARRAY(PG_UUID(as_uuid=True))
 
 
 class UidTaken(Exception):
@@ -73,9 +79,12 @@ class EventRepository:
         """The events passing `rule` that can reach `[start, end)` (all-day ones
         within `ALL_DAY_REACH` of it), each with whether the caller reads its space;
         at most `limit`. With `title`, only those whose title holds it among those the
-        caller sees in full (`full`): a search never answers by hidden content."""
+        caller sees in full (`full`): a search never answers by hidden content. The
+        rows come without `description` (up to 20,000 characters, never in a list);
+        reading it raises."""
         stmt = (
             select(CalendarEvent, reads)
+            .options(defer(CalendarEvent.description, raiseload=True))
             .join(Calendar, Calendar.id == CalendarEvent.calendar_id)
             .where(
                 CalendarEvent.org_id == self.org_id,
@@ -117,7 +126,7 @@ class EventRepository:
         stmt = select(CalendarEvent.series_id, CalendarEvent.recurrence_id).where(
             CalendarEvent.org_id == self.org_id,
             CalendarEvent.deleted_at.is_(None),
-            CalendarEvent.series_id.in_(series_ids),
+            CalendarEvent.series_id == any_(bindparam("series_ids", series_ids, type_=UUID_ARRAY)),
         )
         return {
             (row[0], row[1])

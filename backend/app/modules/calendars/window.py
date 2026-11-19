@@ -7,18 +7,18 @@ of the events the caller may list, by (start, event id), a page at a time.
   personal space is audited), the events of that space alone. `mine`: only those the
   caller organises (task 4 adds those it is invited to). `query`: a title search among
   the events the caller sees in full, so hidden content answers nothing.
-- One statement loads every event that can reach the window (`recurs_until`); series
-  are expanded in Python (`recurrence.occurrences`), overrides take the place of their
-  occurrence. All-day events float on their days: they are loaded 14 hours to either
-  side and compared in the viewer's zone `viewer_zone` (default UTC), so a viewer in
-  UTC+13 or UTC−11 sees the day's event and not the neighbours'.
+- One statement loads every event that can reach the window (`recurs_until`), without
+  its description; `expansion.effective` expands them (overrides take the place of
+  their occurrence; all-day events by the viewer's days in `viewer_zone`, default UTC,
+  so a viewer in UTC+13 or UTC−11 sees the day's event and not the neighbours').
 - Its bounds lie in the years 1900 to 2399 as sent (422
   `calendar.window_out_of_range`), `from` before `to` (`calendar.invalid_window`).
-- At most `MAX_OCCURRENCES` occurrences (and `MAX_CANDIDATES` events) per call;
-  beyond, 422 `calendar.window_too_dense`, counted.
+- At most 2,000 occurrences per call, and the expansion's counted work bounded
+  (`expansion.Budget`: rows and rule candidates, so a calendar full of series that do
+  not occur in the window stays readable); beyond, 422 `calendar.window_too_dense`,
+  counted.
 """
 
-import logging
 import uuid
 from datetime import datetime
 
@@ -29,20 +29,16 @@ from app.core import pagination
 from app.core.access import Action, Actor, require
 from app.core.errors import ValidationFailed
 from app.core.pagination import PageParams, decode_cursor, encode_cursor
-from app.modules.calendars import recurrence, sight, zones
+from app.modules.calendars import expansion, recurrence, sight, zones
 from app.modules.calendars.event_models import CalendarEvent
-from app.modules.calendars.event_repository import ALL_DAY_REACH, EventRepository
+from app.modules.calendars.event_repository import EventRepository
 from app.modules.calendars.event_schemas import OccurrenceOut
-from app.modules.calendars.event_times import floating_day, series_of
 from app.modules.calendars.metrics import WINDOW_TOO_DENSE
 from app.modules.calendars.recurrence import Occurrence
 from app.modules.calendars.recurrence_series import bounded
 from app.modules.calendars.sight import Sight
 
-logger = logging.getLogger(__name__)
-
-MAX_OCCURRENCES = recurrence.DEFAULT_LIMIT  # 2,000
-MAX_CANDIDATES = 2 * MAX_OCCURRENCES
+MAX_OCCURRENCES = expansion.MAX_OCCURRENCES  # 2,000
 VIEWER_ZONE = "UTC"
 FIRST_WALL = datetime(recurrence.FIRST_YEAR, 1, 1)
 LAST_WALL = datetime(recurrence.LAST_YEAR + 1, 1, 1)
@@ -89,6 +85,7 @@ async def list_window(
     if mine:
         rule = and_(rule, sight.attends_sql(actor))
     repo = EventRepository(session, actor.org_id)
+    budget = expansion.Budget()
     rows = await repo.in_window(
         rule,
         reads,
@@ -97,23 +94,23 @@ async def list_window(
         calendar_ids=calendar_ids,
         title=query,
         full=sight.full_sql(actor, named=named),
-        limit=MAX_CANDIDATES + 1,
+        limit=budget.rows_allowed() + 1,
     )
-    if len(rows) > MAX_CANDIDATES:
-        raise too_dense()
-    taken = await repo.overridden([event.id for event, _ in rows if event.recurring])
-    found: list[Found] = []
+    seen: dict[uuid.UUID, Sight] = {}
     for event, reading in rows:
-        seen = sight.of(
+        found_sight = sight.of(
             actor, event, reads=reading, attends=sight.attends(actor, event), named=named
         )
-        if seen is Sight.NONE:
-            continue
-        for occurrence in _expand(event, start, end, zone, MAX_OCCURRENCES - len(found)):
-            if not (event.recurring and (event.id, occurrence.recurrence_id) in taken):
-                found.append((occurrence, event, seen))
-    if len(found) > MAX_OCCURRENCES:
-        raise too_dense()
+        if found_sight is not Sight.NONE:
+            seen[event.id] = found_sight
+    shown = [event for event, _ in rows if event.id in seen]
+    try:
+        budget.charge(len(rows) - len(shown))
+        taken = await repo.overridden([event.id for event in shown if event.recurring])
+        expanded = expansion.effective(shown, taken, start, end, viewer_zone=zone, budget=budget)
+    except expansion.TooDense:
+        raise too_dense() from None
+    found: list[Found] = [(occurrence, event, seen[event.id]) for occurrence, event in expanded]
     found.sort(key=lambda f: (f[0].start, f[1].id))
     if after is not None:
         found = [f for f in found if (f[0].start, f[1].id) > after]
@@ -129,24 +126,3 @@ def _in_years(bound: datetime) -> bool:
     """Whether the aware `bound`, read in the offset it came with, lies in the years
     events may (1900 to 2399; the end of 2399 included as a window's end)."""
     return FIRST_WALL <= bound.replace(tzinfo=None) <= LAST_WALL
-
-
-def _expand(
-    event: CalendarEvent, start: datetime, end: datetime, zone: str, room: int
-) -> list[Occurrence]:
-    """The event's occurrences in the window; all-day ones by the viewer's days."""
-    try:
-        series = series_of(event)
-        if not event.all_day:
-            return recurrence.occurrences(series, start, end, limit=room)
-        near = recurrence.occurrences(
-            series, start - ALL_DAY_REACH, end + ALL_DAY_REACH, limit=room
-        )
-    except recurrence.TooDense:
-        raise too_dense() from None
-    except (recurrence.SeriesInvalid, ValueError):
-        logger.warning("calendar.series_unreadable", extra={"event_id": str(event.id)})
-        return []
-    return [
-        o for o in near if floating_day(o.start, zone) < end and floating_day(o.end, zone) > start
-    ]

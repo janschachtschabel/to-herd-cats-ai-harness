@@ -13,7 +13,6 @@ from uuid_utils.compat import uuid7
 from app.core.principal import SystemRole
 from app.modules.audit.models import AuditLog
 from app.modules.calendars.event_models import CalendarEvent
-from app.modules.calendars.window import MAX_CANDIDATES
 from tests.factories import MakeUser
 from tests.factories_calendar import logged_in, new_calendar, new_event
 from tests.factories_spaces import MakeSpace
@@ -70,7 +69,8 @@ async def test_endless_series_that_do_not_occur_leave_the_window_readable(
     """R3a-2: birthdays (yearly, endless, all in March). `MAX_CANDIDATES` counts every
     endless series that began before the window's end, whether or not it occurs in it:
     with 4,001 of them a week in November is 422 `calendar.window_too_dense` instead
-    of empty, and stays so for good (an import takes 5,000 events, decision 10)."""
+    of empty, and stays so for good (an import takes 5,000 events, decision 10).
+    (Fix wave: the candidate cap is gone; the work is bounded by counted operations.)"""
     client, calendar = await _calendar(make_client, make_user, make_space)
     made = await new_event(
         client,
@@ -90,7 +90,7 @@ async def test_endless_series_that_do_not_occur_leave_the_window_readable(
     ).scalar_one()
     template = {c.name: getattr(row, c.name) for c in CalendarEvent.__table__.columns}
     rows = []
-    for n in range(MAX_CANDIDATES):
+    for n in range(4000):  # with the one made through the API: 4,001
         day = datetime(2020, 3, 1, tzinfo=UTC) + timedelta(days=n % 28)
         rows.append(
             {
