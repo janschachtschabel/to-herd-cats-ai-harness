@@ -15,7 +15,10 @@ of the events the caller may list, by (start, event id), a page at a time.
 - Its bounds lie in the years 1900 to 2399 as sent (422
   `calendar.window_out_of_range`), `from` before `to` (`calendar.invalid_window`).
 - Paged by (start, event id); a cursor holds the viewer zone and is valid with it
-  only (422 `calendar.cursor_time_zone`).
+  only (422 `calendar.cursor_time_zone`). A later page loads and expands from its
+  cursor's start, not the whole window again (plan M10 Task 3c): an occurrence that
+  starts there (all-day ones: their floating day, in any viewer zone) overlaps
+  `[cursor start, end)`, and every one that does overlaps the window.
 - At most 2,000 occurrences per call, and the expansion's counted work bounded
   (`expansion.Budget`: rows and rule candidates, so a calendar full of series that do
   not occur in the window stays readable); beyond, 422 `calendar.window_too_dense`,
@@ -81,6 +84,10 @@ async def list_window(
         raise ValidationFailed(code="calendar.invalid_time_zone") from None
     after = _after(params.cursor, zone)
     start, end = bounded(start), bounded(end)
+    if after is not None:
+        # Pages run by (start, id): a later page needs only what starts at or after
+        # its cursor, and whatever starts there overlaps the window from there too.
+        start = max(start, bounded(after[0]))
     named = space_id is not None
     if space_id is not None:
         await require(session, actor, Action.CALENDAR_READ, space_id)
