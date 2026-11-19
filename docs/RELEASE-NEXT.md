@@ -3,8 +3,14 @@
 Diese Notiz sammelt, was nach dem Stand von [`RELEASE-1.0.0.md`](RELEASE-1.0.0.md)
 (Code-Stand `b8f7ce4`, Alembic-Revision `9e4b6d2f8a17`) dazugekommen ist: M9b Tasks 12
 bis 16 und 18, die Nacharbeiten an der Hostinger-Installation (Task 19) und die
-Fix-Wellen nach den Reviews. Sie richtet sich an alle, die einen Build von 1.0.0
-betreiben und auf den neuen Stand gehen.
+Fix-Wellen nach den Reviews.
+
+**Niemand steigt von 1.0.0 im Betrieb um.** Der Stand 1.0.0 wurde nie veröffentlicht
+(kein Tag, kein Image, kein Chart) und nach Wissen des Projekts nirgends betrieben, nur
+in Entwicklung und Tests gebaut. Einen Rollout, in dem Prozesse von 1.0.0 gegen die
+neue Datenbank laufen, gibt es darum nicht. Die Hinweise zum Update unten beschreiben,
+was ein selbst gebauter Stand von 1.0.0 beim Wechsel träfe; die Migrationen bleiben
+nach den Regeln des Projekts trotzdem rückwärtsverträglich (nur erweiternd).
 
 **Noch keine Freigabe.** Der Tag `v1.0.0` ist nie veröffentlicht worden, und Jan hat
 entschieden, dass der Freigabe-Tag erst kommt, wenn die ganze App fertig ist. Bis
@@ -116,8 +122,11 @@ Vorher sichern (README, „Update einer Installation“), dann:
   Anbieter-Anmeldung, `b1c4e7a90d23` Kalender (M10). Eine einzige ersetzt eine
   Bedingung: `e4b6c8d0f2a3` erweitert die erlaubten Gründe einer Benachrichtigung um
   `totp_locked` (`contract_of` `7c2e9a4f1b86`; der alte Code schreibt weiter nur
-  erlaubte Werte). Ein 1.0.0-Prozess läuft also gegen die neue Datenbank weiter, bis er
-  ersetzt ist (`check_migrations.py` mit `RELEASED=9e4b6d2f8a17`). Nicht auf 1.0.0
+  erlaubte Werte). Ein Prozess von 1.0.0 liefe also gegen die neue Datenbank weiter,
+  bis er ersetzt ist (`check_migrations.py` mit `RELEASED=9e4b6d2f8a17`), mit einer
+  Lücke: Die Aktivität einer Person mit der neuen Benachrichtigung `totp_locked`
+  beantwortete er mit 500, weil sein Schema den Grund nicht kennt. Da 1.0.0 nirgends
+  läuft (oben), betrifft das nur einen selbst gebauten Stand. Nicht auf 1.0.0
   zurückgehen, sobald jemand TOTP eingeschaltet hat: 1.0.0 kennt die TOTP-Tabellen
   nicht und meldet diese Personen nur mit dem Passwort an.
 - **Kürzere Sitzungen.** Eine Sitzung endet jetzt auch nach 24 Stunden ohne Nutzung
@@ -146,9 +155,10 @@ Vorher sichern (README, „Update einer Installation“), dann:
 - **Verknüpfen eines Anbieters** verlangt jetzt das Passwort oder eine frische
   Anmeldung über einen schon verknüpften Anbieter (403 `auth.reauth_required` sonst).
 - **Eigene Collab-Prozesse:** `HERD_COLLAB_URL` entfernen, `HERD_COLLAB_ADVERTISE_URL`
-  setzen (oben). Rolle `all`, Compose und das Chart erledigen das selbst. Während des
-  Rollouts bedient die API einen Collab-Prozess von 1.0.0 nur, solange keine neue
-  Instanz die Seite besitzt; Browser sehen kurz „Getrennt – neuer Versuch …“.
+  setzen (oben). Rolle `all`, Compose und das Chart erledigen das selbst. Liefe
+  während eines Wechsels noch ein Collab-Prozess von 1.0.0 (nur bei einem selbst
+  gebauten Stand, oben), bediente die API ihn nur, solange keine neue Instanz die Seite
+  besitzt; Browser sähen kurz „Getrennt – neuer Versuch …“.
 - **Sicherung in der Verwaltung braucht das Sicherungsverzeichnis in API und Worker.**
   Compose und der Hostinger-Stack hängen das Volume `backups` jetzt ein. Im Chart nur,
   wenn sich die PVC teilen lässt (`backup.persistence.accessModes: [ReadWriteMany]`

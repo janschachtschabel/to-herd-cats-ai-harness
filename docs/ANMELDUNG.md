@@ -307,7 +307,11 @@ Erwähnungen oder Auswahllisten. Audit: `user.self_registered` (durch die neue P
   Passwort (`user_session.reauth_at`); danach geht es zurück ins Profil. Eine gewöhnliche
   Anmeldung über einen Anbieter zählt nicht: Bei einer laufenden Sitzung beim Anbieter
   kann sie ohne jede Eingabe gelingen. Ob der Anbieter `prompt=login` wirklich mit einer
-  Eingabe beantwortet, entscheidet er selbst. Sonst 403 `auth.reauth_required`; ein falsches Passwort 422 `auth.wrong_password`,
+  Eingabe beantwortet, entscheidet er selbst. **Grenze:** Ein ID-Token ohne `auth_time`
+  gilt als frisch. Ein Anbieter, der `prompt=login` und `max_age` übergeht und
+  `auth_time` nicht schickt, lässt also auch eine stille Anmeldung als Nachweis gelten.
+  Google, die Vorlage, dokumentiert weder `prompt=login` noch `max_age` und schickt
+  `auth_time` vermutlich nie: Dort hängt der Nachweis an Googles eigener Abfrage. Sonst 403 `auth.reauth_required`; ein falsches Passwort 422 `auth.wrong_password`,
   gezählt wie beim Passwortwechsel (`HERD_LOGIN_RATE_LIMIT_PER_MINUTE` je Person).
 - **Verwaltung → Personen → Bearbeiten**: mit `user.manage` die Verknüpfungen jeder
   Person sehen und lösen (die eines Owners nur als Owner).
