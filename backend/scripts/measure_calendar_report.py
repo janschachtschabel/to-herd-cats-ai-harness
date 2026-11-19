@@ -6,9 +6,10 @@ against the gate.
     uv run python -m scripts.measure_calendar_report RUN.json [RUN.json …]
 
 Gate: the week view (`week`) and the availability load over 14 days
-(`availability_14`) at p95 under 300 ms, every call answered (status 200), in every
-run given. Several runs (repeated because other work shares the machine) are judged
-each, and the spread of each case's p95 is shown. Exit 0 when the gate holds.
+(`availability_14`) at p95 under 300 ms per call, and the whole week with every page
+(`week_all_pages`) too, every call answered (status 200), in every run given.
+Several runs (repeated because other work shares the machine) are judged each, and
+the spread of each case's p95 is shown. Exit 0 when the gate holds.
 
 Pure functions; scripts/measure_calendar.py records, this module judges, and
 tests/test_measure_calendar_report.py checks it against a fixed series.
@@ -22,7 +23,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-GATES_MS = {"week": 300.0, "availability_14": 300.0}
+# The plan's gate (week view and availability over 14 days, per call), and the whole
+# week with every page as one more target (the coordinator's, after remedies a and b).
+GATES_MS = {"week": 300.0, "availability_14": 300.0, "week_all_pages": 300.0}
 
 
 @dataclass(frozen=True)

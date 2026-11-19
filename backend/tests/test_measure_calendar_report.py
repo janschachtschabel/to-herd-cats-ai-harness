@@ -60,20 +60,27 @@ def test_the_gate_holds_below_300_ms_at_p95() -> None:
     runs = {
         "week": _calls(range(100, 300)),  # p95 289
         "availability_14": _calls(range(50, 250)),  # p95 239
+        "week_all_pages": _calls(range(150, 350)),  # p95 339
         "month": _calls(range(500, 700)),  # not gated
     }
     verdicts = report.verdicts({case: report.summarise(case, c) for case, c in runs.items()})
     assert [(v.case, v.p95_ms, v.target_ms, v.met) for v in verdicts] == [
         ("week", 289, 300, True),
         ("availability_14", 239, 300, True),
+        ("week_all_pages", 339, 300, False),
     ]
-    assert report.passed(verdicts)
+    assert not report.passed(verdicts)  # the whole week (every page) is a target too
+    assert report.passed(verdicts[:2])
 
 
 def test_the_gate_fails_at_300_ms_a_missing_case_or_an_error() -> None:
     at_target = {"week": report.summarise("week", _calls([300] * 200))}
     verdicts = report.verdicts(at_target)
-    assert [(v.case, v.met) for v in verdicts] == [("week", False), ("availability_14", False)]
+    assert [(v.case, v.met) for v in verdicts] == [
+        ("week", False),
+        ("availability_14", False),
+        ("week_all_pages", False),
+    ]
     assert verdicts[1].p95_ms is None  # never measured
     assert not report.passed(verdicts)
 
@@ -81,8 +88,9 @@ def test_the_gate_fails_at_300_ms_a_missing_case_or_an_error() -> None:
     summaries = {
         "week": report.summarise("week", erring),
         "availability_14": report.summarise("availability_14", _calls([10])),
+        "week_all_pages": report.summarise("week_all_pages", _calls([40])),
     }
-    assert [v.met for v in report.verdicts(summaries)] == [False, True]
+    assert [v.met for v in report.verdicts(summaries)] == [False, True, True]
 
 
 def test_several_runs_are_judged_each_and_their_spread_shown(tmp_path: Path) -> None:
@@ -90,6 +98,7 @@ def test_several_runs_are_judged_each_and_their_spread_shown(tmp_path: Path) -> 
         cases = {
             "week": [{"ms": week_ms, "queries": 3, "work": 900} for _ in range(10)],
             "availability_14": [{"ms": 20, "queries": 2} for _ in range(10)],
+            "week_all_pages": [{"ms": 90, "queries": 8} for _ in range(10)],
         }
         path.write_text(json.dumps({"context": {"load_average": load}, "cases": cases}))
         return path
