@@ -11,7 +11,9 @@ through `icalendar`'s process-wide zone cache:
    zones (one well-known city per region), then the other regional zones, then the
    rest (`Etc/…`, `CET`), each group by name, so the choice is the same every time.
 
-Nothing matches: `ical.time_zone_unknown`.
+Nothing matches: `ical.time_zone_unknown`. A comparison scans every zone of `tzdata`,
+so one file gets at most `MAX_COMPARISONS` of them (one per TZID and year); beyond, a
+zone stays unknown.
 """
 
 from collections.abc import Mapping, Sequence
@@ -27,6 +29,7 @@ from app.modules.calendars.ical.problems import Skip
 from app.modules.calendars.ical.vtimezone import Definition, definition
 from app.modules.calendars.recurrence_rule import FIRST_YEAR, LAST_YEAR
 
+MAX_COMPARISONS = 100
 _NOON = 12
 _WEEKS = 53
 
@@ -99,6 +102,8 @@ class Resolver:
     def _matching(self, tzid: str, found: Definition, year: int) -> list[str]:
         key = (tzid, year)
         if key not in self._candidates:
+            if len(self._candidates) >= MAX_COMPARISONS:
+                raise Skip(problems.TIME_ZONE_UNKNOWN)
             samples = [(s, found.offset_at(s)) for s in _samples(year)]
             ordered = list(_ordered())
             if found.location is not None and found.location in zones.names():

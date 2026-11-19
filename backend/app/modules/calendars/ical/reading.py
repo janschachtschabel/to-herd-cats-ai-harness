@@ -52,7 +52,8 @@ def parse(data: bytes, *, default_zone: str, limit: int) -> Parsed:
                 events.append(child)
             elif child.name == "VTIMEZONE":
                 tzid = child.first("TZID")
-                if tzid is not None:
+                if tzid is not None:  # TEXT: some write it escaped (`\,`), some not
+                    timezones.setdefault(tzid.text.strip(), child)
                     timezones.setdefault(tzid.raw.strip(), child)
             else:
                 found[problems.NOT_AN_EVENT] += 1

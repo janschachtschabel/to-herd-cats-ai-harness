@@ -6,7 +6,7 @@ library's table of Windows names, then the file's VTIMEZONE compared with `tzdat
 from collections import Counter
 from datetime import datetime
 
-from app.modules.calendars.ical import reading
+from app.modules.calendars.ical import reading, zones
 from tests.support.ical_occurrences import effective, utc
 
 CET_FROM_1601 = """BEGIN:VTIMEZONE
@@ -169,3 +169,28 @@ def test_a_zone_must_match_at_the_events_own_times() -> None:
     )
     assert [(d.uid, d.series.tzid) for d in parsed.events] == [("in-summer", "Europe/Berlin")]
     assert parsed.problems == Counter({"ical.time_zone_unknown": 1})
+
+
+def test_a_vtimezone_tzid_with_escaped_commas_is_found() -> None:
+    # TZID is TEXT: Outlook escapes the commas of its long names in the property,
+    # while the parameter quotes them.
+    name = "(UTC+01:00) Amsterdam, Berlin, Bern, Rom, Stockholm, Wien"
+    definition = CET_FROM_1601.format(tzid=name.replace(",", "\\,"))
+    parsed = _parse(
+        _calendar(definition, _event("escaped", f'DTSTART;TZID="{name}":20260710T090000'))
+    )
+    assert [d.series.tzid for d in parsed.events] == ["Europe/Berlin"]
+
+
+def test_comparisons_with_tzdata_are_bounded_per_file() -> None:
+    # Every comparison scans every zone of tzdata; a file cannot ask for more than
+    # MAX_COMPARISONS of them (each zone name and year is one).
+    count = zones.MAX_COMPARISONS + 3
+    parts = [
+        CET_FROM_1601.format(tzid=f"Custom {n}")
+        + _event(f"e{n}", f'DTSTART;TZID="Custom {n}":20260710T090000')
+        for n in range(count)
+    ]
+    parsed = reading.parse(_calendar(*parts), default_zone="Europe/Berlin", limit=5000)
+    assert len(parsed.events) == zones.MAX_COMPARISONS
+    assert parsed.problems == Counter({"ical.time_zone_unknown": 3})
