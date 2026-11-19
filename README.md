@@ -830,7 +830,7 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   steht; sonst teilen sich alle Clients die Adresse des Proxys.
 - **Schreibgrenze je Person (seit M9b):** je Person und Minute höchstens
   `HERD_WRITE_RATE_PER_MINUTE` (Standard 120) Schreibvorgänge an Inhalten (Seiten,
-  Nachrichten, Reaktionen, Tickets, Vorschläge, Schlagwörter) und getrennt davon
+  Nachrichten, Reaktionen, Tickets, Vorschläge, Schlagwörter, Kalender) und getrennt davon
   `HERD_UPLOAD_RATE_PER_MINUTE` (Standard 30) Uploads (Anhänge, Importe); gezählt in
   PostgreSQL über alle Knoten, darüber 429 `rate.limited` mit `Retry-After`. Ein Agent
   hat seinen eigenen Zähler, ebenso groß; ein Werkzeug darüber schreibt nichts und

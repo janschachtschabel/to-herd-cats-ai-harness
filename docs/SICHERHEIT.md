@@ -238,7 +238,7 @@ einzelne Felder hinausgehen:
 | OIDC-Starts und Rückrufe | 30 je Adresse und Minute | `HERD_OIDC_RATE_PER_MINUTE` |
 | Gleichzeitiges Passwort-Hashing | 2 je Prozess, 16 wartend, sonst 429 `server.busy` | `HERD_PASSWORD_HASH_CONCURRENCY`, `HERD_PASSWORD_HASH_QUEUE` |
 | `/mcp` | 120 Aufrufe je Token und Minute | `HERD_MCP_RATE_PER_MINUTE` |
-| Schreibvorgänge an Inhalten (Seiten, Nachrichten, Tickets …) | 120 je Person oder Agent und Minute, sonst 429 `rate.limited` mit `Retry-After` | `HERD_WRITE_RATE_PER_MINUTE` |
+| Schreibvorgänge an Inhalten (Seiten, Nachrichten, Tickets, Kalender …) | 120 je Person oder Agent und Minute, sonst 429 `rate.limited` mit `Retry-After` | `HERD_WRITE_RATE_PER_MINUTE` |
 | Uploads (Anhänge, Importe) | 30 je Person und Minute, getrennt gezählt | `HERD_UPLOAD_RATE_PER_MINUTE` |
 | Externe Aufrufe je Lauf | 20 | `HERD_MCP_MAX_CALLS_PER_RUN` |
 | Persönliche Agenten je Person | 5 | `HERD_AI_PERSONAL_AGENTS_MAX` |

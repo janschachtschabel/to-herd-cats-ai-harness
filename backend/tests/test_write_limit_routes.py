@@ -67,6 +67,8 @@ EXEMPT: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/backups/archives"),
         ("POST", "/api/backups/archives/{name}/check"),
         ("POST", "/api/backups/archives/{name}/replace"),
+        # The organisation's calendar switches: a setting, like every admin setting (M10).
+        ("PUT", "/api/admin/calendar-settings"),
         # AI configuration (connections, assignments, budgets, connectors, MCP servers, OAuth
         # apps, access tokens) and agents' setup: configuration, not content.
         ("POST", "/api/agents"),

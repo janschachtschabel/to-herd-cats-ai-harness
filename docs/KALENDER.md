@@ -50,3 +50,10 @@ Standardkalender und Rechte.
   Ablehnung, weil eine Ablehnung dort mehr verrät.
 - **Der Schalter für den Abgleich** (`PUT /api/admin/calendar-settings`, Recht
   `calendar.manage`) steht im Audit (`calendar.settings_set`), wenn er sich ändert.
+
+## Schreibgrenze
+
+Anlegen, Ändern und Archivieren eines Kalenders zählen zur Schreibgrenze je Person
+(`HERD_WRITE_RATE_PER_MINUTE`, darüber 429 `rate.limited` mit `Retry-After`; siehe
+[`SICHERHEIT.md`](SICHERHEIT.md)), wie Seiten und Nachrichten. Lesen zählt nicht, der
+Schalter für den Abgleich als Einstellung der Verwaltung auch nicht.

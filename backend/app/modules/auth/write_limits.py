@@ -1,6 +1,6 @@
 """Which requests the write limit per person counts (J10, `core/write_limit.py`): every
-unsafe method on the routers of content (pages, attachments, messages, tickets, skills
-and what hangs on them), included with `COUNTED`, and single content routes of other
+unsafe method on the routers of content (pages, attachments, messages, tickets, skills,
+calendars and what hangs on them), included with `COUNTED`, and single content routes of other
 routers (`POST /api/spaces`, an automation's manual run, a question's answer) marked
 with `COUNTED` at the route. Reading never counts, nor do read markers, the
 administration, settings, AI configuration or the session's own touch.
