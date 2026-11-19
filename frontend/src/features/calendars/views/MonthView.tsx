@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { addDays, monthGrid, startOfWeek, type Day } from '../dates'
@@ -16,7 +16,8 @@ const STEP: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7
 /** The month as a grid (WAI-ARIA grid pattern): one day is the grid's tab stop; arrow
  *  keys move by day and week, Home and End to the week's ends, a step past the grid
  *  turns the month (`onAnchor`); Enter or Space opens the day (`onOpenDay`). Events
- *  are buttons for the pointer; from the keyboard a day opens them. */
+ *  are buttons for the pointer; from the keyboard a day opens them, which the hint
+ *  under the grid (its description) says. */
 export function MonthView({
   anchor,
   today,
@@ -31,8 +32,9 @@ export function MonthView({
   onOpenDay: (day: Day) => void
   onAnchor: (day: Day) => void
 }) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const locale = i18n.language
+  const hintId = useId()
   const weeks = useMemo(() => monthGrid(anchor, locale), [anchor, locale])
   const days = useMemo(() => byDay(occurrences, zone, byStart), [occurrences, zone])
   const [focused, setFocused] = useState(anchor)
@@ -71,41 +73,47 @@ export function MonthView({
   }
 
   return (
-    <div
-      role="grid"
-      aria-label={formatMonth(anchor, locale)}
-      className="flex min-w-[42rem] flex-col rounded-lg border"
-    >
-      <div role="row" className="grid grid-cols-7 border-b bg-muted/40">
-        {weeks[0]!.map((day) => (
-          <div key={day} role="columnheader" className="px-2 py-1.5 text-xs font-medium">
-            <span aria-hidden>{formatDay(day, locale, { weekday: 'short' })}</span>
-            <span className="sr-only">{formatDay(day, locale, { weekday: 'long' })}</span>
+    <div className="flex min-w-[42rem] flex-col gap-1">
+      <div
+        role="grid"
+        aria-label={formatMonth(anchor, locale)}
+        aria-describedby={hintId}
+        className="flex flex-col rounded-lg border"
+      >
+        <div role="row" className="grid grid-cols-7 border-b bg-muted/40">
+          {weeks[0]!.map((day) => (
+            <div key={day} role="columnheader" className="px-2 py-1.5 text-xs font-medium">
+              <span aria-hidden>{formatDay(day, locale, { weekday: 'short' })}</span>
+              <span className="sr-only">{formatDay(day, locale, { weekday: 'long' })}</span>
+            </div>
+          ))}
+        </div>
+        {weeks.map((week) => (
+          <div key={week[0]} role="row" className="grid grid-cols-7 border-b last:border-b-0">
+            {week.map((day) => (
+              <MonthCell
+                key={day}
+                day={day}
+                outside={day.slice(0, 7) !== month}
+                today={day === today}
+                focusable={day === focused}
+                occurrences={days.get(day) ?? []}
+                register={(element) => {
+                  if (element) cells.current.set(day, element)
+                  else cells.current.delete(day)
+                }}
+                onKeyDown={(event) => onKeyDown(event, day)}
+                onFocus={() => setFocused(day)}
+                onOpenDay={onOpenDay}
+                view={{ calendars, zone, onOpen }}
+              />
+            ))}
           </div>
         ))}
       </div>
-      {weeks.map((week) => (
-        <div key={week[0]} role="row" className="grid grid-cols-7 border-b last:border-b-0">
-          {week.map((day) => (
-            <MonthCell
-              key={day}
-              day={day}
-              outside={day.slice(0, 7) !== month}
-              today={day === today}
-              focusable={day === focused}
-              occurrences={days.get(day) ?? []}
-              register={(element) => {
-                if (element) cells.current.set(day, element)
-                else cells.current.delete(day)
-              }}
-              onKeyDown={(event) => onKeyDown(event, day)}
-              onFocus={() => setFocused(day)}
-              onOpenDay={onOpenDay}
-              view={{ calendars, zone, onOpen }}
-            />
-          ))}
-        </div>
-      ))}
+      <p id={hintId} className="text-xs text-muted-foreground">
+        {t('calendar.month.hint')}
+      </p>
     </div>
   )
 }
@@ -169,6 +177,7 @@ function MonthCell({
                 calendar={view.calendars.get(occurrence.calendar_id)}
                 zone={view.zone}
                 variant="line"
+                day={day}
                 onOpen={view.onOpen}
                 tabIndex={-1}
               />

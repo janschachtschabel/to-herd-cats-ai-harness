@@ -97,4 +97,26 @@ describe('month view', () => {
       expect(within(cell(day)).getByRole('button', { name: /Klausur, ganztägig/ })).toBeVisible()
     expect(within(cell(/21\. November 2026/)).queryByRole('button')).toBeNull()
   })
+
+  test('the grid tells its keys; an event over midnight goes on without its start time', () => {
+    month([
+      makeOccurrence({
+        title: 'Nachtschicht',
+        start: '2026-11-19T22:00:00Z',
+        end: '2026-11-20T02:00:00Z',
+      }),
+    ])
+    expect(screen.getByRole('grid', { name: 'November 2026' })).toHaveAccessibleDescription(
+      'Pfeiltasten wählen einen Tag, die Eingabetaste öffnet ihn.',
+    )
+    const first = within(cell(/19\. November 2026/)).getByRole('button', { name: /Nachtschicht/ })
+    expect(first).toHaveTextContent(/^22:00 Nachtschicht/)
+    const next = within(cell(/20\. November 2026/)).getByRole('button', { name: /Nachtschicht/ })
+    expect(next).toHaveTextContent(/^bis 02:00 Nachtschicht/)
+  })
+
+  test('an event of a calendar the list does not hold names it „Kalender“', () => {
+    month([makeOccurrence({ title: 'Fremd', calendar_id: 'cal-foreign' })])
+    expect(screen.getByRole('button', { name: /Fremd, .*, Kalender$/ })).toBeInTheDocument()
+  })
 })

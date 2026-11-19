@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next'
 import type { Schemas } from '@/lib/api'
 import type { CalendarAbilities } from './abilities'
-import type { Day } from './dates'
+import { dayOf, daysOf, type Day } from './dates'
 import type { Occurrence } from './queries'
 
 export type CalendarColor = Schemas['CalendarColor']
@@ -22,11 +22,14 @@ export function calendarLabel(t: TFunction, calendar: CalendarInfo | undefined):
 
 /** The eight fixed tones (plan M10 decision 17) as a dot and a chip's edge. Colour is
  *  never the only sign: every event names its calendar to screen readers, and text
- *  stays in the theme's foreground on its background (WCAG 2.2 AA). */
+ *  stays in the theme's foreground on its background (WCAG 2.2 AA). Each tone has at
+ *  least 3:1 (WCAG 1.4.11) against the page, `muted` (a chip) and `accent` (a chip
+ *  under the pointer) in its theme: light at least 3.16 (teal-600 on accent), dark at
+ *  least 5.04 (red-400 on accent), measured from the oklch values. */
 export const TONE_DOT: Record<CalendarColor, string> = {
   blue: 'bg-blue-600 dark:bg-blue-400',
-  green: 'bg-green-600 dark:bg-green-400',
-  amber: 'bg-amber-500 dark:bg-amber-400',
+  green: 'bg-green-700 dark:bg-green-400',
+  amber: 'bg-amber-700 dark:bg-amber-400',
   red: 'bg-red-600 dark:bg-red-400',
   violet: 'bg-violet-600 dark:bg-violet-400',
   teal: 'bg-teal-600 dark:bg-teal-400',
@@ -36,8 +39,8 @@ export const TONE_DOT: Record<CalendarColor, string> = {
 
 export const TONE_EDGE: Record<CalendarColor, string> = {
   blue: 'border-l-blue-600 dark:border-l-blue-400',
-  green: 'border-l-green-600 dark:border-l-green-400',
-  amber: 'border-l-amber-500 dark:border-l-amber-400',
+  green: 'border-l-green-700 dark:border-l-green-400',
+  amber: 'border-l-amber-700 dark:border-l-amber-400',
   red: 'border-l-red-600 dark:border-l-red-400',
   violet: 'border-l-violet-600 dark:border-l-violet-400',
   teal: 'border-l-teal-600 dark:border-l-teal-400',
@@ -56,6 +59,39 @@ const timeFormat = (locale: string, zone: string) =>
 
 export function startTime(occurrence: Occurrence, zone: string, locale: string): string {
   return timeFormat(locale, zone).format(new Date(occurrence.start))
+}
+
+/** The time a one-line chip shows on `day`: the start on the day the occurrence starts;
+ *  on a later day („bis 02:00“ on its last, „Fortsetzung“ between) never the start as
+ *  if it began there. None for all-day ones. */
+export function chipTime(
+  t: TFunction,
+  occurrence: Occurrence,
+  day: Day | undefined,
+  zone: string,
+  locale: string,
+): string | null {
+  if (occurrence.all_day) return null
+  if (day === undefined || day <= dayOf(occurrence, zone))
+    return startTime(occurrence, zone, locale)
+  if (day === daysOf(occurrence, zone).at(-1))
+    return t('calendar.event.until', {
+      time: timeFormat(locale, zone).format(new Date(occurrence.end)),
+    })
+  return t('calendar.event.continued')
+}
+
+/** When an occurrence is, for the look at it: its day and times, or for an all-day
+ *  one its day or days („Donnerstag, 19. – Samstag, 21. November 2026, ganztägig“). */
+export function whenText(t: TFunction, occurrence: Occurrence, zone: string, locale: string) {
+  const days = daysOf(occurrence, zone)
+  const first = days[0]!
+  const last = days.at(-1)!
+  const date =
+    occurrence.all_day && last !== first
+      ? formatDayRange(first, last, locale)
+      : formatDay(first, locale)
+  return `${date}, ${timeRange(t, occurrence, zone, locale)}`
 }
 
 /** "10:00–11:00", or „ganztägig“; a timed one over several days names its dates. */
@@ -103,6 +139,14 @@ export function formatDays(first: Day, last: Day, locale: string): string {
     year: 'numeric',
     timeZone: 'UTC',
   }).formatRange(asUtc(first), asUtc(last))
+}
+
+/** A range of days in full words, for the look at an all-day event of several days. */
+export function formatDayRange(first: Day, last: Day, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeZone: 'UTC' }).formatRange(
+    asUtc(first),
+    asUtc(last),
+  )
 }
 
 export function formatMonth(day: Day, locale: string): string {

@@ -288,23 +288,35 @@ ihrem Zeitpunkt; ein Cursor gilt nur mit der Zone, mit der er entstand (422
   Tagen.
 - **Kalenderliste:** je Bereich gruppiert, mit Farbe und einem Schalter zum Ein- und
   Ausblenden (im Browser gemerkt). „nur lesen“ steht an Kalendern, deren Bereich einem
-  nur die Leserolle gibt. Ausgeblendete Kalender fragt die Seite nicht an
-  (`calendar_ids`).
+  nur die Leserolle gibt. Ausblenden filtert, was schon geladen ist: Die Seite fragt
+  den Zeitraum nicht neu an und schickt keine `calendar_ids`, so bleiben auch Termine
+  aus Kalendern, die die Liste nicht führt (sie heißen „Kalender“). Solange die Namen
+  der Bereiche nicht geladen sind, rät die Liste nichts: ein Standardkalender heißt
+  dann „Standardkalender“, ohne „nur lesen“; scheitert das Laden, steht der Fehler mit
+  „Erneut versuchen“ darüber.
 - **Monat:** je Tag höchstens drei Termine, darüber „+N weitere“ (öffnet den Tag).
   Tastatur: Pfeiltasten wählen einen Tag (über den Rand blättert der Monat), Pos1 und
-  Ende springen an den Rand der Woche, die Eingabetaste öffnet den Tag. **Woche und
+  Ende springen an den Rand der Woche, die Eingabetaste öffnet den Tag (der Hinweis
+  steht unter dem Raster und ist seine Beschreibung). Ein Termin über Mitternacht
+  zeigt seine Anfangszeit nur am ersten Tag, danach „bis 02:00“ am letzten und
+  „Fortsetzung“ dazwischen (ebenso in der Ganztägig-Zeile der Woche). **Woche und
   Tag:** oben eine Zeile für ganztägige und mehrtägige Termine, darunter die Stunden;
   Termine zur selben Zeit stehen nebeneinander. **Agenda:** Tage als Überschriften,
   weitere Termine mit „Weitere Termine laden“.
-- **Termine:** Jeder Termin ist ein Knopf mit vollem Namen (Titel, Zeit, Kalender). Ein
-  Termin, den man nur als belegt sieht, heißt „Belegt“ und zeigt keinen Titel. Ein Klick
-  zeigt ihn zum Lesen (Zeit, Ort, Kalender, Serie); Anlegen und Ändern kommen mit dem
+- **Termine:** Jeder Termin ist ein Knopf mit vollem Namen (Titel, Zeit, Kalender; ein
+  ganztägiger nennt auch seinen Tag). Ein Termin, den man nur als belegt sieht, heißt
+  „Belegt“ und zeigt keinen Titel. Die acht Farben haben im hellen und dunklen Design
+  mindestens 3:1 gegen Seite und Termin-Hintergrund. Ein Klick zeigt ihn zum Lesen
+  (Zeit oder bei mehrtägig ganztägigen alle Tage, Ort, Kalender, Serie); Anlegen und
+  Ändern kommen mit dem
   Termin-Dialog (Task 11). Die Suche im Kopf findet Titel, die man sieht.
 - **Nachladen und Grenzen:** Die Seite lädt den Zeitraum seitenweise (je 100 Vorkommen)
   und zeigt, was schon da ist. Mehr als 2.000 Vorkommen in einem Zeitraum lehnt der
-  Server ab (`calendar.window_too_dense`); die Seite sagt dann, dass man Kalender
-  ausblenden oder eine kürzere Ansicht wählen soll, und behält, was sie schon geladen
-  hat.
+  Server ab (`calendar.window_too_dense`); die Seite rät dann zu einer kürzeren
+  Ansicht (Woche oder Tag) oder einem einzelnen Bereich, behält, was sie schon geladen
+  hat, und fragt eine solche Ablehnung (4xx) nicht ein zweites Mal an. Beim Blättern
+  bleibt die Ansicht stehen, bis der neue Zeitraum da ist („Wird geladen …“ in der
+  Statuszeile); „Keine Termine“ sagt sie erst, wenn der Zeitraum geantwortet hat.
 - **Live:** Ändert sich ein Kalender oder ein Termin in einem Bereich, lädt die Seite
   die betroffenen Listen und Zeiträume neu (`calendar.changed` mit Bereich und Kalender,
   nur IDs).

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import type { Day } from '../dates'
 import {
   byStart,
+  calendarLabel,
   eventTitle,
   formatDay,
   occurrenceKey,
@@ -132,7 +133,7 @@ function AgendaRow({
           {occurrence.location}
         </span>
       )}
-      <span className="shrink-0 text-muted-foreground">{calendar?.label}</span>
+      <span className="shrink-0 text-muted-foreground">{calendarLabel(t, calendar)}</span>
     </button>
   )
 }

@@ -47,13 +47,23 @@ describe('week view', () => {
         end: '2026-11-23T00:00:00Z',
       }),
     ])
-    const days = screen.getAllByRole('list', { name: /November 2026/ })
+    const allDay = screen.getByRole('group', { name: 'Ganztägig' })
+    const days = screen
+      .getAllByRole('list', { name: /November 2026/ })
+      .filter((list) => !allDay.contains(list))
     expect(days).toHaveLength(7)
     expect(days[0]).toHaveAccessibleName('Montag, 16. November 2026')
     expect(within(days[0]!).getByRole('button', { name: /^Früh/ })).toBeInTheDocument()
-    const allDay = screen.getByRole('group', { name: 'Ganztägig' })
-    // Saturday and Sunday, the two days it lasts.
+    // Saturday and Sunday, the two days it lasts; each list and chip names its day.
     expect(within(allDay).getAllByRole('button', { name: /^Messe, ganztägig/ })).toHaveLength(2)
+    const saturday = within(allDay).getByRole('list', {
+      name: 'Ganztägig, Samstag, 21. November 2026',
+    })
+    expect(
+      within(saturday).getByRole('button', {
+        name: /^Messe, ganztägig, Samstag, 21\. November 2026/,
+      }),
+    ).toBeInTheDocument()
     await view.user.click(
       screen.getByRole('button', { name: 'Donnerstag, 19. November 2026 öffnen' }),
     )

@@ -97,6 +97,7 @@
     },
     "week": {
       "allDay": "Ganztägig",
+      "allDayOf": "Ganztägig, {{day}}",
       "openDay": "{{day}} öffnen"
     },
     "window": {

@@ -1,22 +1,34 @@
 import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
-import { eventTitle, startTime, timeRange, TONE_EDGE, type CalendarInfo } from '../display'
+import type { Day } from '../dates'
+import {
+  calendarLabel,
+  chipTime,
+  eventTitle,
+  formatDay,
+  timeRange,
+  TONE_EDGE,
+  type CalendarInfo,
+} from '../display'
 import type { Occurrence } from '../queries'
 
 /** One occurrence as a button with its full name (title or „Belegt“, time, calendar;
- *  WCAG 2.2: the visible text starts the name). `line`: one line with the start time
- *  (month, all-day row); `block`: a box in the time grid with title and times. */
+ *  WCAG 2.2: the visible text starts the name). `line`: one line with its time on `day`
+ *  (month, all-day row: the start where it starts, „bis …“/„Fortsetzung“ after; an
+ *  all-day one names `day`); `block`: a box in the time grid with title and times. */
 export function EventChip({
   occurrence,
   calendar,
   zone,
   variant,
+  day,
   onOpen,
   tabIndex,
   style,
 }: {
   occurrence: Occurrence
+  day?: Day | undefined
   calendar: CalendarInfo | undefined
   zone: string
   variant: 'line' | 'block'
@@ -29,13 +41,13 @@ export function EventChip({
   const title = eventTitle(t, occurrence)
   const range = timeRange(t, occurrence, zone, locale)
   const cancelled = occurrence.status === 'cancelled'
-  const calendarLabel = calendar?.label ?? t('calendar.list.unknownSpace')
-  // The block shows its times; the line only the start, so its name adds the range.
+  const label = calendarLabel(t, calendar)
+  // The block shows its times; the line only one, so its name adds the range (and an
+  // all-day one the day it stands on).
+  const time = occurrence.all_day && day ? `${range}, ${formatDay(day, locale)}` : range
   const details =
-    variant === 'line'
-      ? t('calendar.event.details', { time: range, calendar: calendarLabel })
-      : calendarLabel
-  const shownTime = occurrence.all_day ? null : startTime(occurrence, zone, locale)
+    variant === 'line' ? t('calendar.event.details', { time, calendar: label }) : label
+  const shownTime = chipTime(t, occurrence, day, zone, locale)
   return (
     <button
       type="button"

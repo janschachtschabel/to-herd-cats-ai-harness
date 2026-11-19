@@ -73,4 +73,9 @@ describe('agenda', () => {
       'Donnerstag, 19. November 2026',
     ])
   })
+
+  test('an event of a calendar the list does not hold names it „Kalender“', () => {
+    agenda([makeOccurrence({ title: 'Fremd', calendar_id: 'cal-foreign' })])
+    expect(screen.getByRole('button', { name: /Fremd/ })).toHaveTextContent(/Kalender$/)
+  })
 })

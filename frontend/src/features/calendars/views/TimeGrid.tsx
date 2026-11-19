@@ -79,12 +79,17 @@ export function TimeGrid({
           {t('calendar.week.allDay')}
         </span>
         {days.map((day) => (
-          <ul key={day} className="flex min-w-0 flex-col gap-0.5 border-l p-0.5">
+          <ul
+            key={day}
+            aria-label={t('calendar.week.allDayOf', { day: formatDay(day, locale) })}
+            className="flex min-w-0 flex-col gap-0.5 border-l p-0.5"
+          >
             {(allDay.get(day) ?? []).map((occurrence) => (
               <li key={occurrenceKey(occurrence)}>
                 <EventChip
                   occurrence={occurrence}
                   variant="line"
+                  day={day}
                   {...chipProps(view, occurrence)}
                 />
               </li>

@@ -97,6 +97,7 @@
     },
     "week": {
       "allDay": "All day",
+      "allDayOf": "All day, {{day}}",
       "openDay": "Open {{day}}"
     },
     "window": {

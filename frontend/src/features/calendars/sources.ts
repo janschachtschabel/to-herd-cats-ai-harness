@@ -40,6 +40,7 @@ export function useCalendarSources(spaceId: string | undefined) {
   }, [spaces.items, named.data])
 
   const namesKnown = !spaceState.isPending && !spaceState.isError
+  const myId = me?.user.id
   const { infos, groups } = useMemo(() => {
     const infos = new Map<string, CalendarInfo>()
     const bySpace = new Map<string, CalendarGroup>()
@@ -55,7 +56,7 @@ export function useCalendarSources(spaceId: string | undefined) {
         spaceId: calendar.space_id,
         spaceName: !space
           ? t(namesKnown ? 'calendar.list.unknownSpace' : 'calendar.list.spaceNotLoaded')
-          : isOwnPersonal(space, me?.user.id)
+          : isOwnPersonal(space, myId)
             ? t('spaces.mine')
             : space.name,
         calendars: [],
@@ -71,7 +72,7 @@ export function useCalendarSources(spaceId: string | undefined) {
       (a, b) => rank(a) - rank(b) || a.spaceName.localeCompare(b.spaceName),
     )
     return { infos, groups }
-  }, [calendars.items, spaceById, namesKnown, me?.user.id, t])
+  }, [calendars.items, spaceById, namesKnown, myId, t])
 
   return { calendars, spaces: spaceState, infos, groups, namedSpace: named.data }
 }
