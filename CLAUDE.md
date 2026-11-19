@@ -200,7 +200,7 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   SIGTERM drains: draining, save, close 1012, release (`DELETE
   /internal/collab/instances/{id}`). There is no `HERD_COLLAB_URL` any more.
 - Operations (M9, `app/ops/`): `python -m app.ops backup create|verify|list|run|schedule`
-  and `restore check|apply [--replace --confirm NAME]`, `maintenance status|off`
+  and `restore check|apply [--replace --confirm NAME [--allow-superuser]]`, `maintenance status|off`
   (dispatcher `ops/cli.py`, `run(argv, settings, clock)`);
   archive format 1 (`archive.py`, `manifest.py`), `pg_dump`/`pg_restore` only through
   `pgtools.py` (password in `PGPASSWORD` of a built environment; `pg_restore` reads
@@ -213,18 +213,25 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   in `modules/backups` (`backup_run`, gauges read by the worker). Settings in
   `core/config_ops.py` (`HERD_BACKUP_*`). Deleted files keep a tombstone for 48 h
   (`core/storage_tombstones.py`). Rehearsal `deploy/scripts/restore-rehearsal.sh` with
-  `scripts/compare_databases.py` (on S3 with `HERD_STORAGE=s3` in its environment).
+  `scripts/compare_databases.py` (on S3 with `HERD_STORAGE=s3` in its environment; it
+  runs as a LOGIN-only owner role it makes, and also backs up a replaced installation
+  and restores and replaces with that).
   Replacing a running installation (M9b, `replace.py`): safety archive (`pre_restore`),
   maintenance on, the archive's files into the configured storage, one `psql`
   transaction (`swap.py`: explicit `BEGIN`/`COMMIT`, COMMIT only after `pg_restore`
   ended well), migrate, `finish_restore`, maintenance off. A dump runs only the entries
   of its table of contents that `ops/dump_toc.py` judges ours (`archive.dump_foreign`
   otherwise; checked in every check and before every restore, restored with
-  `--use-list` from a memfd), a replace needs pg_restore/psql 16.10+/17.6+ and runs
+  `--use-list` from a memfd; SCHEMA public and its COMMENT, whatever their owner, and
+  EXTENSION plpgsql are taken and left out: the swap makes `public` owned by
+  `CURRENT_ROLE`), a replace needs pg_restore/psql 16.10+/17.6+ and runs
   under a random `--restrict-key` (`restore.tools_too_old`). After any failure or
   cancel the database says what it holds (`swap_outcome.py`): rolled back keeps the old
   state and audits `backup.restore_failed`; `restore.swap_broken`/`restore.swap_unknown`
-  keep maintenance on (the old state may be gone). `backup.manage` is owner-only (`OWNER_ONLY_ACTIONS`;
+  keep maintenance on (the old state may be gone). A dump runs as the restoring role,
+  so a replace as a superuser is refused (`core/db_roles.superuser_problem`): the
+  administration 409 `restore.superuser_refused`, the CLI the same code unless
+  `--allow-superuser`. `backup.manage` is owner-only (`OWNER_ONLY_ACTIONS`;
   `modules/backups/guard.py` answers 404 `backup.not_found`).
 - Backups in the administration (M9b Task 13, `modules/backups`: `router.py`,
   `service.py`, `archives.py`, `checking.py`, `jobs.py`, `replacing.py`, `live.py`):
@@ -282,12 +289,24 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `python -m app.stack init` (`app/stack/init.py`) generates the secrets once into the
   volumes `secrets`/`db-secret`, checks `DOMAIN` (bare lower-case host name with a dot,
   no IP address; exit 2, never corrected) and the one-time admin with the app's password
-  rules, skips missing values (exit 0); `python -m app.stack set-secret-key`
+  rules, skips missing values (exit 0) (the secrets: `secret_key`, `internal_token`,
+  `db_owner_password`, and `db_password` in `db-secret`); `python -m app.stack set-secret-key`
   (`app/stack/secret_key.py`) puts a saved key back from stdin. The app reads every
   secret through `HERD_*_FILE` (`core/config_files.py`); the image's services pull on
   every deploy (`pull_policy: always`) and none but init disables its check. Rules are
   enforced by `tests/test_hostinger_compose.py`; CI runs
   `deploy/scripts/hostinger-smoke.sh`. `deploy/compose/` stays the build/reference variant.
+- The app's database role is never a superuser (review M9b F2-1): every shipped stack
+  with its own PostgreSQL runs `python -m app.stack db-owner` (`app/stack/db_owner.py`)
+  as the superuser before the app, on every start: role `herd_owner` (LOGIN only, an
+  existing one taken back to that), its password from a file written once and set as a
+  SCRAM verifier, and the database, schema `public` and every object in it handed to it.
+  Compose: service `db-owner`, volume `secrets` (`compose.yml`, overlays nodes, s3,
+  roles; `POSTGRES_PASSWORD` only for db-owner); Hostinger: service `db-owner`
+  (`ONE_SHOT` in `tests/test_hostinger_compose.py`), password from `init`; chart with
+  `postgresql.enabled`: the migrate Job's init container, Secret key `owner-password`
+  (`herd.databasePasswordKey`). An empty `HERD_DATABASE_PASSWORD_FILE` counts as unset.
+  Tests that need the roles: `tests/factories_roles.py` (`database_roles`).
 - Retention (M9): `core/retention.py` holds a rule for every table (`Keep`, `Upkeep`,
   `Cleans`; `tests/test_retention.py` fails for a table without one); the due loop's
   `worker/upkeep.py` deletes expired rows.
@@ -359,9 +378,10 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
     `tests/support/clamd_stub.py`.
   - `HERD_DATABASE_SSLMODE`/`HERD_DATABASE_SSLROOTCERT` (`core/config_database.py`,
     `core/db_tls.py`) reach every engine (`make_engine` sets `connect_args`), the LISTEN
-    connection and `pgtools.child_env` (`PGSSLMODE`, `PGSSLROOTCERT`; for verify-ca/-full
-    without a file `PGSSLROOTCERT=system`, as asyncpg uses the system's CAs); the
-    setting wins over the URL's. A failing `pg_dump`/`pg_restore`/`psql` logs only its
+    connection and `pgtools.child_env` (`PGSSLMODE`, `PGSSLROOTCERT`; for verify-full
+    without a file `PGSSLROOTCERT=system`, as asyncpg uses the system's CAs; verify-ca
+    without `HERD_DATABASE_SSLROOTCERT` is a settings error at start, the chart refuses
+    it without `database.caSecret`); the setting wins over the URL's. A failing `pg_dump`/`pg_restore`/`psql` logs only its
     connection-level error line, masked; an SQL error only as `query failed`
     (`ops/tool_errors.py`).
     `HERD_INTERNAL_TOKEN_PREVIOUS` is accepted besides the current token during a
@@ -376,7 +396,8 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
     `HERD_DATABASE_RUNTIME_ROLE` gets data rights after every migration run
     (`core/db_roles.py`, also `ALTER DEFAULT PRIVILEGES`; `alembic_version` stays
     read-only for it). With them, restoring from the administration is refused
-    (`restore.not_schema_owner`). Overlay `deploy/compose/compose.roles.yml` (role all:
+    (`restore.not_schema_owner`: the role must hold schema `public`'s owner, CREATE on it
+    and every table in it). Overlay `deploy/compose/compose.roles.yml` (role all:
     the container still holds the owner's password, so the split stops SQL injection,
     not code in the container); chart `database.migrate`.
 - Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing,
