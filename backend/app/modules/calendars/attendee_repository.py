@@ -49,18 +49,24 @@ class AttendeeRepository:
         stmt = select(Attendee).where(self._of(event_id)).order_by(Attendee.id)
         return list((await self.session.scalars(stmt)).all())
 
-    async def of_events(self, event_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, list[Attendee]]:
-        """The attendees of each event, in one statement."""
-        found: dict[uuid.UUID, list[Attendee]] = {event_id: [] for event_id in event_ids}
+    async def people_of(self, event_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, list[uuid.UUID]]:
+        """The people (not agents, not addresses) invited to each event, in one
+        statement."""
+        found: dict[uuid.UUID, list[uuid.UUID]] = {event_id: [] for event_id in event_ids}
         if not event_ids:
             return found
         stmt = (
-            select(Attendee)
-            .where(Attendee.org_id == self.org_id, Attendee.event_id.in_(event_ids))
+            select(Attendee.event_id, Attendee.principal_id)
+            .where(
+                Attendee.org_id == self.org_id,
+                Attendee.event_id.in_(event_ids),
+                Attendee.principal_type == PrincipalType.USER,
+            )
             .order_by(Attendee.id)
         )
-        for attendee in (await self.session.scalars(stmt)).all():
-            found[attendee.event_id].append(attendee)
+        for event_id, principal_id in (await self.session.execute(stmt)).all():
+            if principal_id is not None:
+                found[event_id].append(principal_id)
         return found
 
     async def page(
@@ -193,13 +199,6 @@ class AttendeeRepository:
             .values(response=Response.NEEDS_ACTION)
             .execution_options(synchronize_session="fetch")
         )
-
-    async def people(self, event_id: uuid.UUID) -> list[uuid.UUID]:
-        """The people (not agents, not addresses) invited to the event."""
-        stmt = select(Attendee.principal_id).where(
-            self._of(event_id), Attendee.principal_type == PrincipalType.USER
-        )
-        return [i for i in (await self.session.scalars(stmt)).all() if i is not None]
 
     async def follow(
         self, series_id: uuid.UUID, principal: Principal, old: Response, new: Response

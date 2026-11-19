@@ -162,7 +162,9 @@ class EventService:
                     event.calendar_id
                 )
                 shifted = moved(natural, change, edited, zone)
-                await after_change(self.session, actor, edited.event, moved=shifted, was=was)
+                await after_change(
+                    self.session, actor, edited.event, edited, moved=shifted, was=was
+                )
                 await audit_admin_write(
                     self.session,
                     actor,
@@ -195,7 +197,7 @@ class EventService:
             require_version(event, version)
             removed = await remove(self.session, actor, event, scope, occurrence)
             by_power = await require_full_sight(self.session, actor, removed.reached)
-            await after_delete(self.session, actor, event)
+            await after_delete(self.session, actor, event, removed, scope)
             await audit_admin_write(
                 self.session,
                 actor,

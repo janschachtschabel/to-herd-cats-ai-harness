@@ -7,11 +7,14 @@
 - A change of the time of the row a write shows (`moved`) puts every other attendee's
   answer back to `needs_action` (who made the change keeps hers; agents stay
   accepted) and tells the people invited; so does cancelling it, or deleting it (the
-  row named becomes a tombstone), without touching the answers. With `scope=all`
-  the time changed when a stored time column did; with `this` and `following` when
-  the change names other times than the named occurrence's, or a rule of its own.
-  Only the row the write names or makes is told about (a series' attendees once, not
-  once per override).
+  row named becomes a tombstone, or occurrences of a series go: `scope=this`, then
+  the people of that occurrence's override if it had one, and `following`), without
+  touching the answers. With `scope=all` the time changed when a stored time column
+  did; with `this` and `following` when the change names other times than the named
+  occurrence's, or a rule of its own. Besides the row the write shows, the people of
+  each override it made a tombstone, or cancelled with its series, are told about
+  that override (review M10 task 4, R4-1); each person once per write, about the
+  first row naming her (a series' attendees about the series, not once per override).
 - Telling is an outbox event per person (`calendar_event.invited`, ids only: the
   calendar's and the person's); the handler writes the notification
   (`notifications.py`) and live delivery sends `event.invited` to that person.
@@ -19,7 +22,7 @@
 """
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -73,24 +76,54 @@ def moved(natural: Times | None, change: Change, edited: Edited, zone: str) -> b
 
 
 async def after_change(
-    session: AsyncSession, actor: Actor, event: CalendarEvent, *, moved: bool, was: EventStatus
+    session: AsyncSession,
+    actor: Actor,
+    event: CalendarEvent,
+    edited: Edited,
+    *,
+    moved: bool,
+    was: EventStatus,
 ) -> None:
     """After a write that shows `event` (whose status was `was`): answers reset and
-    the people told when it moved; told when it was cancelled by the write."""
+    the people told when it moved; told when it was cancelled by the write. The people
+    of each override the write made a tombstone (a series moved or cut so that its
+    occurrence went), or cancelled with its series, are told too (review M10 task 4,
+    R4-1)."""
     cancelled = event.status == EventStatus.CANCELLED and was != EventStatus.CANCELLED
-    if not (moved or cancelled):
-        return
-    repo = AttendeeRepository(session, event.org_id)
+    rows = [event] if moved or cancelled else []
     if moved:
-        await repo.reset(event.id, actor.principal)
-    await invited(session, actor, event, await repo.people(event.id))
+        await AttendeeRepository(session, event.org_id).reset(event.id, actor.principal)
+    rows += [
+        o
+        for o in edited.reached
+        if o.deleted_at is not None or (cancelled and o.status == EventStatus.CANCELLED)
+    ]
+    await tell(session, actor, rows)
 
 
-async def after_delete(session: AsyncSession, actor: Actor, event: CalendarEvent) -> None:
-    """After deleting: the people invited to the row named are told if it went."""
-    if event.deleted_at is not None:
-        people = await AttendeeRepository(session, event.org_id).people(event.id)
-        await invited(session, actor, event, people)
+async def after_delete(
+    session: AsyncSession, actor: Actor, event: CalendarEvent, removed: Edited, scope: Scope
+) -> None:
+    """After deleting: the people invited to the row named are told when it went, or
+    when occurrences of it went while it stays (`scope=this`/`following` on a series,
+    review M10 task 4, R4-3; one occurrence with an override: that override's people,
+    not the series'); the people of each override that became a tombstone too (R4-1)."""
+    gone = [o for o in removed.reached if o.deleted_at is not None]
+    lost_some = event.deleted_at is None and not (scope is Scope.THIS and gone)
+    rows = [event] if event.deleted_at is not None or lost_some else []
+    await tell(session, actor, [*rows, *gone])
+
+
+async def tell(session: AsyncSession, actor: Actor, rows: Sequence[CalendarEvent]) -> None:
+    """The people of each row are told about it; each person once, about the first
+    row that names her (a series' people about the series, not its overrides)."""
+    unique = list({row.id: row for row in rows}.values())
+    found = await AttendeeRepository(session, actor.org_id).people_of([r.id for r in unique])
+    told: set[uuid.UUID] = set()
+    for row in unique:
+        people = [u for u in found[row.id] if u not in told]
+        told.update(people)
+        await invited(session, actor, row, people)
 
 
 async def invited(
