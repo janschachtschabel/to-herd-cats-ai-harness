@@ -10,8 +10,9 @@ M5 Tasks 1–7, M6, M7 and M8 (plans `docs/superpowers/plans/2026-11-12-m1-funda
 `2026-11-14-m6-agenten-als-mitarbeiter.md`, `2026-11-14-m7-automatisierung.md`,
 `2026-11-15-m8-oeffnung.md`) and M9a (`2026-11-15-m9-produktion.md`, Tasks 1–11 and 5b)
 are built and make v1.0.0 (version 1.0.0, `backend/alembic/RELEASED` = `9e4b6d2f8a17`,
-release note `docs/RELEASE-1.0.0.md`); M9b Tasks 12 to 16 and 18 are built after it; next
-are M9b Task 17 and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
+release note `docs/RELEASE-1.0.0.md`); M9b Tasks 12 to 16 and 18 and M10 Tasks 1 and 2
+(`2026-11-18-m10-kalender.md`) are built after it; next are M9b Task 17, M10 from
+Task 3a and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
 `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
@@ -58,13 +59,16 @@ Redis (Task 15); optional TOTP for every password account (Task 16: profile setu
 two-step sign-in, recovery codes, admin reset, second factor for new access tokens);
 the ASVS gaps J7–J14 (Task 18: idle timeout, own sessions, re-authentication before
 linking, write limits, optional virus scan, database TLS, internal token rotation, OAuth
-callback per app with `iss`, optional separate database roles).
+callback per app with `iss`, optional separate database roles). Calendar (M10, so
+far): calendars per space with their rights and defaults (Task 1); time zones and
+RFC 5545 recurrence as pure functions on `python-dateutil` (Task 2).
 Planned, not present: embeddings, hybrid search, Docling conversion (M5 Tasks 8–11).
 Operations: `README.md` (Betriebshinweise),
 `docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
 and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
 behind a proxy), `docs/TICKETS.md` (ticket use and operation, sprints and the new
-boards), `docs/KI.md` (connections, keys, egress, assignment, usage, policy, the stub),
+boards), `docs/KALENDER.md` (calendars, defaults, rights; grows with M10),
+`docs/KI.md` (connections, keys, egress, assignment, usage, policy, the stub),
 `docs/AGENTEN.md` (agents and automations: use, admin, worker runs and the due loop,
 limits, metrics and alerts), `docs/MCP.md` (tokens, `/mcp` with Claude Code and Codex,
 external agents, servers, connectors, catalogue, operation, metrics and alerts),
@@ -98,6 +102,22 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `features/tickets` (board with `@dnd-kit/core`, no sortable; `sprints/`, `my-board/`,
   `daily/`); what to offer comes from `ticketAbilities(my_role)`. Sprint events go live
   as one SSE name, `sprint.changed` (`space_id`, `sprint_id`).
+- Calendars (M10, `modules/calendars`): every calendar belongs to a space (`calendar`,
+  at most 20 not archived per space, 409 `calendar.limit`; archived = 404 for
+  everyone), rights `calendar.read` (viewer), `calendar.write` (editor),
+  `calendar.moderate` (moderator), `calendar.manage` (admins) and the derived
+  `calendar.sync` (active non-guests while `calendar_setting.sync_enabled` is on,
+  `calendars/standing.py`; `PUT /api/admin/calendar-settings`, audited). Defaults (one
+  in the own personal space, one in „Allgemein“) are made by the first list call of a
+  person acting for herself (`calendars/defaults.py`, space row lock plus a partial
+  unique index); they have no stored name (`name` null, the frontend words them:
+  `features/calendars/name.ts`), count toward the 20 and are never archived (409
+  `calendar.default_kept`). Calendar lists filter with `access.member_space_ids`
+  (`visible_space_ids` without the admin branch, C1): an admin reaches another team or
+  personal space's calendars only by naming the space (`access.require`, audited),
+  never in her own lists. The calendar routers include `auth/write_limits.COUNTED`
+  (the admin switch, a setting, is exempt in `tests/test_write_limit_routes.py`); a new
+  calendar content route does too.
 - AI (`modules/ai`): connections (`provider.py` makes the provider calls, through
   `core/egress.py` or `HERD_AI_EGRESS_PROXY`), secrets (`core/secrets.py`: `env:HERD_AI_*`
   or `enc:` under `HERD_SECRET_KEY`; `scripts/rotate_secrets.py`), assignments and the
@@ -124,6 +144,24 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `(automation_id, due_at)`; it also runs the wiki's review pass,
   `modules/wiki/review_pass.py`, the log's retention and `mcp_call`'s after 90 days). Time comes from
   `core/clock.py`. Frontend `features/automations`.
+- Calendar time (M10 Task 2, `modules/calendars`, pure): `zones.py` (IANA names only;
+  `localise` moves a gap's wall time on by the gap and takes the first of a doubled
+  one), `recurrence_rule.py` (the RRULE subset: `DAILY` up, `COUNT` ≤ 5,000, ASCII
+  digits, codes `event.rrule_invalid`/`event.rrule_unsupported`, UNTIL outside
+  1900–2399 `event.time_out_of_range`; the canonical text reads back as itself),
+  `recurrence_series.py` (`Series`, `Occurrence`, `bounded`), `recurrence.py` (the only
+  code that imports `python-dateutil`, `tests/test_calendar_imports.py` scans `app` and
+  `scripts`; `recurrence_jump.py` may too). A `Series` is wall times in its zone (start,
+  RDATE, EXDATE, RECURRENCE-ID; all-day: 00:00 UTC, no zone); DTSTART is always the
+  first occurrence; series lie in 1900–2399 and `dateutil` runs 7,600 years ahead so its
+  scan ends at our 2399; an endless rule jumps whole periods to the window
+  (`recurrence_jump.jump`). Where `dateutil` departs from RFC 5545 our layer corrects it
+  (BYDAY mixing plain and numbered days is one list; a weekly BYSETPOS counts in the
+  whole first week); `test_calendar_recurrence_oracle.py` compares with a brute-force
+  RFC expander that does not use `dateutil`. Two occurrences at one instant show once
+  (the earlier id); a gap occurrence's id is the rule's wall time
+  (`recurrence_id_at` maps an instant back). Every write path calls `check_series`
+  (refuses a rule that never matches).
 - MCP (M8): `app/mcp/` is the only code that imports the MCP SDK (`mcp`, `mcp_types`;
   `tests/test_mcp_imports.py`): the endpoint (`endpoint.py`: Origin, token, POST only;
   `server.py`: one stateless SDK server per request, JSON answers), the client
@@ -150,7 +188,8 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   Several instances (M9b Task 15, `wiki/collab_instances.py`,
   `collab_owner_repository.py`): each process announces itself every 5 s
   (`collab/instance.mjs`, `HERD_COLLAB_ADVERTISE_URL`, required; role all:
-  `ws://127.0.0.1:<collab port>`; the chart: the pod IP) and counts as alive for 15 s;
+  `ws://127.0.0.1:<collab port>`; the chart: the pod IP) and counts as alive for 15 s
+  (judged by the database's `clock_timestamp()`, never a node's clock);
   the relay binds each page to one live, non-draining instance (`collab_page_owner`,
   epoch rising with each new binding; least busy = fewest unexpired bindings) and dials
   it, with none 4502. Auth/load return the epoch; save and check name instance and
@@ -175,11 +214,19 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   Replacing a running installation (M9b, `replace.py`): safety archive (`pre_restore`),
   maintenance on, the archive's files into the configured storage, one `psql`
   transaction (`swap.py`: explicit `BEGIN`/`COMMIT`, COMMIT only after `pg_restore`
-  ended well), migrate, `finish_restore`, maintenance off; a failed swap leaves the old
-  state and audits `backup.restore_failed`. `backup.manage` is owner-only (`OWNER_ONLY_ACTIONS`;
+  ended well), migrate, `finish_restore`, maintenance off. A dump runs only the entries
+  of its table of contents that `ops/dump_toc.py` judges ours (`archive.dump_foreign`
+  otherwise; checked in every check and before every restore, restored with
+  `--use-list` from a memfd), a replace needs pg_restore/psql 16.10+/17.6+ and runs
+  under a random `--restrict-key` (`restore.tools_too_old`). After any failure or
+  cancel the database says what it holds (`swap_outcome.py`): rolled back keeps the old
+  state and audits `backup.restore_failed`; `restore.swap_broken`/`restore.swap_unknown`
+  keep maintenance on (the old state may be gone). `backup.manage` is owner-only (`OWNER_ONLY_ACTIONS`;
   `modules/backups/guard.py` answers 404 `backup.not_found`).
 - Backups in the administration (M9b Task 13, `modules/backups`: `router.py`,
   `service.py`, `archives.py`, `checking.py`, `jobs.py`, `replacing.py`, `live.py`):
+  One request or replace starts at a time (transaction try-lock `herd.backup.admin`,
+  else 409 `backup.busy`).
   "Jetzt sichern" is a `backup_run` row (`trigger=admin`, `running`) that the worker's
   `BackupJobLoop` takes up with `run_backup(..., run_id=)`; `REQUEST_GRACE` (10 min)
   spares a young request from upkeep and other backups (`spare_requests_since`), a
@@ -197,7 +244,8 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `GET /api/maintenance` and reloads `/` once a fresh answer says it ended.
 - Maintenance (M9b, `modules/maintenance`): one row per org (`maintenance`); each
   process holds the state in `cache.py` (`maintenance_cache()`, `in_maintenance()`;
-  NOTIFY `herd_maintenance` and a 5 s poll; a failed read keeps the last state), started
+  NOTIFY `herd_maintenance` and a 5 s poll; a failed read keeps the last state, and a
+  starting process counts as in maintenance until its first read succeeds), started
   by the public app's lifespan and the worker. Never ask the database whether it is in
   maintenance on a request path (tables are locked during the swap). While active:
   `/api/*` and `/mcp` answer 503 `maintenance.active` with `Retry-After: 30` except
@@ -255,8 +303,11 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   the secret `enc:` under `HERD_SECRET_KEY` (rotated by `rotate_secrets`), recovery
   codes as SHA-256 (`recovery.py`); a used time step or recovery code is spent in one
   statement (`repository.py`). Checking (`factor.py`) counts wrong codes per person
-  (`second-factor-fail:<id>`, the login limit); `begin` commits, so call it before any
-  lock. A password or OIDC sign-in of a person with TOTP opens no session: login
+  (`second-factor-fail:<id>`, the login limit); ten wrong codes within 24 h lock the
+  factor for 1 h (`user_totp.locked_until`, one atomic UPDATE; 429
+  `auth.second_factor_locked` even for a right code, audit `user.totp_locked`,
+  notification `totp_locked`; a right code resets the count); `begin` commits, so call
+  it before any lock. A password or OIDC sign-in of a person with TOTP opens no session: login
   answers 202 and leaves a `sign_in_challenge` (hash only, 5 min, 5 wrong codes) bound
   to the cookie `herd_sign_in` (`cookies.py`); `sign_in.py` is the second step.
   Whatever ends a person's sessions ends her waiting sign-ins too. Codes are judged at
@@ -266,27 +317,50 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `uqr`; e2e `tests/totp.spec.mjs` with an authenticator in `totp-helpers.mjs`.
 - Security (M9b Task 18, ASVS J7–J14; rows in `docs/SICHERHEIT.md`):
   - Sessions are judged at the wall time (`auth/timing.SESSION_CLOCK`, not the e2e
-    clock). A session unused for `HERD_SESSION_IDLE_HOURS` (24, 0 = off) ends; the touch
-    in `current_auth` commits at once and never waits (`SKIP LOCKED`); `/api/stream` and
-    collab's checks do not touch. `user_session.device` ("Browser · System", never a
-    version, `auth/device.py`) and `signed_in_at` are noted by the one hand-over helper
-    `auth/handover.py` (password, OIDC, second factor). `/api/auth/me/sessions`
-    (`sessions_router.py`, `own_sessions.py`): list, end one, end all others.
-  - Linking a provider account needs the password or a provider sign-in of this
-    session at most 10 min ago (`auth/reauth.py`, 403 `auth.reauth_required`; frontend
-    `profile/identities/ReauthDialog.tsx`).
+    clock). A session unused for `HERD_SESSION_IDLE_HOURS` (24, 0 = off) ends, and the
+    end is recorded on its row (expiry = the idle moment: by the request that finds it,
+    a logout, the worker's upkeep), so raising the setting later revives nothing. Only
+    the person's own requests count as use: the SPA marks requests after more than 60 s
+    without input in the tab `X-Herd-Unattended: 1` (`lib/attention.ts`), which
+    `current_auth` does not count, and while she works with no counted request for
+    5 min it sends `POST /api/auth/me/touch` (204, no write; typing only in the live
+    editor keeps the session). The touch in `current_auth` commits at once and never
+    waits (`SKIP LOCKED`); `/api/stream` and collab's checks do not touch.
+    `/api/auth/me` names `session_limits` (`idle_hours`, null when off; `ttl_hours`).
+    `user_session.device` ("Browser · System", never a version, `auth/device.py`) and
+    `signed_in_at` are noted by the one hand-over helper `auth/handover.py` (password,
+    OIDC, second factor). `/api/auth/me/sessions` (`sessions_router.py`,
+    `own_sessions.py`): list, end one, end all others (the audit counts only sessions
+    still running).
+  - Linking a provider account needs the password, or a fresh login at a provider the
+    person already uses, at most 10 min ago (`auth/reauth.py`, 403
+    `auth.reauth_required`; frontend `profile/identities/ReauthDialog.tsx`). Only a
+    sign-in started for it (`?reauth=true`: `prompt=login`, `max_age=600`, an
+    `auth_time` within 10 min or `oidc.reauth_stale`; `oidc/fresh.py`, column `reauth`
+    on `oidc_flow` and `sign_in_challenge`) counts; an ordinary provider sign-in, maybe
+    silent, does not.
   - Writes count per person/agent and minute in PostgreSQL (`core/write_limit.py`,
     `HERD_WRITE_RATE_PER_MINUTE` 120, uploads apart `HERD_UPLOAD_RATE_PER_MINUTE` 30;
-    429 `rate.limited`): content routers include `web/write_limits.COUNTED`; agent and
-    `/mcp` writes count in `writing.effect` inside the step's transaction. A new content
-    write route adds `COUNTED`. Bulk scripts wait out a 429 (`Retry-After`).
-  - `HERD_CLAMAV_ADDRESS` (optional clamd, `core/virus_scan.py`): attachments and
-    imports are scanned before storing; a find is 422 `attachment.rejected_by_scan`, a
-    failed scan 503 `attachment.scan_unavailable` (fail closed). Stub
+    429 `rate.limited`): content routers include `auth/write_limits.COUNTED`, single
+    content routes of other routers carry it at the route, upload routes carry `UPLOAD`
+    besides (decided at the route, never by path); agent and `/mcp` writes count in
+    `writing.effect` inside the step's transaction. `tests/test_write_limit_routes.py`
+    fails for any unsafe `/api` route that is neither counted nor on its commented
+    exemption list: a new write route adds `COUNTED` or an exemption with its reason.
+    Bulk scripts wait out a 429 (`Retry-After`).
+  - `HERD_CLAMAV_ADDRESS` (optional clamd, `core/virus_scan.py`): attachments, imports
+    and skill imports are scanned before storing, never while a transaction or pooled
+    connection waits; a find is 422 `attachment.rejected_by_scan`, a failed scan 503
+    `attachment.scan_unavailable` (fail closed). Uploaded backup archives are not
+    scanned (owner-only, a database dump; `docs/SICHERHEIT.md`). Stub
     `tests/support/clamd_stub.py`.
   - `HERD_DATABASE_SSLMODE`/`HERD_DATABASE_SSLROOTCERT` (`core/config_database.py`,
     `core/db_tls.py`) reach every engine (`make_engine` sets `connect_args`), the LISTEN
-    connection and `pgtools.child_env` (`PGSSLMODE`); the setting wins over the URL's.
+    connection and `pgtools.child_env` (`PGSSLMODE`, `PGSSLROOTCERT`; for verify-ca/-full
+    without a file `PGSSLROOTCERT=system`, as asyncpg uses the system's CAs); the
+    setting wins over the URL's. A failing `pg_dump`/`pg_restore`/`psql` logs only its
+    connection-level error line, masked; an SQL error only as `query failed`
+    (`ops/tool_errors.py`).
     `HERD_INTERNAL_TOKEN_PREVIOUS` is accepted besides the current token during a
     rotation (API only; collab sends the current one).
   - OAuth apps have their own callback `/api/ai/oauth/{oauth_client.id}/callback`
@@ -297,9 +371,11 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   - Optional separate roles: `HERD_MIGRATE_DATABASE_URL` (+ `_PASSWORD`) owns the
     schema and is used by Alembic and every `python -m app.ops` command and pg tool;
     `HERD_DATABASE_RUNTIME_ROLE` gets data rights after every migration run
-    (`core/db_roles.py`, also `ALTER DEFAULT PRIVILEGES`). With them, restoring from the
-    administration is refused (`restore.not_schema_owner`). Overlay
-    `deploy/compose/compose.roles.yml`; chart `database.migrate`.
+    (`core/db_roles.py`, also `ALTER DEFAULT PRIVILEGES`; `alembic_version` stays
+    read-only for it). With them, restoring from the administration is refused
+    (`restore.not_schema_owner`). Overlay `deploy/compose/compose.roles.yml` (role all:
+    the container still holds the owner's password, so the split stops SQL injection,
+    not code in the container); chart `database.migrate`.
 - Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing,
   messaging, tickets, agents, automations, MCP, backups and TOTP in the real app (role all, worker
   included) on a throwaway database, with the OpenAI stub
