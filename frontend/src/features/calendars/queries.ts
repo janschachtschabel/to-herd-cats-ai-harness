@@ -1,6 +1,7 @@
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { api, unwrap, type Schemas } from '@/lib/api'
+import { spaceQuery } from '@/features/spaces/queries'
 import { pagedQuery } from '@/lib/paging'
 import { calendarKeys } from './keys'
 
@@ -22,6 +23,16 @@ export const spaceCalendarsQuery = (spaceId: string) =>
       }),
     ),
   )
+
+/** The spaces one's calendars belong to, every page (without other people's
+ *  personal spaces, whose calendars one does not list). */
+export const calendarSpacesQuery = pagedQuery(calendarKeys.spaceNames, async (cursor) =>
+  unwrap(
+    await api.GET('/api/spaces', {
+      params: { query: { cursor, limit: PAGE_SIZE, include_others_personal: false } },
+    }),
+  ),
+)
 
 /** What the window is asked for. `calendarIds`: only these calendars (an empty list
  *  asks nothing); `spaceId`: the named way, this space's events alone; `q`: titles. */
@@ -92,4 +103,13 @@ export function useSpaceCalendars(spaceId: string | undefined) {
 export function useWindow(params: WindowParams, { everything = true } = {}) {
   const enabled = params.calendarIds === undefined || params.calendarIds.length > 0
   return useLoaded(windowQuery(params), { everything, enabled })
+}
+
+export function useCalendarSpaces({ enabled = true } = {}) {
+  return useLoaded(calendarSpacesQuery, { enabled })
+}
+
+/** The space named in the address (`/calendar?space=<id>`), if any. */
+export function useNamedSpace(spaceId: string | undefined) {
+  return useQuery({ ...spaceQuery(spaceId ?? ''), enabled: Boolean(spaceId) })
 }

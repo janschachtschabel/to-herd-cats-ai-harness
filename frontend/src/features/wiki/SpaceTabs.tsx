@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import {
   BookOpen,
   CalendarClock,
+  CalendarDays,
   Inbox,
   Layers,
   ScrollText,
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { automationAbilities } from '@/features/automations/abilities'
+import { calendarAbilities } from '@/features/calendars/abilities'
 import { ProposalsTab } from '@/features/proposals/ProposalsTab'
 import { skillAbilities } from '@/features/skills/abilities'
 import { ticketAbilities } from '@/features/tickets/abilities'
@@ -26,7 +28,8 @@ const tab =
 /** The views of a space: its wiki (pages, trash, settings), its proposals for page
  *  editors (with the number of open ones), with `ticket.read` its board, its epics, its sprints and its backlog, and its skills for those who may
  *  read them (AI and a role in the space, or `skill.manage`), and its automations
- *  for people with AI and a role here (or `agent.manage`). */
+ *  for people with AI and a role here (or `agent.manage`), and with `calendar.read` its
+ *  calendar (the calendar page filtered to the space, plan M10). */
 export function SpaceTabs({
   space,
   me,
@@ -78,6 +81,16 @@ export function SpaceTabs({
             {t('tickets.space.backlog')}
           </Link>
         </>
+      )}
+      {calendarAbilities(space.my_role).read && (
+        <Link
+          to="/calendar"
+          search={{ space: space.id }}
+          className={cn(tab, 'border-transparent text-muted-foreground hover:text-foreground')}
+        >
+          <CalendarDays className="size-4" aria-hidden />
+          {t('nav.calendar')}
+        </Link>
       )}
       {skillAbilities(me, space).read && (
         <Link to="/spaces/$spaceId/skills" params={params} {...look('skills')}>

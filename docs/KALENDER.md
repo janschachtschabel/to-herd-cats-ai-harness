@@ -4,7 +4,8 @@ Der Kalender entsteht mit Meilenstein 10 (Plan
 `docs/superpowers/plans/2026-11-18-m10-kalender.md`, Entscheidungen 2 und 3). Diese
 Seite wächst mit jeder Aufgabe; vollständig wird sie mit Task 21 (Bedienung, Serien,
 Einladungen, Feeds und Abos, Abgleich, Betrieb). Bisher beschreibt sie Kalender,
-Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
+Standardkalender, Rechte, Termine (anlegen, lesen, sehen; Task 3a) und die
+Kalenderseite (Task 10).
 
 ## Kalender und Bereiche
 
@@ -271,6 +272,42 @@ Art ist 422 `calendar.overlay_kind_unknown` (so schaltet die Oberfläche Überla
 ab). Die Liste ist seitenweise nach (Tag, Art, ID) sortiert, Aufgaben eines Tages nach
 ihrem Zeitpunkt; ein Cursor gilt nur mit der Zone, mit der er entstand (422
 `calendar.cursor_time_zone`).
+
+## Die Kalenderseite
+
+- **Aufruf:** „Kalender“ in der Seitenleiste unter „Arbeit“ (`/calendar`) zeigt die
+  Kalender der eigenen Bereiche. Aus einem Bereich führt „Kalender“ in seiner
+  Ansichtsleiste auf dieselbe Seite, gefiltert auf diesen Bereich
+  (`/calendar?space=<id>`); für Admins außerhalb des Bereichs ist das der benannte,
+  auditierte Weg. „Alle meine Kalender“ hebt den Filter auf.
+- **Vier Ansichten:** Monat, Woche, Tag und Agenda (30 Tage ab dem gewählten Tag).
+  Ansicht und Tag stehen in der Adresse (`view`, `date`), „Heute“, „Voriger“ und
+  „Nächster Zeitraum“ blättern. Die Wochen beginnen nach der Sprache (Deutsch: Montag,
+  Englisch: Sonntag). Zeiten zeigt die Seite in der Zeitzone des Browsers und fragt den
+  Zeitraum in ihr an (`time_zone`); ganztägige Termine bleiben in jeder Zone auf ihren
+  Tagen.
+- **Kalenderliste:** je Bereich gruppiert, mit Farbe und einem Schalter zum Ein- und
+  Ausblenden (im Browser gemerkt). „nur lesen“ steht an Kalendern, deren Bereich einem
+  nur die Leserolle gibt. Ausgeblendete Kalender fragt die Seite nicht an
+  (`calendar_ids`).
+- **Monat:** je Tag höchstens drei Termine, darüber „+N weitere“ (öffnet den Tag).
+  Tastatur: Pfeiltasten wählen einen Tag (über den Rand blättert der Monat), Pos1 und
+  Ende springen an den Rand der Woche, die Eingabetaste öffnet den Tag. **Woche und
+  Tag:** oben eine Zeile für ganztägige und mehrtägige Termine, darunter die Stunden;
+  Termine zur selben Zeit stehen nebeneinander. **Agenda:** Tage als Überschriften,
+  weitere Termine mit „Weitere Termine laden“.
+- **Termine:** Jeder Termin ist ein Knopf mit vollem Namen (Titel, Zeit, Kalender). Ein
+  Termin, den man nur als belegt sieht, heißt „Belegt“ und zeigt keinen Titel. Ein Klick
+  zeigt ihn zum Lesen (Zeit, Ort, Kalender, Serie); Anlegen und Ändern kommen mit dem
+  Termin-Dialog (Task 11). Die Suche im Kopf findet Titel, die man sieht.
+- **Nachladen und Grenzen:** Die Seite lädt den Zeitraum seitenweise (je 100 Vorkommen)
+  und zeigt, was schon da ist. Mehr als 2.000 Vorkommen in einem Zeitraum lehnt der
+  Server ab (`calendar.window_too_dense`); die Seite sagt dann, dass man Kalender
+  ausblenden oder eine kürzere Ansicht wählen soll, und behält, was sie schon geladen
+  hat.
+- **Live:** Ändert sich ein Kalender oder ein Termin in einem Bereich, lädt die Seite
+  die betroffenen Listen und Zeiträume neu (`calendar.changed` mit Bereich und Kalender,
+  nur IDs).
 
 ## Was Admins sehen und was im Audit steht
 

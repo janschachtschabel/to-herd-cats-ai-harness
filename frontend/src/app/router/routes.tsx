@@ -1,4 +1,5 @@
 import { createRoute, lazyRouteComponent, notFound, redirect } from '@tanstack/react-router'
+import { calendarSearch } from '@/features/calendars/search'
 import { pageQuery } from '@/features/wiki/queries'
 import { ticketSearch } from '@/features/tickets/filters'
 import { adminTree } from './adminRoutes'
@@ -32,6 +33,10 @@ const TicketsPage = lazyRouteComponent(
 const TicketScreen = lazyRouteComponent(
   () => import('@/features/tickets/TicketScreen'),
   'TicketScreen',
+)
+const CalendarPage = lazyRouteComponent(
+  () => import('@/features/calendars/CalendarPage'),
+  'CalendarPage',
 )
 const ActivityPage = lazyRouteComponent(
   () => import('@/features/activity/ActivityPage'),
@@ -126,6 +131,19 @@ const ticketRoute = createRoute({
   },
 })
 
+/** The calendar (plan M10): view and day in the address; `space` names one space. */
+const calendarRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/calendar',
+  validateSearch: calendarSearch,
+  loader: () => CalendarPage.preload?.(),
+  component: function CalendarRoute() {
+    const search = calendarRoute.useSearch()
+    const navigate = calendarRoute.useNavigate()
+    return <CalendarPage search={search} onSearch={(next) => void navigate({ search: next })} />
+  },
+})
+
 const activityRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/activity',
@@ -156,6 +174,7 @@ export const routeTree = rootRoute.addChildren([
     ticketsRoute,
     myBoardRoute,
     ticketRoute,
+    calendarRoute,
     activityRoute,
     profileRoute,
     ...tokenRoutes,

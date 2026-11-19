@@ -7,6 +7,8 @@ export const calendarKeys = {
   /** One space's calendars, the named way (`GET /api/spaces/{id}/calendars`). */
   spaces: ['calendars', 'space'] as const,
   space: (spaceId: string) => ['calendars', 'space', spaceId] as const,
+  /** The spaces the calendars belong to: their names, kinds and one's roles. */
+  spaceNames: ['calendars', 'space-names'] as const,
   /** The window's occurrences, keyed by what is asked. */
   windows: ['calendars', 'window'] as const,
   window: (params: object) => ['calendars', 'window', params] as const,

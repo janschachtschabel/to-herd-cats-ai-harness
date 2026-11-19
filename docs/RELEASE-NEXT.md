@@ -27,8 +27,9 @@ dahin gilt:
 - Auch `RELEASE-1.0.0.md` ist nicht endgültig; beide Notizen werden zur Freigabe
   zusammengeführt.
 - Auf dem Arbeitszweig liegt außerdem der Anfang von M10 (Kalender, Tasks 1 bis 4, 7a,
-  9 und 13a, [`KALENDER.md`](KALENDER.md); Task 9, die Überlagerungen, bringt keine
-  Migration und keine Einstellung). Er ist hier nur bei den Migrationen erwähnt und wird
+  9, 10 und 13a, [`KALENDER.md`](KALENDER.md); Task 9, die Überlagerungen, bringt keine
+  Migration und keine Einstellung; Task 10 ist die Kalenderseite unter „Arbeit“). Er ist
+  hier nur bei den Migrationen erwähnt und wird
   beschrieben, wenn M10 fertig ist.
 
 ## Was neu ist

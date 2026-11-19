@@ -1,5 +1,5 @@
 import { isoToZoned } from '@/features/automations/zoned'
-import type { Day, Timed } from './dates'
+import { daysOf, type Day, type Timed } from './dates'
 
 /** A span of one day in minutes of the wall clock (0 … 1440). */
 export interface Span {
@@ -74,4 +74,23 @@ export function segmentOn(occurrence: Timed, day: Day, zone: string): Span | nul
 export function inAllDayRow(occurrence: Timed): boolean {
   if (occurrence.all_day) return true
   return new Date(occurrence.end).getTime() - new Date(occurrence.start).getTime() >= 86_400_000
+}
+
+/** The occurrences of each day they touch for the viewer, in the order the views show
+ *  them (all-day first, then by start). */
+export function byDay<T extends Timed>(
+  occurrences: readonly T[],
+  zone: string,
+  order: (a: T, b: T) => number,
+): Map<Day, T[]> {
+  const days = new Map<Day, T[]>()
+  for (const occurrence of occurrences) {
+    for (const day of daysOf(occurrence, zone)) {
+      const list = days.get(day)
+      if (list) list.push(occurrence)
+      else days.set(day, [occurrence])
+    }
+  }
+  for (const list of days.values()) list.sort(order)
+  return days
 }

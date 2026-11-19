@@ -8,7 +8,8 @@
   "errors": {
     "calendar": {
       "window_out_of_range": "The calendar spans the years 1900 to 2399.",
-      "cursor_time_zone": "The view changed its time zone; please load it again from the start."
+      "cursor_time_zone": "The view changed its time zone; please load it again from the start.",
+      "window_too_dense": "This period holds too many events (more than 2,000). Hide calendars or choose a shorter view."
     },
     "event": {
       "too_long": "An event lasts a year and a day at most.",
@@ -43,6 +44,63 @@
         "tentative": "maybe",
         "declined": "declined"
       }
+    }
+  },
+  "nav": {
+    "calendar": "Calendar"
+  },
+  "calendar": {
+    "title": "Calendar",
+    "named": "Calendars of the space {{space}}",
+    "showAll": "All my calendars",
+    "views": {
+      "label": "View",
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "agenda": "Agenda"
+    },
+    "toolbar": {
+      "label": "Period",
+      "today": "Today",
+      "previous": "Previous period",
+      "next": "Next period",
+      "search": "Search events"
+    },
+    "list": {
+      "title": "Calendars",
+      "readOnly": "read only",
+      "empty": "No calendars yet.",
+      "unknownSpace": "Another space"
+    },
+    "event": {
+      "busy": "Busy",
+      "untitled": "Untitled",
+      "allDay": "all day",
+      "cancelled": "cancelled",
+      "details": "{{time}}, {{calendar}}",
+      "series": "Part of a series",
+      "location": "Location",
+      "calendar": "Calendar",
+      "redacted": "You see this event only as busy.",
+      "cancelledNote": "This event is cancelled."
+    },
+    "month": {
+      "more_one": "+{{count}} more",
+      "more_other": "+{{count}} more",
+      "hint": "Arrow keys choose a day, Enter opens it."
+    },
+    "week": {
+      "allDay": "All day",
+      "openDay": "Open {{day}}"
+    },
+    "window": {
+      "empty": "No events in this period.",
+      "loadingMore": "Loading more events …",
+      "hidden": "Every calendar is hidden."
+    },
+    "agenda": {
+      "more": "Load more events"
     }
   }
 }

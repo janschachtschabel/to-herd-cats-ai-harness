@@ -8,7 +8,8 @@
   "errors": {
     "calendar": {
       "window_out_of_range": "Der Kalender reicht von 1900 bis 2399.",
-      "cursor_time_zone": "Die Ansicht hat die Zeitzone gewechselt; bitte von vorn laden."
+      "cursor_time_zone": "Die Ansicht hat die Zeitzone gewechselt; bitte von vorn laden.",
+      "window_too_dense": "In diesem Zeitraum liegen zu viele Termine (mehr als 2.000). Blende Kalender aus oder wähle eine kürzere Ansicht."
     },
     "event": {
       "too_long": "Ein Termin dauert höchstens ein Jahr und einen Tag.",
@@ -43,6 +44,63 @@
         "tentative": "vielleicht",
         "declined": "abgesagt"
       }
+    }
+  },
+  "nav": {
+    "calendar": "Kalender"
+  },
+  "calendar": {
+    "title": "Kalender",
+    "named": "Kalender im Bereich {{space}}",
+    "showAll": "Alle meine Kalender",
+    "views": {
+      "label": "Ansicht",
+      "month": "Monat",
+      "week": "Woche",
+      "day": "Tag",
+      "agenda": "Agenda"
+    },
+    "toolbar": {
+      "label": "Zeitraum",
+      "today": "Heute",
+      "previous": "Voriger Zeitraum",
+      "next": "Nächster Zeitraum",
+      "search": "Termine suchen"
+    },
+    "list": {
+      "title": "Kalender",
+      "readOnly": "nur lesen",
+      "empty": "Noch keine Kalender.",
+      "unknownSpace": "Weiterer Bereich"
+    },
+    "event": {
+      "busy": "Belegt",
+      "untitled": "Ohne Titel",
+      "allDay": "ganztägig",
+      "cancelled": "abgesagt",
+      "details": "{{time}}, {{calendar}}",
+      "series": "Teil einer Serie",
+      "location": "Ort",
+      "calendar": "Kalender",
+      "redacted": "Du siehst diesen Termin nur als belegt.",
+      "cancelledNote": "Dieser Termin ist abgesagt."
+    },
+    "month": {
+      "more_one": "+{{count}} weiterer",
+      "more_other": "+{{count}} weitere",
+      "hint": "Pfeiltasten wählen einen Tag, die Eingabetaste öffnet ihn."
+    },
+    "week": {
+      "allDay": "Ganztägig",
+      "openDay": "{{day}} öffnen"
+    },
+    "window": {
+      "empty": "Keine Termine in diesem Zeitraum.",
+      "loadingMore": "Weitere Termine werden geladen …",
+      "hidden": "Alle Kalender sind ausgeblendet."
+    },
+    "agenda": {
+      "more": "Weitere Termine laden"
     }
   }
 }
