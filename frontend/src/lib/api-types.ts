@@ -1599,7 +1599,7 @@ export interface paths {
         /**
          * Oauth Callback
          * @description An app's authorization server's redirect: finish the flow started with this
-         *     callback, then send the browser to the result page (`/ai/oauth/done?status=...`).
+         *     callback, then send the browser to its purpose's result page (`?status=...`).
          */
         get: operations["oauth_callback_api_ai_oauth__client_id__callback_get"];
         put?: never;

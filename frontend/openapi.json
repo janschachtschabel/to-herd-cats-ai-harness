@@ -23409,7 +23409,7 @@
     },
     "/api/ai/oauth/{client_id}/callback": {
       "get": {
-        "description": "An app's authorization server's redirect: finish the flow started with this\ncallback, then send the browser to the result page (`/ai/oauth/done?status=...`).",
+        "description": "An app's authorization server's redirect: finish the flow started with this\ncallback, then send the browser to its purpose's result page (`?status=...`).",
         "operationId": "oauth_callback_api_ai_oauth__client_id__callback_get",
         "parameters": [
           {
