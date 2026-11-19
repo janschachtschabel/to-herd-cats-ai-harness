@@ -38,6 +38,7 @@ MAX_ONSETS = 5000  # every DTSTART and RDATE of a definition
 MAX_RULE_MONTHS = 3
 MAX_RULE_DAYS = 3  # BYDAY entries
 MAX_RULE_MONTHDAYS = 10
+_MONTH_DAYS = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 
 
 def _free(units: int) -> None:
@@ -78,7 +79,7 @@ class Observance:
         if rule.count is not None:
             years.add(self.start.year + (rule.count - 1) * rule.interval)
         # a neighbour's onset stays a datetime
-        return sorted(each for each in years if MINYEAR < each < MAXYEAR)
+        return sorted([each for each in years if MINYEAR < each < MAXYEAR])
 
     def onsets_in(self, year: int) -> list[datetime]:
         rule = self.rule
@@ -108,7 +109,8 @@ def days_of(rule: ParsedRule, year: int, month: int, start_day: int = 1) -> list
     """The days of `month` in `year` a yearly rule picks (its start's day without
     BYMONTHDAY or BYDAY); `vtimezone_out` writes rules this reader reads. Found by
     arithmetic: work by the rule's list entries, never by the days of the month."""
-    first_weekday, last = calendar.monthrange(year, month)
+    first_weekday = date(year, month, 1).weekday()
+    last = _MONTH_DAYS[month - 1] + (month == 2 and calendar.isleap(year))
     if not rule.bymonthday and not rule.byday:
         return [start_day] if start_day <= last else []
     days: list[int] | range = range(1, last + 1)

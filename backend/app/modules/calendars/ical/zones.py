@@ -137,15 +137,19 @@ def _samples(year: int) -> list[datetime]:
     ]
 
 
-def _named(tzid: str, found: Definition, name: str) -> bool:
+def _words(tzid: str) -> str:
+    """The TZID's words, each between spaces (`(UTC+01:00) Amsterdam, Berlin, …`)."""
+    return f" {_NOT_LETTERS.sub(' ', tzid.lower()).strip()} "
+
+
+def _named(words: str, found: Definition, name: str) -> bool:
     """Whether the definition names the zone: its `X-LIC-LOCATION`, or the city in the
-    TZID (`(UTC+01:00) Amsterdam, Berlin, …`)."""
+    TZID (its `_words`)."""
     if name == found.location:
         return True
     area, _, city = name.rpartition("/")
     if area.split("/")[0] not in _AREAS:
         return False
-    words = f" {_NOT_LETTERS.sub(' ', tzid.lower()).strip()} "
     return f" {_NOT_LETTERS.sub(' ', city.lower()).strip()} " in words
 
 
@@ -156,6 +160,7 @@ class Resolver:
         self._components = dict(timezones)
         self._definitions: dict[str, Definition | str] = {}  # a definition or a code
         self._candidates: dict[tuple[str, int], list[str]] = {}
+        self._rankings: dict[tuple[str, tuple[int, ...]], list[str]] = {}
         self._same: dict[Definition, Definition] = {}  # one instance per content
         self._references: dict[tuple[int, str], int] = {}
         self._reference_offsets: dict[int, list[tuple[datetime, timedelta]]] = {}
@@ -178,20 +183,32 @@ class Resolver:
         if not FIRST_YEAR <= walls[0].year <= LAST_YEAR:
             raise Skip(problems.TIME_OUT_OF_RANGE)
         expected = [(wall, found.offset_at(wall, budget.spend)) for wall in walls]
-        fits: Counter[str] = Counter()
-        for index, year in enumerate(compared or (walls[0].year,)):
-            try:
-                fits.update(self._matching(tzid, found, year, budget))
-            except Skip:
-                if index == 0:
-                    raise
-                break  # no more comparisons for this file: decide on what was compared
-        for name in self._ranked(tzid, found, fits, budget):
-            budget.spend(1 + len(expected) // 4)
+        for name in self._ranking(tzid, found, tuple(compared or (walls[0].year,)), budget):
+            budget.spend(1 + len(expected) // 2)
             zone = ZoneInfo(name)
             if all(zone.utcoffset(wall) == offset for wall, offset in expected):
                 return name
         raise Skip(problems.TIME_ZONE_UNKNOWN)
+
+    def _ranking(
+        self, tzid: str, found: Definition, compared: tuple[int, ...], budget: Budget
+    ) -> list[str]:
+        """The zones that fit the definition in the years `compared`, best first; once
+        per TZID and years (on a fixed grid, so the events of a file share them)."""
+        key = (tzid, compared)
+        if key not in self._rankings:
+            fits: Counter[str] = Counter()
+            for index, year in enumerate(compared):
+                try:
+                    matching = self._matching(tzid, found, year, budget)
+                except Skip:
+                    if index == 0:
+                        raise
+                    break  # no more comparisons for this file: decide on what was compared
+                budget.spend(1 + len(matching) // 4)
+                fits.update(matching)
+            self._rankings[key] = self._ranked(tzid, found, fits, budget)
+        return self._rankings[key]
 
     def _definition(self, tzid: str, budget: Budget) -> Definition:
         """The definition of `tzid` (built once per TZID, its size charged);
@@ -229,12 +246,13 @@ class Resolver:
         self, tzid: str, found: Definition, fits: Counter[str], budget: Budget
     ) -> list[str]:
         ranks = _ranks()
-
-        def first_keys(name: str) -> tuple[int, bool, int]:
-            return (-fits[name], not _named(tzid, found, name), ranks[name][0])
-
-        ranked = sorted(fits, key=lambda name: (first_keys(name), ranks[name][1]))
-        lead = [name for name in ranked if first_keys(name) == first_keys(ranked[0])]
+        budget.spend(1 + 3 * len(fits))
+        words = _words(tzid)
+        keys = {
+            name: (-fits[name], not _named(words, found, name), ranks[name][0]) for name in fits
+        }
+        ranked = sorted(fits, key=lambda name: (keys[name], ranks[name][1]))
+        lead = [name for name in ranked if keys[name] == keys[ranked[0]]]
         if len(lead) > 1:
             scores = {name: self._reference(found, name, budget) for name in lead}
             lead.sort(key=lambda name: (-scores[name], ranks[name][1]))
@@ -253,7 +271,7 @@ class Resolver:
         key = (id(found), name)
         if key not in self._references:
             offsets = self._reference_offsets[id(found)]
-            budget.spend(len(offsets) // 4)
+            budget.spend(1 + len(offsets) // 2)
             zone = ZoneInfo(name)
             self._references[key] = sum(zone.utcoffset(s) == offset for s, offset in offsets)
         return self._references[key]

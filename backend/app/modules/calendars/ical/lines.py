@@ -52,24 +52,29 @@ class Component:
     name: str  # upper case
     lines: list[Contentline] = field(default_factory=list)
     children: list["Component"] = field(default_factory=list)
-    _props: list[Prop] | None = None
+    _props: dict[str, list[Prop]] | None = None  # by name, in the order written
     broken: int = 0  # lines that could not be split
 
-    def props(self) -> list[Prop]:
+    def props(self) -> dict[str, list[Prop]]:
+        """The properties by name, parsed once: every look-up after is one step, never
+        a walk over the component's lines (re-check RC7a: work by the data once)."""
         if self._props is None:
-            self._props = []
+            self._props = {}
             for line in self.lines:
                 try:
-                    self._props.append(_prop(line))
+                    prop = _prop(line)
                 except ValueError:
                     self.broken += 1
+                    continue
+                self._props.setdefault(prop.name, []).append(prop)
         return self._props
 
     def all(self, name: str) -> list[Prop]:
-        return [prop for prop in self.props() if prop.name == name]
+        return list(self.props().get(name, ()))
 
     def first(self, name: str) -> Prop | None:
-        return next((prop for prop in self.props() if prop.name == name), None)
+        found = self.props().get(name)
+        return found[0] if found else None
 
     def quick(self, name: str) -> Prop | None:
         """The first property `name`, parsing only the lines that may be it."""
