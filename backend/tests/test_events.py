@@ -120,6 +120,7 @@ async def test_a_new_event_shows_what_was_stored(
         "calendar_id": calendar["id"],
         "space_id": calendar["space_id"],
         "series_id": None,
+        "recurrence_id": None,
         "title": "Planung",
         "location": "Raum 1",
         "description": "<b>kein HTML</b>",  # plain text, never rendered
