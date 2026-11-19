@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import Actor
 from app.core.request_context import client_ip
+from app.modules.audit import kept
 from app.modules.audit.models import (
     ADMIN_ACCESS,
     AGENT_ADMIN_ACCESS,
@@ -71,14 +72,17 @@ async def record_admin_access(
     session: AsyncSession, actor: Actor, space_id: uuid.UUID, kind: str
 ) -> None:
     """An admin opened a team or personal space they are not a member of (spec 5.5):
-    one entry per admin, space and UTC day."""
-    await AuditRepository(session).add_unless_present(
+    one entry per admin, space and UTC day; kept should the change that follows be
+    refused (`kept`)."""
+    values = {
         **_who(actor),
-        action=ADMIN_ACCESS,
-        target_type="space",
-        target_id=space_id,
-        details={"kind": kind},
-    )
+        "action": ADMIN_ACCESS,
+        "target_type": "space",
+        "target_id": space_id,
+        "details": {"kind": kind},
+    }
+    await AuditRepository(session).add_unless_present(**values)
+    kept.note(session, [values])
 
 
 async def record_agent_admin_access(
@@ -104,7 +108,8 @@ async def record_private_event_reads(
 ) -> None:
     """An admin read private calendar events by admin power alone (plan M10, review
     task 3a R3a-4): one entry per admin, event and UTC day, in one statement; `events`
-    are (event, space, calendar) ids, the only details."""
+    are (event, space, calendar) ids, the only details. Kept should the change that
+    follows be refused (`kept`)."""
     rows = [
         {
             **_who(actor),
@@ -116,6 +121,7 @@ async def record_private_event_reads(
         for event_id, space_id, calendar_id in sorted(set(events))
     ]
     await AuditRepository(session).add_many_unless_present(rows)
+    kept.note(session, rows)
 
 
 async def record_event_admin_write(

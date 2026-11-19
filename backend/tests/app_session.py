@@ -4,7 +4,12 @@ from collections.abc import AsyncIterator, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import discard_after_commit, run_after_commit
+from app.core.db import (
+    discard_after_commit,
+    discard_after_rollback,
+    run_after_commit,
+    run_after_rollback,
+)
 
 
 def session_override(session: AsyncSession) -> Callable[[], AsyncIterator[AsyncSession]]:
@@ -24,7 +29,9 @@ def session_override(session: AsyncSession) -> Callable[[], AsyncIterator[AsyncS
             discard_after_commit(session)
             if nested.is_active:
                 await nested.rollback()
+            await run_after_rollback(session)
             raise
+        discard_after_rollback(session)
         await run_after_commit(session)
 
     return _session_override

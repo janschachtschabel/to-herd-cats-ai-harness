@@ -14,7 +14,7 @@
 - Changing and deleting one (task 3b) is the named way too, under a row lock (a series
   before its override): full sight and `calendar.write` (`event_writes.require_writable`),
   the version read (409), then the scope (`series`, `series_split`). A refusal keeps
-  the audit written before it (`event_writes.refusals_keep_audit`); a write by admin
+  the audit written before it (`event_writes.refusals_roll_back`); a write by admin
   power alone is audited. Deleting leaves a tombstone: the series with its overrides
   (`scope=all`), an EXDATE (`scope=this`, also for deleting an override), or the end
   of the series (`scope=following`; at the first occurrence: all).
@@ -43,7 +43,7 @@ from app.modules.calendars.event_writes import (
     announce,
     audit_admin_write,
     new_uid,
-    refusals_keep_audit,
+    refusals_roll_back,
     require_version,
     require_writable,
     tombstone,
@@ -150,7 +150,7 @@ class EventService:
     ) -> Changed:
         seen = await self._for_write(actor, event_id)
         event = seen.event
-        async with refusals_keep_audit(self.session):
+        async with refusals_roll_back(self.session):
             unhides = change.values.get("visibility", event.visibility) != event.visibility
             await require_writable(self.session, actor, seen, changes_visibility=unhides)
             require_version(event, version)
@@ -175,7 +175,7 @@ class EventService:
     ) -> None:
         seen = await self._for_write(actor, event_id)
         event = seen.event
-        async with refusals_keep_audit(self.session):
+        async with refusals_roll_back(self.session):
             await require_writable(self.session, actor, seen)
             require_version(event, version)
             await self._remove(actor, event, scope, occurrence)

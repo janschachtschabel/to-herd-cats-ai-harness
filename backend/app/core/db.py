@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 AfterCommit = Callable[[AsyncSession], Awaitable[None]]
 _AFTER_COMMIT = "herd.after_commit"
+_AFTER_ROLLBACK = "herd.after_rollback"
 
 
 def make_engine(
@@ -71,7 +72,9 @@ async def get_session() -> AsyncIterator[AsyncSession]:
         except Exception:
             discard_after_commit(session)
             await session.rollback()
+            await run_after_rollback(session)
             raise
+        discard_after_rollback(session)
         await run_after_commit(session)
 
 
@@ -84,6 +87,34 @@ def after_commit(session: AsyncSession, action: AfterCommit) -> None:
 
 def discard_after_commit(session: AsyncSession) -> None:
     session.info.pop(_AFTER_COMMIT, None)
+
+
+def after_rollback(session: AsyncSession, action: AfterCommit) -> bool:
+    """Run `action` once the request's transaction has rolled back (a refused or failed
+    request), with the session outside any transaction: for what must outlive the
+    refusal, such as the audit of an admin's look into a foreign space
+    (`audit/kept.py`, review M10 task 3b R3b-5). Dropped when the request commits.
+    Whether it was not registered yet."""
+    actions: list[AfterCommit] = session.info.setdefault(_AFTER_ROLLBACK, [])
+    if action in actions:
+        return False
+    actions.append(action)
+    return True
+
+
+def discard_after_rollback(session: AsyncSession) -> None:
+    session.info.pop(_AFTER_ROLLBACK, None)
+
+
+async def run_after_rollback(session: AsyncSession) -> None:
+    """The registered actions; a failing one is logged, never raised over the
+    request's own error."""
+    actions: list[AfterCommit] = session.info.pop(_AFTER_ROLLBACK, [])
+    for action in actions:
+        try:
+            await action(session)
+        except Exception as exc:
+            logger.warning("after-rollback action failed", extra={"error": type(exc).__name__})
 
 
 def after_commit_mark(session: AsyncSession) -> int:

@@ -6,22 +6,30 @@ private event read by admin power, survive a 409 and a 422; nothing was written,
 there is no `calendar.admin_write`."""
 
 import uuid
+from datetime import datetime
 from typing import Any
 
+import pytest
 from sqlalchemy import select
 
+from app.core.errors import Conflict
 from app.core.principal import Principal
+from app.modules.audit import kept
 from app.modules.audit.models import (
     ADMIN_ACCESS,
     CALENDAR_ADMIN_WRITE,
     CALENDAR_PRIVATE_READ,
     AuditLog,
 )
+from app.modules.calendars.event_models import CalendarEvent
+from app.modules.calendars.event_times import Times
+from app.modules.calendars.event_writes import Change, Scope
+from app.modules.calendars.events import EventService, NewEvent
 from app.modules.spaces.models import Space, SpaceKind, SpaceRole
 from app.modules.spaces.repository import SpaceRepository
 from app.modules.users.models import User
 from tests.factories import login
-from tests.factories_calendar import new_calendar, new_event
+from tests.factories_calendar import actor_of, new_calendar, new_event
 from tests.real_db import MakeRealClient, RealDb
 
 
@@ -93,3 +101,53 @@ async def test_an_admins_refused_write_in_a_foreign_space_stays_audited(
     assert CALENDAR_ADMIN_WRITE not in [action for action, _ in entries]
     read = await member.get(f"/api/events/{plain['id']}")
     assert (read.json()["title"], read.json()["version"]) == ("Termin", 1)
+
+
+async def test_a_callers_refused_write_rolls_back_its_work_and_keeps_the_audit(
+    real_db: RealDb, make_real_client: MakeRealClient
+) -> None:
+    """A caller that is no HTTP request (an import, an agent's step) holds work of its
+    own when an admin's write in a foreign space is refused: the service commits
+    nothing, the caller rolls back, and `audit.kept.write` then keeps the audit of the
+    admin's look in a transaction of its own (review M10 task 3b, R3b-5)."""
+    member = await make_real_client()
+    await login(member, real_db.member_email)
+    team_id = await _team_of(real_db, real_db.member_email)
+    personal_id = await _personal_of(real_db, real_db.member_email)
+    calendar_id = uuid.UUID((await new_calendar(member, team_id))["id"])
+    private = await new_event(
+        member, (await new_calendar(member, personal_id))["id"], visibility="private"
+    )
+    unfinished = "unfinished@example.com"
+    async with real_db.database.session_factory() as session:
+        owner = await session.scalar(select(User).where(User.email == real_db.owner_email))
+        assert owner is not None
+        actor = await actor_of(session, owner)
+        service = EventService(session)
+        start = Times(
+            starts_at=datetime.fromisoformat("2026-12-01T10:00:00+00:00"),
+            ends_at=datetime.fromisoformat("2026-12-01T11:00:00+00:00"),
+        )
+        await service.create(actor, calendar_id, NewEvent(title="X", times=start, uid=unfinished))
+        with pytest.raises(Conflict):
+            await service.update(
+                actor,
+                uuid.UUID(private["id"]),
+                Change({"title": "Y"}),
+                scope=Scope.ALL,
+                occurrence=None,
+                version=99,
+            )
+        await session.rollback()  # the caller gives its unfinished work up
+        await kept.write(session)
+    async with real_db.database.session_factory() as session:
+        made = await session.scalar(select(CalendarEvent).where(CalendarEvent.uid == unfinished))
+    assert made is None
+    entries = await _entries(real_db, real_db.owner_email)
+    assert sorted(entries) == sorted(
+        [
+            (ADMIN_ACCESS, team_id),
+            (ADMIN_ACCESS, personal_id),
+            (CALENDAR_PRIVATE_READ, uuid.UUID(private["id"])),
+        ]
+    )

@@ -8,10 +8,12 @@
   (attendees, import, agent tools) calls this one function.
 - `require_version`: the version the client read, else 409 `event.version_conflict`
   with `current_version` (said only to someone who passed `require_writable`).
-- `refusals_keep_audit`: a write runs in a savepoint; a refusal (any `AppError`) rolls
-  it back, then commits what the request recorded before it (an admin's look into a
-  foreign space, `space.admin_access`; a private event read by admin power), then
-  raises (review M10 task 1, R1-M2: the audit survives the refusal).
+- `refusals_roll_back`: a write runs in a savepoint; a refusal (any `AppError`) rolls
+  it back and raises. Nothing here commits: the caller owns the transaction (an HTTP
+  request, an import, an agent's step; review M10 task 3b, R3b-5). What the audit
+  recorded before a refusal (an admin's look into a foreign space,
+  `space.admin_access`; a private event read by admin power) outlives the caller's
+  rollback through `audit.kept` (review M10 task 1, R1-M2).
 - A write by admin power alone (a private event of someone else, or `calendar.write`
   only through the admin role) is audited, one `calendar.admin_write` per write with
   ids, the scope and the changed fields' names.
@@ -31,7 +33,7 @@ from uuid_utils.compat import uuid7
 
 from app.core.access import Action, held_by_admin_power, require
 from app.core.actor import Actor
-from app.core.errors import AppError, Conflict, Forbidden, NotFound
+from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.models_base import utcnow
 from app.core.outbox import emit
 from app.modules.audit.recorder import record_event_admin_write
@@ -115,15 +117,11 @@ def require_version(event: CalendarEvent, version: int) -> None:
 
 
 @asynccontextmanager
-async def refusals_keep_audit(session: AsyncSession) -> AsyncIterator[None]:
-    """The write inside runs in a savepoint; a refusal rolls it back and commits the
-    audit recorded before it, then raises."""
-    try:
-        async with session.begin_nested():
-            yield
-    except AppError:
-        await session.commit()
-        raise
+async def refusals_roll_back(session: AsyncSession) -> AsyncIterator[None]:
+    """The write inside runs in a savepoint; a refusal rolls only it back and raises.
+    It never commits (the caller's transaction is the caller's)."""
+    async with session.begin_nested():
+        yield
 
 
 def snapshot(event: CalendarEvent) -> dict[str, Any]:
