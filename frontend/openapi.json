@@ -2973,6 +2973,13 @@
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "time_zone": {
+            "default": "Europe/Berlin",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Time Zone",
+            "type": "string"
           }
         },
         "required": [
@@ -2982,7 +2989,7 @@
         "type": "object"
       },
       "CalendarOut": {
-        "description": "`is_default`: made by the system for a personal space (\u201eMein Kalender\u201c) or the\ngeneral space; there is at most one per space, and it cannot be archived. `name`\nis null for a default nobody renamed: the interface words it.",
+        "description": "`is_default`: made by the system for a personal space (\u201eMein Kalender\u201c) or the\ngeneral space; there is at most one per space, and it cannot be archived. `name`\nis null for a default nobody renamed: the interface words it. `time_zone`: the\nzone of a new event that names none.",
         "properties": {
           "color": {
             "$ref": "#/components/schemas/CalendarColor"
@@ -3012,6 +3019,10 @@
             "title": "Space Id",
             "type": "string"
           },
+          "time_zone": {
+            "title": "Time Zone",
+            "type": "string"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -3023,6 +3034,7 @@
           "name",
           "color",
           "is_default",
+          "time_zone",
           "version"
         ],
         "title": "CalendarOut",
@@ -3092,6 +3104,19 @@
               }
             ],
             "title": "Name"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
           },
           "version": {
             "title": "Version",
@@ -5470,6 +5495,162 @@
         "title": "EpicOut",
         "type": "object"
       },
+      "EventCreate": {
+        "additionalProperties": false,
+        "description": "An event with a time of day names `starts_at`, `ends_at` (instants) and its\n`tzid` (default: the calendar's zone); an all-day one `all_day`, `first_day` and\n`last_day`. `rrule` (RFC 5545, `DAILY` or slower), `rdates` and `exdates` (wall\ntimes in the event's zone, without offset) make it a series. `busy` defaults to\ntrue, for all-day events to false.",
+        "properties": {
+          "all_day": {
+            "default": false,
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "busy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Busy"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 20000,
+            "title": "Description",
+            "type": "string"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "exdates": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Exdates",
+            "type": "array"
+          },
+          "first_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Day"
+          },
+          "last_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Day"
+          },
+          "location": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Location",
+            "type": "string"
+          },
+          "rdates": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Rdates",
+            "type": "array"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus",
+            "default": "confirmed"
+          },
+          "title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tzid": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tzid"
+          },
+          "uid": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uid"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/EventVisibility",
+            "default": "default"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "EventCreate",
+        "type": "object"
+      },
       "EventIn": {
         "additionalProperties": false,
         "properties": {
@@ -5528,6 +5709,222 @@
         "title": "EventKind",
         "type": "string"
       },
+      "EventOut": {
+        "description": "`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`\nand of the day after `last_day`). `recurs_until`: when the last occurrence ends\n(null: endless). `redacted`: the caller sees only times and \"busy\"; content fields\nare null.",
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "busy": {
+            "title": "Busy",
+            "type": "boolean"
+          },
+          "calendar_id": {
+            "format": "uuid",
+            "title": "Calendar Id",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "exdates": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Exdates",
+            "type": "array"
+          },
+          "first_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Day"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Day"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "organizer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizerOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rdates": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Rdates",
+            "type": "array"
+          },
+          "recurs_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurs Until"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "tzid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tzid"
+          },
+          "uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uid"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/EventVisibility"
+          }
+        },
+        "required": [
+          "id",
+          "calendar_id",
+          "space_id",
+          "uid",
+          "title",
+          "description",
+          "location",
+          "all_day",
+          "starts_at",
+          "ends_at",
+          "first_day",
+          "last_day",
+          "tzid",
+          "rrule",
+          "rdates",
+          "exdates",
+          "recurs_until",
+          "status",
+          "visibility",
+          "busy",
+          "organizer",
+          "redacted",
+          "version"
+        ],
+        "title": "EventOut",
+        "type": "object"
+      },
+      "EventStatus": {
+        "enum": [
+          "confirmed",
+          "tentative",
+          "cancelled"
+        ],
+        "title": "EventStatus",
+        "type": "string"
+      },
       "EventType": {
         "description": "What an event rule listens to (decision 8).",
         "enum": [
@@ -5537,6 +5934,15 @@
           "page.review_due"
         ],
         "title": "EventType",
+        "type": "string"
+      },
+      "EventVisibility": {
+        "description": "`private`: only the organiser (and, on the named way, admins) sees its content;\nevery other reader of the calendar sees times and \"busy\" (`sight.py`).",
+        "enum": [
+          "default",
+          "private"
+        ],
+        "title": "EventVisibility",
         "type": "string"
       },
       "FiguresOut": {
@@ -7778,6 +8184,109 @@
         "title": "OAuthSpec",
         "type": "object"
       },
+      "OccurrenceOut": {
+        "description": "One occurrence in the window. `recurrence_id`: for an occurrence of a series,\nthe wall time it is named by (ISO 8601 without offset), which changing or deleting\njust this one takes back (task 3b); null for an event that is no series.\n`redacted`: the caller sees only times and \"busy\" (`title`, `location` null).",
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "busy": {
+            "title": "Busy",
+            "type": "boolean"
+          },
+          "calendar_id": {
+            "format": "uuid",
+            "title": "Calendar Id",
+            "type": "string"
+          },
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "recurrence_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence Id"
+          },
+          "recurring": {
+            "title": "Recurring",
+            "type": "boolean"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/EventVisibility"
+          }
+        },
+        "required": [
+          "event_id",
+          "calendar_id",
+          "space_id",
+          "start",
+          "end",
+          "all_day",
+          "recurring",
+          "recurrence_id",
+          "title",
+          "location",
+          "status",
+          "visibility",
+          "busy",
+          "redacted"
+        ],
+        "title": "OccurrenceOut",
+        "type": "object"
+      },
       "OffsiteState": {
         "enum": [
           "off",
@@ -7858,6 +8367,24 @@
           "name"
         ],
         "title": "OrgOut",
+        "type": "object"
+      },
+      "OrganizerOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "title": "OrganizerOut",
         "type": "object"
       },
       "Outcome": {
@@ -9102,6 +9629,33 @@
           "items"
         ],
         "title": "Page[MessageOut]",
+        "type": "object"
+      },
+      "Page_OccurrenceOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OccurrenceOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[OccurrenceOut]",
         "type": "object"
       },
       "Page_PersonalServerOut_": {
@@ -25026,6 +25580,165 @@
         ]
       }
     },
+    "/api/calendar/events": {
+      "get": {
+        "description": "Every occurrence overlapping `[from, to)` of the events one may list (member\nspaces and one's own; another space's only by naming it with `space_id`), by\nstart. Private events of others come `redacted`; `q` searches titles one sees.",
+        "operationId": "list_events_api_calendar_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "calendar_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Calendar Ids"
+            }
+          },
+          {
+            "description": "the named way: this space's events only",
+            "in": "query",
+            "name": "space_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the named way: this space's events only",
+              "title": "Space Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 300,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "description": "the viewer's zone (all-day days)",
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the viewer's zone (all-day days)",
+              "title": "Tz"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OccurrenceOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Events",
+        "tags": [
+          "calendar events"
+        ]
+      }
+    },
     "/api/calendars": {
       "get": {
         "description": "The calendars of the spaces one belongs to (or open spaces one reads), the same\nfor admins; another space's calendars only by naming it.",
@@ -25182,6 +25895,60 @@
         "summary": "Update Calendar",
         "tags": [
           "calendars"
+        ]
+      }
+    },
+    "/api/calendars/{calendar_id}/events": {
+      "post": {
+        "description": "A new event in the calendar (`calendar.write` in its space); the caller is its\norganiser and sees it in full.",
+        "operationId": "create_event_api_calendars__calendar_id__events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "calendar_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calendar Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Event",
+        "tags": [
+          "calendar events"
         ]
       }
     },
@@ -26068,6 +26835,49 @@
         "summary": "Open Dm",
         "tags": [
           "messaging"
+        ]
+      }
+    },
+    "/api/events/{event_id}": {
+      "get": {
+        "operationId": "get_event_api_events__event_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Event",
+        "tags": [
+          "calendar events"
         ]
       }
     },

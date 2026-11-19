@@ -2459,6 +2459,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/calendar/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Events
+         * @description Every occurrence overlapping `[from, to)` of the events one may list (member
+         *     spaces and one's own; another space's only by naming it with `space_id`), by
+         *     start. Private events of others come `redacted`; `q` searches titles one sees.
+         */
+        get: operations["list_events_api_calendar_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/calendars": {
         parameters: {
             query?: never;
@@ -2499,6 +2521,27 @@ export interface paths {
         head?: never;
         /** Update Calendar */
         patch: operations["update_calendar_api_calendars__calendar_id__patch"];
+        trace?: never;
+    };
+    "/api/calendars/{calendar_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Event
+         * @description A new event in the calendar (`calendar.write` in its space); the caller is its
+         *     organiser and sees it in full.
+         */
+        post: operations["create_event_api_calendars__calendar_id__events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/channels": {
@@ -2696,6 +2739,23 @@ export interface paths {
          *     (201) or the one they have.
          */
         post: operations["open_dm_api_dms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event */
+        get: operations["get_event_api_events__event_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5491,12 +5551,18 @@ export interface components {
             color?: components["schemas"]["CalendarColor"];
             /** Name */
             name: string;
+            /**
+             * Time Zone
+             * @default Europe/Berlin
+             */
+            time_zone?: string;
         };
         /**
          * CalendarOut
          * @description `is_default`: made by the system for a personal space („Mein Kalender“) or the
          *     general space; there is at most one per space, and it cannot be archived. `name`
-         *     is null for a default nobody renamed: the interface words it.
+         *     is null for a default nobody renamed: the interface words it. `time_zone`: the
+         *     zone of a new event that names none.
          */
         CalendarOut: {
             color: components["schemas"]["CalendarColor"];
@@ -5514,6 +5580,8 @@ export interface components {
              * Format: uuid
              */
             space_id: string;
+            /** Time Zone */
+            time_zone: string;
             /** Version */
             version: number;
         };
@@ -5543,6 +5611,8 @@ export interface components {
             color?: components["schemas"]["CalendarColor"] | null;
             /** Name */
             name?: string | null;
+            /** Time Zone */
+            time_zone?: string | null;
             /** Version */
             version: number;
         };
@@ -6346,6 +6416,57 @@ export interface components {
             /** Via Token */
             via_token?: string | null;
         };
+        /**
+         * EventCreate
+         * @description An event with a time of day names `starts_at`, `ends_at` (instants) and its
+         *     `tzid` (default: the calendar's zone); an all-day one `all_day`, `first_day` and
+         *     `last_day`. `rrule` (RFC 5545, `DAILY` or slower), `rdates` and `exdates` (wall
+         *     times in the event's zone, without offset) make it a series. `busy` defaults to
+         *     true, for all-day events to false.
+         */
+        EventCreate: {
+            /**
+             * All Day
+             * @default false
+             */
+            all_day?: boolean;
+            /** Busy */
+            busy?: boolean | null;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Exdates */
+            exdates?: string[];
+            /** First Day */
+            first_day?: string | null;
+            /** Last Day */
+            last_day?: string | null;
+            /**
+             * Location
+             * @default
+             */
+            location?: string;
+            /** Rdates */
+            rdates?: string[];
+            /** Rrule */
+            rrule?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** @default confirmed */
+            status?: components["schemas"]["EventStatus"];
+            /** Title */
+            title: string;
+            /** Tzid */
+            tzid?: string | null;
+            /** Uid */
+            uid?: string | null;
+            /** @default default */
+            visibility?: components["schemas"]["EventVisibility"];
+        };
         /** EventIn */
         EventIn: {
             event_type: components["schemas"]["EventType"];
@@ -6369,11 +6490,90 @@ export interface components {
          */
         EventKind: "model_call" | "tool_call" | "stop" | "mark";
         /**
+         * EventOut
+         * @description `starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`
+         *     and of the day after `last_day`). `recurs_until`: when the last occurrence ends
+         *     (null: endless). `redacted`: the caller sees only times and "busy"; content fields
+         *     are null.
+         */
+        EventOut: {
+            /** All Day */
+            all_day: boolean;
+            /** Busy */
+            busy: boolean;
+            /**
+             * Calendar Id
+             * Format: uuid
+             */
+            calendar_id: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Exdates */
+            exdates: string[];
+            /** First Day */
+            first_day: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Day */
+            last_day: string | null;
+            /** Location */
+            location: string | null;
+            organizer: components["schemas"]["OrganizerOut"] | null;
+            /** Rdates */
+            rdates: string[];
+            /** Recurs Until */
+            recurs_until: string | null;
+            /** Redacted */
+            redacted: boolean;
+            /** Rrule */
+            rrule: string | null;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            status: components["schemas"]["EventStatus"];
+            /** Title */
+            title: string | null;
+            /** Tzid */
+            tzid: string | null;
+            /** Uid */
+            uid: string | null;
+            /** Version */
+            version: number;
+            visibility: components["schemas"]["EventVisibility"];
+        };
+        /**
+         * EventStatus
+         * @enum {string}
+         */
+        EventStatus: "confirmed" | "tentative" | "cancelled";
+        /**
          * EventType
          * @description What an event rule listens to (decision 8).
          * @enum {string}
          */
         EventType: "page.published" | "ticket.created" | "attachment.uploaded" | "page.review_due";
+        /**
+         * EventVisibility
+         * @description `private`: only the organiser (and, on the named way, admins) sees its content;
+         *     every other reader of the calendar sees times and "busy" (`sight.py`).
+         * @enum {string}
+         */
+        EventVisibility: "default" | "private";
         /**
          * FiguresOut
          * @description `tools_major`: the archive's pg_dump, this installation's pg_restore.
@@ -7290,6 +7490,56 @@ export interface components {
             token_endpoint: string;
         };
         /**
+         * OccurrenceOut
+         * @description One occurrence in the window. `recurrence_id`: for an occurrence of a series,
+         *     the wall time it is named by (ISO 8601 without offset), which changing or deleting
+         *     just this one takes back (task 3b); null for an event that is no series.
+         *     `redacted`: the caller sees only times and "busy" (`title`, `location` null).
+         */
+        OccurrenceOut: {
+            /** All Day */
+            all_day: boolean;
+            /** Busy */
+            busy: boolean;
+            /**
+             * Calendar Id
+             * Format: uuid
+             */
+            calendar_id: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /** Location */
+            location: string | null;
+            /** Recurrence Id */
+            recurrence_id: string | null;
+            /** Recurring */
+            recurring: boolean;
+            /** Redacted */
+            redacted: boolean;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            status: components["schemas"]["EventStatus"];
+            /** Title */
+            title: string | null;
+            visibility: components["schemas"]["EventVisibility"];
+        };
+        /**
          * OffsiteState
          * @enum {string}
          */
@@ -7327,6 +7577,15 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+        };
+        /** OrganizerOut */
+        OrganizerOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            type: components["schemas"]["PrincipalType"];
         };
         /**
          * Outcome
@@ -7715,6 +7974,13 @@ export interface components {
         Page_MessageOut_: {
             /** Items */
             items: components["schemas"]["MessageOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[OccurrenceOut] */
+        Page_OccurrenceOut_: {
+            /** Items */
+            items: components["schemas"]["OccurrenceOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -15805,6 +16071,46 @@ export interface operations {
             };
         };
     };
+    list_events_api_calendar_events_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                limit?: number;
+                cursor?: string | null;
+                calendar_ids?: string[] | null;
+                /** @description the named way: this space's events only */
+                space_id?: string | null;
+                q?: string | null;
+                /** @description the viewer's zone (all-day days) */
+                tz?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_OccurrenceOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_calendars_api_calendars_get: {
         parameters: {
             query?: {
@@ -15890,6 +16196,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalendarOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_event_api_calendars__calendar_id__events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                calendar_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
                 };
             };
             /** @description Validation Error */
@@ -16385,6 +16726,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_api_events__event_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
                 };
             };
             /** @description Validation Error */

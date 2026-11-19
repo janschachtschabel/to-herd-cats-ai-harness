@@ -5,6 +5,7 @@ import { userKeys } from '@/features/admin/users/queries'
 import { agentKeys } from '@/features/agents/keys'
 import { approvalKeys } from '@/features/approvals/queries'
 import { automationKeys } from '@/features/automations/queries'
+import { calendarKeys } from '@/features/calendars/keys'
 import { skillProposalKeys } from '@/features/skills/proposals/queries'
 import { skillKeys } from '@/features/skills/queries'
 import { ticketKeys } from '@/features/tickets/keys'
@@ -61,6 +62,8 @@ const KEYS = {
   preview: automationKeys.preview(null),
   pendingUsers: [...userKeys.all, 'pending'],
   pendingCount: userKeys.pendingCount,
+  calendars: [...calendarKeys.all, 'list'],
+  calendarWindow: [...calendarKeys.all, 'window', {}],
 }
 
 /** What the ticket queries hold where the invalidation reads it (the ticket's id). */
@@ -137,6 +140,8 @@ describe('live invalidation', () => {
       'automationA',
       'firingsA',
       'automationB',
+      'calendars',
+      'calendarWindow',
     ])
   })
 
@@ -203,6 +208,13 @@ describe('live invalidation', () => {
     const event = { conversationId: 'a', ticketId: 't', spaceId: 'space' }
     expect(staleAfter({ type: 'ticket.updated', ...event })).toEqual(affected)
     expect(staleAfter({ type: 'ticket.created', ...event })).toEqual(affected)
+  })
+
+  test('a calendar event refreshes the calendar views, nothing else (plan M10)', () => {
+    expect(staleAfter({ type: 'calendar.changed', spaceId: 'space' })).toEqual([
+      'calendars',
+      'calendarWindow',
+    ])
   })
 
   test('a sprint event refreshes the sprints, boards and lists of its space (plan M4b)', () => {
