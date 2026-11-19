@@ -180,6 +180,11 @@ export default async function globalSetup() {
     // CI before totp.spec), so it is raised here, as in deploy/compose/load.sh. The
     // limit on failures per address and email stays as in production.
     HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE: "1000",
+    // live-opening.spec creates and publishes a few hundred pages as one person in a
+    // few minutes, far beyond the per-person write limit a team member meets (120 a
+    // minute). The limit itself is proven by the backend's tests.
+    HERD_WRITE_RATE_PER_MINUTE: "100000",
+    HERD_UPLOAD_RATE_PER_MINUTE: "100000",
     SSL_CERT_FILE: tls.cert,
   };
   const startApp = () => {
