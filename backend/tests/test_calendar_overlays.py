@@ -5,143 +5,54 @@ Tickets and sprints come from the spaces one belongs to (`access.member_space_id
 an admin's overlays hold only her own spaces, never what admin power opens); an
 automation shows to whom `automations/sight.py` shows it, and only where it sits in
 such a space or is one's own. Everything is filtered in SQL and paged by (starts_on,
-kind, id), automations within a day by their term."""
+kind, id), automations within a day by their term. The scene: `factories_overlays`."""
 
-import uuid
-from collections.abc import Iterator
-from contextlib import contextmanager
-from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
-from httpx import AsyncClient
-from sqlalchemy import event, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import PageParams
 from app.core.permissions import READ_ACTIONS, SPACE_ACTION_MIN_ROLE, Action, SpaceRole
-from app.core.principal import Principal
 from app.modules.audit.models import ADMIN_ACCESS, AuditLog
 from app.modules.automations.models import Automation
 from app.modules.calendars.models import Calendar
-from app.modules.calendars.overlays import OverlayKind, list_overlays
-from app.modules.spaces.models import Space, SpaceKind
-from app.modules.spaces.repository import SpaceRepository
+from app.modules.calendars.overlays import list_overlays
 from app.modules.tickets.models import Sprint, WorkItem
-from tests.factories_agents import open_agent_dm
 from tests.factories_automations import placed
 from tests.factories_calendar import actor_of
+from tests.factories_overlays import (
+    ALL,
+    FROM,
+    TO,
+    URL,
+    expect,
+    loading,
+    new_channel,
+    overlays,
+    refs,
+    sent,
+    set_scene,
+    term,
+)
 from tests.factories_spaces import MakeSpace
 from tests.factories_sprints import new_sprint
-from tests.factories_tickets import new_ticket, patch, status_of
+from tests.factories_tickets import new_ticket
 from tests.factories_writing import Work
-
-URL = "/api/calendar/overlays"
-FROM, TO = "2026-11-16", "2026-11-30"
-MAX_PAGES = 100
-ALL = {OverlayKind.TICKETS, OverlayKind.SPRINTS, OverlayKind.AUTOMATIONS}
-
-
-async def overlays(client: AsyncClient, limit: int = 100, **params: Any) -> list[dict[str, Any]]:
-    """Every overlay of the range, page by page (a cursor that never ends fails)."""
-    items: list[dict[str, Any]] = []
-    cursor = None
-    for _ in range(MAX_PAGES):
-        query: dict[str, Any] = {"from": FROM, "to": TO, "limit": limit, **params}
-        if cursor:
-            query["cursor"] = cursor
-        r = await client.get(URL, params=query)
-        assert r.status_code == 200, r.text
-        items += r.json()["items"]
-        if (cursor := r.json()["next_cursor"]) is None:
-            return items
-    raise AssertionError("the pages do not end")
-
-
-def refs(items: list[dict[str, Any]]) -> set[tuple[str, str]]:
-    return {(i["kind"], i["ref"]) for i in items}
-
-
-async def _channel(client: AsyncClient, space_id: object, name: str) -> uuid.UUID:
-    r = await client.post(f"/api/spaces/{space_id}/channels", json={"name": name})
-    assert r.status_code == 201, r.text
-    return uuid.UUID(r.json()["id"])
-
-
-@dataclass
-class Scene:
-    work: Work
-    foreign: Space  # Carol's alone
-    shown: dict[str, tuple[str, str]]  # name → (kind, ref)
-
-
-def _term(day: int, hour: int = 9) -> datetime:
-    return datetime(2026, 11, day, hour, tzinfo=UTC)
-
-
-async def _scene(work: Work, make_space: MakeSpace) -> Scene:
-    """Werkstatt (Alice, the admin, Bob as a viewer), Geheim (Alice, the admin) and
-    Carol's Fremd, each with what overlays can show, and things they never show."""
-    bench, people = work.bench, work.bench.people
-    carol = people.users["carol"]
-    await SpaceRepository(bench.session).set_member(
-        work.space.id, Principal.user(people.users["bob"].id), SpaceRole.VIEWER
-    )
-    foreign = await make_space(SpaceKind.TEAM, name="Fremd", members=[(carol, SpaceRole.ADMIN)])
-    admin = people.admin
-    shown: dict[str, tuple[str, str]] = {}
-
-    async def ticket(name: str, client: AsyncClient, space: Space, due: str | None) -> Any:
-        made = await new_ticket(client, space.id, name, due_on=due)
-        shown[name] = ("tickets", made["key"])
-        return made
-
-    async def sprint(name: str, client: AsyncClient, space: Space, start: str, end: str) -> None:
-        made = await new_sprint(client, space.id, name, starts_on=start, ends_on=end)
-        shown[name] = ("sprints", made["id"])
-
-    async def automation(name: str, place: object, owner: str, **fields: Any) -> None:
-        made = await placed(bench, place, owner=owner, **fields)
-        shown[name] = ("automations", str(made.id))
-
-    await ticket("werk-ticket", admin, work.space, "2026-11-20")
-    await ticket("werk-later", admin, work.space, "2026-12-03")  # after the range
-    await ticket("werk-undated", admin, work.space, None)
-    done = await ticket("werk-done", admin, work.space, "2026-11-21")
-    r = await patch(admin, done, status_id=(await status_of(admin, work.space.id, "done"))["id"])
-    assert r.status_code == 200, r.text
-    await ticket("geheim-ticket", admin, work.private, "2026-11-18")
-    await ticket("fremd-ticket", people.carol, foreign, "2026-11-19")
-    await sprint("werk-sprint", admin, work.space, "2026-11-09", "2026-11-20")  # reaches in
-    await sprint("werk-old", admin, work.space, "2026-10-01", "2026-10-14")  # before
-    await sprint("fremd-sprint", people.carol, foreign, "2026-11-23", "2026-12-04")
-    werk_channel = await _channel(admin, work.space.id, "puls")
-    fremd_channel = await _channel(people.carol, foreign.id, "fremd")
-    bob_dm = await open_agent_dm(people.bob, bench.agent)
-    await automation("werk-auto", werk_channel, "alice", due=_term(17))
-    await automation("werk-paused", werk_channel, "alice", due=_term(18), paused=True)
-    await automation("alice-dm-auto", bench.dm_id, "alice", due=_term(19), cron=None)
-    await automation("bob-dm-auto", bob_dm["id"], "bob", due=_term(24))
-    await automation("fremd-auto", fremd_channel, "carol", due=_term(25))
-    await automation("werk-later-auto", werk_channel, "alice", due=_term(30, 12))
-    return Scene(work, foreign, shown)
-
-
-def _expect(scene: Scene, *names: str) -> set[tuple[str, str]]:
-    return {scene.shown[n] for n in names}
 
 
 async def test_overlays_show_only_what_the_person_may_see(
     work: Work, make_space: MakeSpace
 ) -> None:
-    scene = await _scene(work, make_space)
+    scene = await set_scene(work, make_space)
     people = work.bench.people
     werk = ("werk-ticket", "werk-sprint")
-    assert refs(await overlays(people.bob)) == _expect(scene, *werk, "bob-dm-auto")
-    assert refs(await overlays(people.alice)) == _expect(
+    assert refs(await overlays(people.bob)) == expect(scene, *werk, "bob-dm-auto")
+    assert refs(await overlays(people.alice)) == expect(
         scene, *werk, "geheim-ticket", "werk-auto", "alice-dm-auto"
     )
-    assert refs(await overlays(people.carol)) == _expect(
+    assert refs(await overlays(people.carol)) == expect(
         scene, "fremd-ticket", "fremd-sprint", "fremd-auto"
     )
     assert await overlays(people.gast) == []
@@ -172,10 +83,10 @@ async def test_overlays_show_only_what_the_person_may_see(
 
 
 async def test_kinds_pick_what_shows(work: Work, make_space: MakeSpace) -> None:
-    scene = await _scene(work, make_space)
+    scene = await set_scene(work, make_space)
     alice = work.bench.people.alice
-    assert refs(await overlays(alice, kinds="sprints")) == _expect(scene, "werk-sprint")
-    assert refs(await overlays(alice, kinds="tickets,automations")) == _expect(
+    assert refs(await overlays(alice, kinds="sprints")) == expect(scene, "werk-sprint")
+    assert refs(await overlays(alice, kinds="tickets,automations")) == expect(
         scene, "werk-ticket", "geheim-ticket", "werk-auto", "alice-dm-auto"
     )
     r = await alice.get(URL, params={"from": FROM, "to": TO, "kinds": "tickets,events"})
@@ -201,9 +112,9 @@ async def test_an_admins_overlays_hold_only_their_own_spaces(
 ) -> None:
     """The admin manages every agent (`agent.manage`) and may read every space, yet her
     overlays hold only the spaces she is in: not Carol's Fremd, not Alice's DM."""
-    scene = await _scene(work, make_space)
+    scene = await set_scene(work, make_space)
     admin = work.bench.people.admin
-    assert refs(await overlays(admin)) == _expect(
+    assert refs(await overlays(admin)) == expect(
         scene, "werk-ticket", "werk-sprint", "geheim-ticket", "werk-auto"
     )
     entries = await session.scalar(
@@ -212,45 +123,15 @@ async def test_an_admins_overlays_hold_only_their_own_spaces(
     assert entries == 0
 
 
-@contextmanager
-def _statements(session: AsyncSession) -> Iterator[list[str]]:
-    sync_conn = session.sync_session.connection()
-    statements: list[str] = []
-
-    def _note(conn, cursor, statement, *args) -> None:  # type: ignore[no-untyped-def]
-        statements.append(statement)
-
-    event.listen(sync_conn, "before_cursor_execute", _note)
-    try:
-        yield statements
-    finally:
-        event.remove(sync_conn, "before_cursor_execute", _note)
-
-
-@contextmanager
-def _loading(session: AsyncSession) -> Iterator[list[object]]:
-    """Every row the session loads, held (the identity map only holds them weakly)."""
-    loaded: list[object] = []
-
-    def _keep(_session, instance) -> None:  # type: ignore[no-untyped-def]
-        loaded.append(instance)
-
-    event.listen(session.sync_session, "loaded_as_persistent", _keep)
-    try:
-        yield loaded
-    finally:
-        event.remove(session.sync_session, "loaded_as_persistent", _keep)
-
-
 async def test_overlays_filter_in_sql(
     session: AsyncSession, work: Work, make_space: MakeSpace
 ) -> None:
-    scene = await _scene(work, make_space)
+    scene = await set_scene(work, make_space)
     for n in range(20):  # much more out of sight than in it
         await new_ticket(work.bench.people.carol, scene.foreign.id, f"f{n}", due_on="2026-11-20")
     actor = await actor_of(session, work.bench.people.users["admin"])
     session.expunge_all()
-    with _statements(session) as statements, _loading(session) as loaded:
+    with sent(session) as statements, loading(session) as loaded:
         page = await list_overlays(
             session,
             actor,
@@ -276,18 +157,18 @@ async def test_overlays_filter_in_sql(
 async def test_overlays_page_without_gaps(work: Work, make_space: MakeSpace) -> None:
     """Ties everywhere: tickets and sprints on one day, several automations on one day,
     in a viewer zone that moves their day; every page size gives the one list."""
-    scene = await _scene(work, make_space)
+    scene = await set_scene(work, make_space)
     bench, admin = work.bench, work.bench.people.admin
     for n in range(4):
         await new_ticket(admin, work.space.id, f"t{n}", due_on="2026-11-20")
         await new_sprint(
             admin, work.space.id, f"s{n}", starts_on="2026-11-20", ends_on="2026-11-21"
         )
-    channel = await _channel(admin, work.space.id, "takt")
+    channel = await new_channel(admin, work.space.id, "takt")
     for hour in (22, 23, 23, 5):
-        await placed(bench, channel, due=_term(19 if hour > 5 else 20, hour))
+        await placed(bench, channel, due=term(19 if hour > 5 else 20, hour))
     alice = bench.people.alice
-    zone = {"time_zone": "Europe/Berlin"}
+    zone: dict[str, Any] = {"time_zone": "Europe/Berlin"}
     whole = await overlays(alice, **zone)
     keys = [(i["starts_on"], i["kind"], i["at"] or "", i["id"]) for i in whole]
     assert keys == sorted(keys) and len(set(keys)) == len(keys) == 17
@@ -308,10 +189,10 @@ async def test_overlays_page_without_gaps(work: Work, make_space: MakeSpace) -> 
 async def test_overlays_store_nothing(
     session: AsyncSession, work: Work, make_space: MakeSpace
 ) -> None:
-    await _scene(work, make_space)
+    await set_scene(work, make_space)
     actor = await actor_of(session, work.bench.people.users["alice"])
     calendars = await session.scalar(select(func.count()).select_from(Calendar))
-    with _statements(session) as statements:
+    with sent(session) as statements:
         page = await list_overlays(
             session,
             actor,
