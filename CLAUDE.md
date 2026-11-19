@@ -12,9 +12,10 @@ M5 Tasks 1–7, M6, M7 and M8 (plans `docs/superpowers/plans/2026-11-12-m1-funda
 are built and make v1.0.0 (version 1.0.0, `backend/alembic/RELEASED` = `9e4b6d2f8a17`,
 release note `docs/RELEASE-1.0.0.md`; the tag is not published: Jan tags only when the
 whole app is finished); M9b (Tasks 12 to 19, closed by Task 17: docs, Steckbrief, spec,
-demo `docs/demo/m9.md`) and M10 Tasks 1 and 2 (`2026-11-18-m10-kalender.md`) are built
+demo `docs/demo/m9.md`) and M10 Tasks 1–3c, 7a and 13a (`2026-11-18-m10-kalender.md`) are built
 after it, collected for operators of 1.0.0 builds in `docs/RELEASE-NEXT.md` (unreleased;
-versions and `RELEASED` unchanged); next are M10 from Task 3a and M5 Tasks 8–12.
+versions and `RELEASED` unchanged); next are M10 from Task 4 (with 7b and 13b) and M5
+Tasks 8–12.
 Present: identity, groups, spaces, roles, `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
@@ -63,7 +64,12 @@ the ASVS gaps J7–J14 (Task 18: idle timeout, own sessions, re-authentication b
 linking, write limits, optional virus scan, database TLS, internal token rotation, OAuth
 callback per app with `iss`, optional separate database roles). Calendar (M10, so
 far): calendars per space with their rights and defaults (Task 1); time zones and
-RFC 5545 recurrence as pure functions on `python-dateutil` (Task 2).
+RFC 5545 recurrence as pure functions on `python-dateutil` (Task 2); events with
+recurrence and private visibility, the window, sight and expansion (Task 3a); changing
+and deleting events and series by occurrence, split and rule (Task 3b); the measured
+expansion with its two remedies (Task 3c); reading and writing iCalendar as pure
+functions on `icalendar` (Task 7a); a purpose on connectors and OAuth apps, so calendar
+accesses reuse M8's without AI rights (Task 13a).
 Planned, not present: embeddings, hybrid search, Docling conversion (M5 Tasks 8–11).
 Operations: `README.md` (Betriebshinweise),
 `docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
@@ -165,6 +171,54 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   (the earlier id); a gap occurrence's id is the rule's wall time
   (`recurrence_id_at` maps an instant back). Every write path calls `check_series`
   (refuses a rule that never matches).
+- iCalendar (M10 Task 7a, `modules/calendars/ical`, pure): the only code that imports
+  `icalendar`, pinned to 7.3.x (`tests/test_calendar_imports.py`; the inner names it
+  uses: `tests/test_ical_library.py`). `reading.parse(data, default_zone=, limit=)` →
+  `Parsed(events, problems)` is lenient and never raises for the file's sake (a last
+  guard per event: `ical.event_unreadable`): odd forms (UNTIL as a date or local time,
+  an all-day UNTIL instant read on its UTC day, EXDATE as a date or in another zone,
+  an instant naming an occurrence in a gap) become the series' wall times (`times.py`),
+  and whatever it leaves out counts once per event by an `ical.*` code
+  (`problems.CODES`; a `SeriesInvalid` code maps through `problems.FROM_SERIES`). Cost
+  is work: the work of one parse is charged where it is done, by counted operations,
+  never the clock (`ical/budget.py`, `calendars/recurrence_cost.py`: a definition's
+  size and each `Definition.offset_at` by its ruled observances and rule lists, names
+  looked up, zone comparisons and rankings, rule checks and `recurrence_ids` passes by
+  the periods `dateutil` scans; beyond `WORK_LIMIT` the rest is `ical.over_budget`).
+  Where work is done inside C calls or Python loops without calls, a structural cap
+  bounds it: a TZID ≤ 255 characters and ≤ 8 parts (`ical.time_zone_too_large`, like a
+  VTIMEZONE beyond `vtimezone.MAX_*`: 1,000 observances, 20 ruled, 5,000 onsets, rule
+  lists of 3 months, 3 weekdays, 10 days of the month), ≤ 1,000 RDATEs and ≤ 1,000
+  overrides per series (`ical.over_limit`), lines in one flat pass (nesting ≤ 6), a
+  component's properties indexed by name. `tests/test_ical_hostile.py` reads 21
+  hostile shapes at 5 MiB within 15 million Python calls each (`HERD_TEST_ICAL_WALL=1`
+  also times them). Imports and subscriptions (Tasks 7b, 8b) parse in the worker in a
+  subprocess under a CPU-time rlimit besides. `writing.calendar_ics(…, name=, now=)`
+  (streamed) and `event_ics(event, now=)` write only the RFC's forms: TZID plus one
+  VTIMEZONE per zone covering 1900–2399, every change `tzdata` has as onsets and yearly
+  rules for today's changes (`vtimezone_out.py`; only `UTC` as `…Z`), DURATION in
+  exact hours where a DTEND would land in a doubled hour, TRANSP always, a parameter
+  that holds a backslash quoted (quoted parameters are read verbatim, RFC 6868 carets).
+  A redacted series or override (`ExportEvent.redacted`, `ExportOverride.redacted`)
+  carries only its times, TRANSP, `CLASS:PRIVATE`, `STATUS:CONFIRMED`/`CANCELLED` and
+  `now` as DTSTAMP; a visible override carries `ExportOverride.stamp` (its own last
+  change) or the series'. A redacted series is written under `ExportEvent.opaque_uid`
+  (required), which the caller makes with `ical/opaque.opaque_uid(uid,
+  key=key_from_secret(HERD_SECRET_KEY), purpose=Purpose.FEED|EXPORT, audience=<feed or
+  person id>)` (HMAC-SHA-256 over length-prefixed parts, never a plain hash; an empty
+  secret is refused). Never use
+  `icalendar`'s date decoding or `Calendar.from_ical` on input: it resolves TZIDs
+  through a process-wide cache that every parsed VTIMEZONE feeds (one organisation's
+  file would define zones for the next). Zones resolve per file (`ical/zones.py`:
+  IANA, the Windows table, a globally unique TZID's last three parts, then the file's
+  VTIMEZONE compared with tzdata across the years the event spans, ≤ 100 comparisons
+  per file; of the zones that fit: most years, a zone the definition names, canonical
+  zones before links and `Etc/…` (`ical/zone_names.py`, links from `tzdata.zi`), the
+  longest follower of the definition in 1981–2037). Drafts (`drafts.py`): a `Series`,
+  `Content` (texts without control characters, U+2028/2029/0085 as line breaks, cut
+  to decision 5's lengths; status, visibility, busy, sequence ≤ 2^31 − 1, attendees),
+  overrides by recurrence id (a cancelled one is an EXDATE; one without its series is
+  `ical.override_orphaned`), alarms as minutes before the start; a UID is one line.
 - MCP (M8): `app/mcp/` is the only code that imports the MCP SDK (`mcp`, `mcp_types`;
   `tests/test_mcp_imports.py`): the endpoint (`endpoint.py`: Origin, token, POST only;
   `server.py`: one stateless SDK server per request, JSON answers), the client
@@ -483,6 +537,9 @@ SMOKE_S3=1 bash deploy/compose/smoke.sh                 # compose.s3.yml (Seawee
 bash deploy/compose/load.sh                             # docker stats idle/warm/load + latency (Steckbrief)
 # 200-person load test without Docker: deploy/compose/{loadsetup,loadmix,loadreport}.py,
 # deploy/scripts/measure-processes.sh (RSS/CPU per role from /proc); README of compose
+# Calendar expansion (M10 Task 3c gate; own database, never a shared one):
+#   cd backend && uv run python -m scripts.measure_calendar window --database-url URL --out run.json
+#   cd backend && uv run python -m scripts.measure_calendar_report run1.json [run2.json …]
 # Live editing under load (Steckbrief, M9b): collab/scripts/live-load.mjs BASE STATE [SECONDS] [TYPE_MS] [STOP_PID]
 bash deploy/scripts/restore-rehearsal.sh                # backup A → restore into empty B → compare → replace
                                                         # running B (--replace) (PGHOST/PGPORT, REHEARSAL_PORT)
@@ -551,6 +608,40 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   ticket is ever written into a channel or DM (acceptance M4; `e2e/tests/tickets-quiet`).
   A ticket's sprint belongs to its space (foreign key `(sprint_id, space_id)`); lock
   sprints before tickets.
+- Calendar events (M10 Task 3a, `modules/calendars`): `calendar_event` (foreign key
+  `(calendar_id, space_id)`; a series is its rule, RDATEs and EXDATEs as wall times
+  of `tzid`, expanded when read; `recurs_until` = when the last occurrence ends, a
+  single event's end, NULL endless; overrides are rows with `series_id` and
+  `recurrence_id`; tombstones `deleted_at`; one live master per UID and calendar,
+  `NULLS NOT DISTINCT`). The API calls every zone `time_zone` (calendar, event, the
+  window's viewer zone); the column stays `tzid`. Times are checked in
+  `event_times.check` (every write path: aware instants in 1900–2399, at most 366 days,
+  no series that overlaps itself, `recurrence_gaps`; 422 with the series' code); a
+  stored event is a `Series` through `event_times.series_of`. `calendars/sight.py` is
+  the one rule of who sees an event and how much (`of(actor, event, *, reads, attends,
+  named)` → `FULL`/`BUSY`/`NONE`; its organiser always, inside a run's read scope;
+  private content otherwise only for admins on the named way), and holds the SQL forms
+  services use; do not restate it. A `FULL` from admin power alone
+  (`sight.by_admin_power`, member admins and open spaces included) writes
+  `calendar.private_read` (one per admin, event and day). Lists (window, search, mine)
+  use `sight.listed_events_sql` (member spaces and one's own, never admin power);
+  another space only by naming it (`space_id`, an event by id: `access.require`,
+  audited). An event one may not see answers like an unknown id (404
+  `event.not_found`, one statement, `EventRepository.find`). A private event is
+  `redacted` for every other reader on every output path; each new path (export,
+  feed, notification, tool, `/mcp`, …) proves it in its own
+  `tests/test_private_path_<area>.py` with the fixture
+  `tests/factories_calendar.private_event`. Expanding stored events goes through
+  `expansion.effective` (rows in, effective occurrences out: overrides, EXDATEs,
+  all-day days in the viewer's zone; bounded by `Budget`: 2,000 occurrences and
+  counted work, a row 40, a rule candidate 1, `MAX_WORK` 500,000); never copy it. The
+  window (`window.list_window`) loads in one statement (without `description`), pages
+  by (start, id) with a cursor bound to its `time_zone` and refuses beyond the budget
+  (422 `calendar.window_too_dense`, counted). Outbox `calendar_event.*` with ids only;
+  live one `calendar.changed` (`space_id`, `calendar_id`) for the space's members alone
+  (`calendars/live.py`, `space_readers` without admin power). Live delivery is
+  `messaging/live_events.py` (shape), `live_publish.py` (outbox → NOTIFY) and
+  `live_decode.py` (payload → `LiveEvent`).
 - Demo data: `backend/scripts/demo_seed.py` (+ `demo_tickets.py`, `demo_sprints.py`,
   `demo_messaging.py`, `demo_ai.py`, `demo_ai_model.py`, `demo_automations.py`,
   `demo_mcp.py`, `demo_oidc.py` (only with `--oidc-stub`), `demo_totp.py` (only with
@@ -558,6 +649,30 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   `demo_pages.py`, shared API helpers in
   `demo_api.py`) goes through the public API only; extend it and its test with each
   milestone.
+- Calendar event writes (M10 Task 3b, `modules/calendars`): `PATCH`/`DELETE
+  /api/events/{id}` with `scope=all|this|following`, `occurrence` (the wall time in the
+  series' zone, ISO without offset) and `version` (409 `event.version_conflict`). The
+  path (`event_change.py`) finds by id, locks (a series before its override, retried
+  when a split re-homed it) and judges sight on the locked row; the one write check is
+  `event_writes.require_writable` (sight FULL else 403 `event.private`, then
+  `calendar.write`, then visibility only organiser/admin, then the version), inside
+  `refusals_roll_back` (a savepoint). Services never commit: the caller owns the
+  transaction; the audit of a refused admin-power access outlives its rollback through
+  `audit/kept.py` (`get_session` writes it after the rollback, `after_rollback`; other
+  callers call `kept.write` after theirs). Every override a series operation writes
+  (`Edited.reached`) needs full sight too (`series_reach.require_full_sight`, also in a
+  dry run); `scope=all` content reaches each override field that kept the series' old
+  value (private and cancelled reach all). Splits go through `series_cut.cut` (the new
+  part starts at the first rule occurrence that is no gap time, its rule written out;
+  RDATEs and gap occurrences before it stay with the old part as overrides); a series
+  with no live occurrence left is a tombstone; "the first" is the first live
+  occurrence. A write that needs the admin role audits `calendar.admin_write` once
+  (column names; none for a change that changes nothing). Hooks: `series.ON_OVERRIDE`
+  (a new override) and `series_split.CARRY` (the part split off) are where later tasks
+  copy what hangs on a series (attendees, reminders). Deleted rows are tombstones
+  (`deleted_at`, 30 days, `core/retention.py`); the series' outbox event names the
+  overrides it wrote (`overrides`). The in-session test client shares one session:
+  test what must survive a rollback on `real_db`.
 - AI and agents:
   - Only `app/runtime/` imports Pydantic AI (and DBOS, should it ever come); nothing
     else does.
@@ -619,6 +734,33 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   - A connector's secret goes only to the origin (OAuth: the endpoints) it was given
     for: a server's new origin or a client's new endpoints disconnect its connectors
     (`connectors/moving.py`; a shared one stays only when the change says so).
+  - Purpose (M10 Task 13a, `connectors/purposes.py`): `connector.purpose` and
+    `oauth_client.purpose` are `mcp` (server default, everything of M8) or `calendar`.
+    `ConnectorRepository`/`ClientRepository`/`ClientService` serve one purpose, `mcp`
+    unless named, so every M8 path sees `mcp` rows alone (a calendar row answers like
+    an unknown id; `tests/test_connector_purposes.py` sweeps every connector, OAuth and
+    MCP server route of the route table); only `name_taken` (the unique names span
+    purposes) and by-id paths that judge the row's own purpose (key rotation, a client's
+    move, renewal, a flow's end) span them. `rule_for(purpose)`: `mcp` `ai.use`/
+    `ai.manage` (404 `ai.not_found`), `calendar` `calendar.sync`/`calendar.manage` (403);
+    a calendar connector is personal, serves no MCP server and connects only through an
+    app of its purpose (checks plus the foreign key `(oauth_client_id, purpose)`); an
+    MCP server names only `mcp` connectors and apps (`mcp_server.purpose`, constant
+    `mcp`, in composite foreign keys). `purposes.create_personal` stores a calendar one
+    only (`mcp` is a `ValueError`; `enc:`, a blank secret 422 `connector.secret_invalid`,
+    generated name `calendar:<id>`, origin in the audit). An origin has one spelling,
+    `connectors/origins.origin_of` (https, IDNA host, IPv6 in brackets, no `:443`),
+    shared by `purposes.bare_origin` (422 `connector.origin_invalid`) and
+    `moving.moved_origin` (an unspellable URL counts as moved).
+    `credentials.headers_for`/`credential_headers`/`tokens.renew` take the caller's
+    purpose (default `mcp`) and refuse another (`WrongPurpose`). The OAuth callback
+    stays the app's own; the connector's purpose picks the right checked again and the
+    next page (`Rule.return_to`: `/ai/oauth/done`, `/calendar/accounts`; without a
+    session or flow, the purpose of the app whose callback was hit,
+    `oauth/repository.callback_purpose`), the request carries
+    `Rule.extra_authorization` (Google: `access_type=offline`, `prompt=consent`), each on
+    the purpose's allow-list `Rule.extra_keys`. Going below migration `d5f8a1c3e7b9`
+    deletes calendar connectors and apps.
   - Settings use the `HERD_MCP_` prefix (never `HERD_AI_`); add each to both Compose
     files, the chart (values, schema, chart rule) and `docs/MCP.md`.
 - Automations:
