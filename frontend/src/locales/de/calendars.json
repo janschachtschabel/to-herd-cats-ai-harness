@@ -12,7 +12,15 @@
     },
     "event": {
       "too_long": "Ein Termin dauert höchstens ein Jahr und einen Tag.",
-      "series_overlaps": "Jeder Termin der Serie muss enden, bevor der nächste beginnt."
+      "series_overlaps": "Jeder Termin der Serie muss enden, bevor der nächste beginnt.",
+      "private": "Diesen Termin siehst du nur als belegt; ändern kann ihn nur, wer seinen Inhalt sieht.",
+      "visibility_organiser_only": "Die Sichtbarkeit ändert nur die Organisatorin oder ein Admin.",
+      "version_conflict": "Der Termin wurde inzwischen geändert; bitte neu laden.",
+      "occurrence_overridden": "Dieses Vorkommen wurde schon einzeln geändert; bitte dort ändern.",
+      "occurrence_required": "Welches Vorkommen? Bitte eines der Serie wählen.",
+      "occurrence_unknown": "Dieses Vorkommen gibt es in der Serie nicht (mehr).",
+      "scope_invalid": "Das passt nicht zu diesem Termin: einzelne Termine und einzeln geänderte Vorkommen sind keine Serie.",
+      "too_many_dates": "Eine Serie hat höchstens 500 gelöschte Vorkommen."
     }
   }
 }

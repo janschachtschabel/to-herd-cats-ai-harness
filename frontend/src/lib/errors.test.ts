@@ -14,6 +14,15 @@ describe('errorMessage', () => {
     ['rate.limited', 429],
     ['attachment.rejected_by_scan', 422],
     ['attachment.scan_unavailable', 503],
+    // Changing and deleting calendar events (plan M10 Task 3b).
+    ['event.private', 403],
+    ['event.visibility_organiser_only', 403],
+    ['event.version_conflict', 409],
+    ['event.occurrence_overridden', 409],
+    ['event.occurrence_required', 422],
+    ['event.occurrence_unknown', 422],
+    ['event.scope_invalid', 422],
+    ['event.too_many_dates', 422],
   ])('%s has its own text', (code, status) => {
     const t = i18n.t.bind(i18n)
     for (const locale of ['de', 'en'] as const) {

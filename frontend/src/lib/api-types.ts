@@ -2757,10 +2757,22 @@ export interface paths {
         get: operations["get_event_api_events__event_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Event
+         * @description Deletes the event (a tombstone for 30 days): the series with its overrides, one
+         *     occurrence (`this`), or this and the following (`following`).
+         */
+        delete: operations["delete_event_api_events__event_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Event
+         * @description Changes the event (`calendar.write` and full sight; 403 `event.private` with
+         *     "busy" sight), at the version read (409 `event.version_conflict`): the whole series
+         *     (`scope=all`), one occurrence (`this`: an override) or this and the following
+         *     (`following`: the series is split).
+         */
+        patch: operations["update_event_api_events__event_id__patch"];
         trace?: never;
     };
     "/api/maintenance": {
@@ -6418,6 +6430,20 @@ export interface components {
             via_token?: string | null;
         };
         /**
+         * EventChangeOut
+         * @description The answer to a change: the event it shows (the series; with `scope=this` the
+         *     new override; with `scope=following` the new series; with `dry_run` the event as
+         *     it is) and what the change drops: overrides and deleted occurrences (EXDATEs) that
+         *     no longer name an occurrence of the series (with `dry_run`: would drop).
+         */
+        EventChangeOut: {
+            /** Dropped Exdates */
+            dropped_exdates: number;
+            /** Dropped Overrides */
+            dropped_overrides: number;
+            event: components["schemas"]["EventOut"];
+        };
+        /**
          * EventCreate
          * @description An event with a time of day names `starts_at`, `ends_at` (instants) and its
          *     `time_zone` (IANA; default: the calendar's); an all-day one `all_day`, `first_day` and
@@ -6495,9 +6521,10 @@ export interface components {
          * @description `starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`
          *     and of the day after `last_day`). `recurs_until`: when the last occurrence ends
          *     (null: endless). `series_id`: for an override (one occurrence changed on its own),
-         *     the series it belongs to; null otherwise. `time_zone`: the zone its series runs
-         *     in (null for all-day). `redacted`: the caller sees only times and "busy"; content
-         *     fields are null.
+         *     the series it belongs to, and `recurrence_id` the occurrence it takes the place of
+         *     (its wall time in the series, ISO 8601 without offset); null otherwise.
+         *     `time_zone`: the zone its series runs in (null for all-day). `redacted`: the caller
+         *     sees only times and "busy"; content fields are null.
          */
         EventOut: {
             /** All Day */
@@ -6532,6 +6559,8 @@ export interface components {
             organizer: components["schemas"]["OrganizerOut"] | null;
             /** Rdates */
             rdates: string[];
+            /** Recurrence Id */
+            recurrence_id: string | null;
             /** Recurs Until */
             recurs_until: string | null;
             /** Redacted */
@@ -6572,6 +6601,47 @@ export interface components {
          * @enum {string}
          */
         EventType: "page.published" | "ticket.created" | "attachment.uploaded" | "page.review_due";
+        /**
+         * EventUpdate
+         * @description A change: `version` (the one read) and only the fields that change, named as
+         *     when making an event. Times start from the stored ones: an event moves by its
+         *     `starts_at`/`ends_at` (all-day: `first_day`/`last_day`); `all_day` switches the kind
+         *     and then needs the other kind's bounds. With `scope=all` the times are the series'
+         *     (its first occurrence); with `scope=this` the occurrence's; with `scope=following`
+         *     those of the part from the occurrence on. `rrule: null` ends the rule.
+         */
+        EventUpdate: {
+            /** All Day */
+            all_day?: boolean | null;
+            /** Busy */
+            busy?: boolean | null;
+            /** Description */
+            description?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Exdates */
+            exdates?: string[] | null;
+            /** First Day */
+            first_day?: string | null;
+            /** Last Day */
+            last_day?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Rdates */
+            rdates?: string[] | null;
+            /** Rrule */
+            rrule?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            status?: components["schemas"]["EventStatus"] | null;
+            /** Time Zone */
+            time_zone?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Version */
+            version: number;
+            visibility?: components["schemas"]["EventVisibility"] | null;
+        };
         /**
          * EventVisibility
          * @description `private`: only the organiser (and, on the named way, admins) sees its content;
@@ -9036,6 +9106,14 @@ export interface components {
          * @enum {string}
          */
         SchemaProblem: "schema_too_large" | "schema_unsupported" | "schema_property_names";
+        /**
+         * Scope
+         * @description Which occurrences of a series a write touches (decision 6): `this` one (an
+         *     override, or an EXDATE when deleting), this and the `following` (a split), or
+         *     `all` (the series row; the only scope of an event that is no series).
+         * @enum {string}
+         */
+        Scope: "this" | "following" | "all";
         /**
          * SearchResults
          * @description A page of hits of every kind, told apart by `type`.
@@ -16766,6 +16844,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_event_api_events__event_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+                scope?: components["schemas"]["Scope"];
+                /** @description with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it) */
+                occurrence?: string | null;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_event_api_events__event_id__patch: {
+        parameters: {
+            query?: {
+                scope?: components["schemas"]["Scope"];
+                /** @description with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it) */
+                occurrence?: string | null;
+                /** @description only count what the change drops */
+                dry_run?: boolean;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventChangeOut"];
                 };
             };
             /** @description Validation Error */

@@ -12,7 +12,15 @@
     },
     "event": {
       "too_long": "An event lasts a year and a day at most.",
-      "series_overlaps": "Each occurrence of the series must end before the next one begins."
+      "series_overlaps": "Each occurrence of the series must end before the next one begins.",
+      "private": "You see this event only as busy; only someone who sees its content can change it.",
+      "visibility_organiser_only": "Only the organiser or an admin changes the visibility.",
+      "version_conflict": "The event changed meanwhile; please reload it.",
+      "occurrence_overridden": "This occurrence was already changed on its own; please change it there.",
+      "occurrence_required": "Which occurrence? Please choose one of the series.",
+      "occurrence_unknown": "The series has no such occurrence (any more).",
+      "scope_invalid": "That does not fit this event: single events and occurrences changed on their own are no series.",
+      "too_many_dates": "A series has at most 500 deleted occurrences."
     }
   }
 }

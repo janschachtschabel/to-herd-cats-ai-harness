@@ -5495,6 +5495,29 @@
         "title": "EpicOut",
         "type": "object"
       },
+      "EventChangeOut": {
+        "description": "The answer to a change: the event it shows (the series; with `scope=this` the\nnew override; with `scope=following` the new series; with `dry_run` the event as\nit is) and what the change drops: overrides and deleted occurrences (EXDATEs) that\nno longer name an occurrence of the series (with `dry_run`: would drop).",
+        "properties": {
+          "dropped_exdates": {
+            "title": "Dropped Exdates",
+            "type": "integer"
+          },
+          "dropped_overrides": {
+            "title": "Dropped Overrides",
+            "type": "integer"
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventOut"
+          }
+        },
+        "required": [
+          "event",
+          "dropped_overrides",
+          "dropped_exdates"
+        ],
+        "title": "EventChangeOut",
+        "type": "object"
+      },
       "EventCreate": {
         "additionalProperties": false,
         "description": "An event with a time of day names `starts_at`, `ends_at` (instants) and its\n`time_zone` (IANA; default: the calendar's); an all-day one `all_day`, `first_day` and\n`last_day`. `rrule` (RFC 5545, `DAILY` or slower), `rdates` and `exdates` (wall\ntimes in the event's zone, without offset) make it a series. `busy` defaults to\ntrue, for all-day events to false.",
@@ -5710,7 +5733,7 @@
         "type": "string"
       },
       "EventOut": {
-        "description": "`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`\nand of the day after `last_day`). `recurs_until`: when the last occurrence ends\n(null: endless). `series_id`: for an override (one occurrence changed on its own),\nthe series it belongs to; null otherwise. `time_zone`: the zone its series runs\nin (null for all-day). `redacted`: the caller sees only times and \"busy\"; content\nfields are null.",
+        "description": "`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`\nand of the day after `last_day`). `recurs_until`: when the last occurrence ends\n(null: endless). `series_id`: for an override (one occurrence changed on its own),\nthe series it belongs to, and `recurrence_id` the occurrence it takes the place of\n(its wall time in the series, ISO 8601 without offset); null otherwise.\n`time_zone`: the zone its series runs in (null for all-day). `redacted`: the caller\nsees only times and \"busy\"; content fields are null.",
         "properties": {
           "all_day": {
             "title": "All Day",
@@ -5806,6 +5829,17 @@
             },
             "title": "Rdates",
             "type": "array"
+          },
+          "recurrence_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence Id"
           },
           "recurs_until": {
             "anyOf": [
@@ -5905,6 +5939,7 @@
           "calendar_id",
           "space_id",
           "series_id",
+          "recurrence_id",
           "uid",
           "title",
           "description",
@@ -5948,6 +5983,204 @@
         ],
         "title": "EventType",
         "type": "string"
+      },
+      "EventUpdate": {
+        "additionalProperties": false,
+        "description": "A change: `version` (the one read) and only the fields that change, named as\nwhen making an event. Times start from the stored ones: an event moves by its\n`starts_at`/`ends_at` (all-day: `first_day`/`last_day`); `all_day` switches the kind\nand then needs the other kind's bounds. With `scope=all` the times are the series'\n(its first occurrence); with `scope=this` the occurrence's; with `scope=following`\nthose of the part from the occurrence on. `rrule: null` ends the rule.",
+        "properties": {
+          "all_day": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "All Day"
+          },
+          "busy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Busy"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "exdates": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exdates"
+          },
+          "first_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Day"
+          },
+          "last_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Day"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "rdates": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rdates"
+          },
+          "rrule": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rrule"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "EventUpdate",
+        "type": "object"
       },
       "EventVisibility": {
         "description": "`private`: only the organiser (and, on the named way, admins) sees its content;\nevery other reader of the calendar sees times and \"busy\" (`sight.py`).",
@@ -12644,6 +12877,16 @@
           "schema_property_names"
         ],
         "title": "SchemaProblem",
+        "type": "string"
+      },
+      "Scope": {
+        "description": "Which occurrences of a series a write touches (decision 6): `this` one (an\noverride, or an EXDATE when deleting), this and the `following` (a split), or\n`all` (the series row; the only scope of an event that is no series).",
+        "enum": [
+          "this",
+          "following",
+          "all"
+        ],
+        "title": "Scope",
         "type": "string"
       },
       "SearchResults": {
@@ -26865,6 +27108,78 @@
       }
     },
     "/api/events/{event_id}": {
+      "delete": {
+        "description": "Deletes the event (a tombstone for 30 days): the series with its overrides, one\noccurrence (`this`), or this and the following (`following`).",
+        "operationId": "delete_event_api_events__event_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Scope",
+              "default": "all"
+            }
+          },
+          {
+            "description": "with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it)",
+            "in": "query",
+            "name": "occurrence",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it)",
+              "title": "Occurrence"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Event",
+        "tags": [
+          "calendar events"
+        ]
+      },
       "get": {
         "operationId": "get_event_api_events__event_id__get",
         "parameters": [
@@ -26902,6 +27217,98 @@
           }
         },
         "summary": "Get Event",
+        "tags": [
+          "calendar events"
+        ]
+      },
+      "patch": {
+        "description": "Changes the event (`calendar.write` and full sight; 403 `event.private` with\n\"busy\" sight), at the version read (409 `event.version_conflict`): the whole series\n(`scope=all`), one occurrence (`this`: an override) or this and the following\n(`following`: the series is split).",
+        "operationId": "update_event_api_events__event_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Scope",
+              "default": "all"
+            }
+          },
+          {
+            "description": "with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it)",
+            "in": "query",
+            "name": "occurrence",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "with scope this or following: the occurrence's recurrence_id (its wall time, as the window names it)",
+              "title": "Occurrence"
+            }
+          },
+          {
+            "description": "only count what the change drops",
+            "in": "query",
+            "name": "dry_run",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "only count what the change drops",
+              "title": "Dry Run",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Event",
         "tags": [
           "calendar events"
         ]
