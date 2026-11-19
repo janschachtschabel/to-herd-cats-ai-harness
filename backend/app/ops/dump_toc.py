@@ -10,10 +10,13 @@ table) and each entry judged:
 - restored: tables, their data, sequences, defaults, indexes and constraints in
   schema `public`; functions and triggers only by the names our migrations give them
   (FUNCTIONS, TRIGGERS; `tests/test_dump_toc.py` holds them to the migrated schema);
-- left out: grants (`ACL`, `DEFAULT ACL`; a restore never sets privileges) and a
-  comment on schema `public` (the swap's own marker, `swap.py`);
-- anything else (another schema, an extension, a comment, a view, a rule, an event
-  trigger, a function of another name ...) refuses the archive: `archive.dump_foreign`.
+- left out: grants (`ACL`, `DEFAULT ACL`; a restore never sets privileges), schema
+  `public` and its comment whatever their owner (the swap makes the schema, owned by
+  the schema owner, and comments it with its own marker, `swap.py`; review M9b F2-2),
+  and the extension plpgsql with its comment (every installation has it);
+- anything else (another schema, another extension, a comment, a view, a rule, an
+  event trigger, a function of another name ...) refuses the archive:
+  `archive.dump_foreign`.
 
 The restore then gets exactly the entries judged restorable (`--use-list`), from an
 in-memory file (no scratch file on disk). An entry's text is still the archive's: an
@@ -68,7 +71,15 @@ _IN_PUBLIC = (
     "INDEX",
     "CONSTRAINT",
 )
-_LEFT_OUT = ("DEFAULT ACL ", "ACL ", "COMMENT - SCHEMA public ")
+_LEFT_OUT = ("DEFAULT ACL ", "ACL ")
+# Schema `public` itself (the swap makes it; after a replace, or with an owner set by
+# hand, every dump names it with its owner: review M9b F2-2) and its comment (the
+# swap's marker); plpgsql, which every installation has (a dump names it when it was
+# dropped and created again). Taken whatever their owner, never restored.
+_TAKEN_NOT_RESTORED = re.compile(
+    r"(?:SCHEMA - public|COMMENT - SCHEMA public|EXTENSION - plpgsql"
+    r"|COMMENT - EXTENSION plpgsql)(?: \S*)?"
+)
 _ENTRY = re.compile(r"(\d+); \d+ \d+ (.+)")
 _FUNCTION = re.compile(r"FUNCTION public (\w+)\(\) ")
 _TRIGGER = re.compile(r"TRIGGER public \w+ (\w+) ")
@@ -94,7 +105,7 @@ def judge(toc: str) -> str:
         if entry is None:
             raise ToolFailed(FOREIGN)
         what = entry.group(2)
-        if what.startswith(_LEFT_OUT):
+        if what.startswith(_LEFT_OUT) or _TAKEN_NOT_RESTORED.fullmatch(what):
             continue
         if not _ours(what):
             raise ToolFailed(FOREIGN)

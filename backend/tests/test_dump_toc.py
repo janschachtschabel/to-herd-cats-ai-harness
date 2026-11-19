@@ -51,7 +51,30 @@ def test_our_entries_are_restored_and_grants_left_out() -> None:
 @pytest.mark.parametrize(
     "entry",
     [
+        # Schema public after a replace, or with an owner set by hand (review M9b F2-2).
+        "5; 2615 15297822 SCHEMA - public herd",
+        "5; 2615 2200 SCHEMA - public pg_database_owner",
+        "4403; 0 0 COMMENT - SCHEMA public pg_database_owner",
+        # plpgsql dropped and created again: the one extension taken.
+        "1; 3079 15297826 EXTENSION - plpgsql ",
+        "4404; 0 0 COMMENT - EXTENSION plpgsql ",
+    ],
+)
+def test_schema_public_and_plpgsql_are_taken_and_left_out(entry: str) -> None:
+    """The swap makes schema `public` itself and every installation has plpgsql: the
+    entries are no reason to refuse and nothing the restore runs."""
+    assert judge(OURS + entry + "\n") == judge(OURS)
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
         "4500; 0 0 COMMENT public TABLE note herd",
+        "4510; 2615 16508 SCHEMA - public2 herd",
+        "4511; 2615 16509 SCHEMA - public owner with spaces",
+        "4512; 3079 16510 EXTENSION - pg_trgm ",
+        "4513; 0 0 COMMENT - EXTENSION pg_trgm ",
+        "4514; 3079 16511 EXTENSION - plpgsql2 ",
         "4501; 3079 16400 EXTENSION - dblink",
         "4502; 1255 16500 FUNCTION public run_anything() herd",
         "4503; 1255 16501 FUNCTION public herd_work_item_hierarchy(text) herd",

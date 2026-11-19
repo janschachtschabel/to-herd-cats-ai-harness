@@ -479,7 +479,8 @@ keine zweite Wiederherstellung dazwischen):
    gelesen hat;
 4. die Dateien des Archivs, die noch nicht in der Ablage liegen (lokal oder in S3, wie
    `HERD_STORAGE` sagt; [unten](#anhänge-in-s3)), dann die Datenbank in
-   **einer** Transaktion (`psql`): `DROP SCHEMA public CASCADE`, `CREATE SCHEMA public`,
+   **einer** Transaktion (`psql`): `DROP SCHEMA public CASCADE`, `CREATE SCHEMA public`
+   (im Besitz der einspielenden Rolle),
    der Dump des Archivs (aus `pg_restore --file=-`, ohne Zwischendatei), der
    Wartungsmodus im eingespielten Stand, `COMMIT`. Das `COMMIT` geht erst hinaus, wenn
    `pg_restore` fehlerfrei durch ist; bei jedem Fehler wird `psql` beendet, bevor es ein
@@ -582,11 +583,19 @@ fremdes oder verändertes Archiv anrichten kann:
 1. **Nur unser Schema.** Jede Prüfung (`restore check`, „Prüfen“) und jedes Einspielen
    liest das Inhaltsverzeichnis des Dumps (`pg_restore --list`) und lässt nur Tabellen,
    ihre Daten, Sequenzen, Vorgaben, Indexe und Constraints im Schema `public` zu,
-   Funktionen und Trigger nur mit den Namen aus unseren Migrationen. Rechte (`ACL`)
-   und ein Kommentar am Schema `public` bleiben weg (die Rechte der Laufzeitrolle
-   vergibt die Migration nach dem Einspielen neu); alles andere (ein anderes Schema,
-   eine Erweiterung, ein Kommentar, eine Sicht, eine Regel, ein Ereignis-Trigger, eine
-   fremde Funktion) lehnt das Archiv ab: `archive.dump_foreign`. Eingespielt wird genau
+   Funktionen und Trigger nur mit den Namen aus unseren Migrationen. Rechte (`ACL`),
+   das Schema `public` selbst und sein Kommentar (gleich, wem es gehört) sowie die
+   Erweiterung `plpgsql` mit ihrem Kommentar bleiben weg: Der Tausch legt `public`
+   selbst an, im Besitz der einspielenden Rolle, `plpgsql` hat jede Installation, und
+   die Rechte der Laufzeitrolle vergibt die Migration nach dem Einspielen neu. Darum
+   lässt sich auch jede Sicherung einer schon einmal ersetzten Installation wieder
+   einspielen (ihr Dump nennt `public` mit seiner Besitzerin). Alles andere (ein
+   anderes Schema, eine andere Erweiterung, ein Kommentar, eine Sicht, eine Regel, ein
+   Ereignis-Trigger, eine fremde Funktion) lehnt das Archiv ab: `archive.dump_foreign`.
+   Eine Datenbank mit einer weiteren Erweiterung (etwa `pg_stat_statements` oder
+   `pg_trgm`, wie sie manche verwaltete Datenbank anlegt) oder einem weiteren Schema
+   ergibt also Sicherungen, die sich so nicht einspielen lassen: Die App braucht keins
+   davon; vor der ersten Sicherung entfernen oder in eine eigene Datenbank legen. Eingespielt wird genau
    die geprüfte Liste (`pg_restore --use-list`).
 2. **Keine Metabefehle.** `pg_restore` ab 16.10/17.6 umschließt das Skript mit
    `\restrict` und einem Schlüssel, den der Tausch zufällig wählt; `psql` führt darin
@@ -919,8 +928,10 @@ Vergleich aller Tabellen (`scripts/compare_databases.py`: Zeilen und Prüfsumme 
 Inhalts), Anmeldung an B, das alte Cookie von A gilt nicht, der Anhang hat dieselbe
 Prüfsumme; dann wird das laufende B (mit einer neuen Seite) durch dasselbe Archiv
 ersetzt (`--replace`): B antwortet dazwischen 503, danach ist Bs Sitzung ungültig, die
-neue Seite weg, der Anhang da und das Sicherheitsarchiv gelistet; zuletzt wird ein
-manipuliertes Archiv abgelehnt. Ohne Docker, gegen einen
+neue Seite weg, der Anhang da und das Sicherheitsarchiv gelistet; danach wird das
+ersetzte B gesichert, diese Sicherung in eine leere Datenbank C eingespielt (Anmeldung
+und Anhang an C) und B noch einmal durch sie ersetzt, dessen Sicherheitsarchiv die
+Prüfung ebenfalls besteht; zuletzt wird ein manipuliertes Archiv abgelehnt. Ohne Docker, gegen einen
 PostgreSQL-Server über `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD` (Standard
 `localhost:5433`, `herd`); Ausgabe der letzten Probe in
 [`demo/m9.md`](demo/m9.md). In der CI läuft sie als Job `restore` gegen PostgreSQL 17.

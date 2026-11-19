@@ -3,7 +3,7 @@ transaction, all or nothing.
 
     BEGIN; SET LOCAL lock_timeout;
     CREATE TEMPORARY TABLE herd_swap_<token> ON COMMIT DROP (this transaction's id);
-    DROP SCHEMA public CASCADE; CREATE SCHEMA public;
+    DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION CURRENT_ROLE;
     <the archive's dump as SQL, from `pg_restore --file=-`, within `\\restrict <key>`>
     <`tail_sql`: maintenance stays on in the restored state>
     <the check that this is still the transaction of the temporary table>
@@ -73,7 +73,10 @@ def head_sql(token: str) -> str:
         f"CREATE TEMPORARY TABLE herd_swap_{token} (xid pg_catalog.xid8) ON COMMIT DROP;\n"
         f"INSERT INTO pg_temp.herd_swap_{token} VALUES (pg_catalog.pg_current_xact_id());\n"
         "DROP SCHEMA public CASCADE;\n"
-        "CREATE SCHEMA public;\n"
+        # Owned by the schema owner: the connecting role, which is the migration role
+        # when roles are separate (`pgtools.child_env`). Dumps name it from now on;
+        # `dump_toc.py` takes that entry (review M9b F2-2).
+        "CREATE SCHEMA public AUTHORIZATION CURRENT_ROLE;\n"
     )
 
 

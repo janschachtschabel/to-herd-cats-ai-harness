@@ -18,9 +18,13 @@
 #      safety archive, B answered 503 in between, B's session is gone, the page made
 #      after the archive is gone, the attachment is still there, the safety archive
 #      is listed (`backup list`, trigger pre_restore);
-#   7. a manipulated copy of the archive fails `restore check` with
+#   7. the replaced B backed up (review M9b F2-2: its dump names schema `public` with
+#      its owner): `restore check` into empty database C (no problem), `restore apply`,
+#      app C serves the demo admin and the attachment; B replaced again by that
+#      archive; its safety archive passes `restore check` against an empty C too;
+#   8. a manipulated copy of the archive fails `restore check` with
 #      archive.member_checksum;
-#   8. both apps stopped, both databases dropped, the scratch directory removed.
+#   9. every app stopped, every database dropped, the scratch directory removed.
 #
 # Prints "REHEARSAL OK" and exits 0 only if every step holds.
 #
@@ -41,6 +45,7 @@ port="${REHEARSAL_PORT:-18480}"
 suffix="$$_$RANDOM"
 db_a="herd_rehearsal_a_${suffix}"
 db_b="herd_rehearsal_b_${suffix}"
+db_c="herd_rehearsal_c_${suffix}"
 work="$(mktemp -d)"
 pids=()
 admin_email="admin@rehearsal.example"
@@ -60,6 +65,7 @@ cleanup() {
   for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null || true; done
   dropdb --if-exists --force "$db_a" 2>/dev/null || true
   dropdb --if-exists --force "$db_b" 2>/dev/null || true
+  dropdb --if-exists --force "$db_c" 2>/dev/null || true
   rm -rf "$work"
 }
 trap cleanup EXIT
@@ -197,6 +203,34 @@ sha_r="$(curl -s -b "$work/jar-b" -H 'X-Requested-With: herd' "$base_b$attachmen
 [[ $sha_r == "$sha_a" ]] || fail "the attachment after the replace differs"
 runs="$(app_env "$db_b" "$work/data-b" "$py" -m app.ops backup list)" || fail "backup list on B failed"
 grep -q $'\tpre_restore\tok\t' <<<"$runs" || fail "the safety archive is not listed: $runs"
+
+say "back up the replaced B, restore that into empty C ($db_c), replace B with it again"
+archive_r="$(app_env "$db_b" "$work/data-b" "$py" -m app.ops backup create | tail -1)"
+[[ -f $archive_r ]] || fail "backup create on the replaced B printed $archive_r"
+createdb "$db_c"
+app_env "$db_c" "$work/data-c" "$py" -m app.ops restore check "$archive_r" \
+  >"$work/check-r.out" || { cat "$work/check-r.out" >&2; fail "restore check of B's backup"; }
+[[ "$(tail -1 "$work/check-r.out")" == ok ]] || fail "restore check of B's backup: $(cat "$work/check-r.out")"
+app_env "$db_c" "$work/data-c" "$py" -m app.ops restore apply "$archive_r" \
+  | tail -1 | tee "$work/apply-r.out"
+grep -q '^restored ' "$work/apply-r.out" || fail "restore apply of B's backup"
+no_local_files "$work/data-c"
+base_c="http://127.0.0.1:$((port + 4))"
+start_app "$db_c" "$work/data-c" "$((port + 4))"
+[[ $(login "$base_c" "$work/jar-c") == 200 ]] || fail "login on C"
+sha_c="$(curl -s -b "$work/jar-c" -H 'X-Requested-With: herd' "$base_c$attachment_url" | sha256sum | cut -d' ' -f1)"
+[[ $sha_c == "$sha_a" ]] || fail "the attachment from C differs"
+kill "${pids[-1]}" && wait "${pids[-1]}" || true
+app_env "$db_b" "$work/data-b" "$py" -m app.ops restore apply "$archive_r" --replace \
+  --confirm "$org_name" | tail -1 | tee "$work/replace-r.out"
+grep -q '^replaced by .*safety archive herd-' "$work/replace-r.out" || fail "the second replace"
+safety_r="$work/backups/$(sed 's/.*safety archive //' "$work/replace-r.out")"
+[[ -f $safety_r ]] || fail "the second safety archive $safety_r is missing"
+dropdb --force "$db_c" && createdb "$db_c"
+app_env "$db_c" "$work/data-c2" "$py" -m app.ops restore check "$safety_r" \
+  >"$work/check-s.out" || { cat "$work/check-s.out" >&2; fail "restore check of the safety archive"; }
+[[ "$(tail -1 "$work/check-s.out")" == ok ]] || fail "the safety archive: $(cat "$work/check-s.out")"
+echo "   $(basename "$archive_r") restored into C and B; safety archive $(basename "$safety_r") ok"
 
 say "a manipulated archive is refused"
 cp "$archive" "$work/spoiled.tar"
