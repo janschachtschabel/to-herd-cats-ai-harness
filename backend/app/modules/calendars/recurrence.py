@@ -26,7 +26,7 @@ that imports `dateutil` (`tests/test_calendar_imports.py` allows it here and in
 """
 
 import heapq
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from itertools import chain, islice
 from typing import Any
@@ -132,13 +132,18 @@ def _matches(
         # would count in a cut first week; run it from the week's start (WKST) and drop
         # what lies before `begin` (RFC 5545 3.3.10: the whole set, then >= DTSTART).
         first = datetime.combine(week_start(begin.date(), rule.wkst), begin.time())
-    until = _ahead(min(stop, HORIZON))
-    run = rrule(dtstart=_ahead(first), until=until, cache=False, **_kwargs(rule, start))
-    for found in run:
+    # `dateutil` checks an UNTIL at candidates only: it scans to the first one past it
+    # either way; stopping there here lets the counter see how far the scan reached.
+    until = min(stop, HORIZON)
+    for found in rrule(dtstart=_ahead(first), cache=False, **_kwargs(rule, start)):
         counter.candidates += 1
         wall = found.replace(year=found.year - _AHEAD_YEARS)
+        counter.reached = wall
+        if wall > until:
+            return
         if wall >= begin:
             yield wall
+    counter.reached = HORIZON  # scanned to `dateutil`'s last year
 
 
 def _last_instant(series: Series, rule: ParsedRule) -> datetime | None:
@@ -173,11 +178,19 @@ def rule_walls(
 
 
 def walls(
-    series: Series, lo: datetime, hi: datetime, counter: Counter, *, keep_exdates: bool = False
+    series: Series,
+    lo: datetime,
+    hi: datetime,
+    counter: Counter,
+    *,
+    keep_exdates: bool = False,
+    rdates: Sequence[datetime] | None = None,
 ) -> Iterator[datetime]:
     """Every occurrence's wall time from `lo` to `hi` (inclusive), in order, once
-    (`keep_exdates`: deleted ones too; `recurrence_ids` asks for many ids at once)."""
-    rdates = sorted(wall for wall in set(series.rdates) if wall >= lo)
+    (`keep_exdates`: deleted ones too; `rdates`: the series' RDATEs from `lo` on,
+    sorted, once: `recurrence_ids` asks for many ids at once)."""
+    if rdates is None:
+        rdates = sorted(wall for wall in set(series.rdates) if wall >= lo)
     exdates = frozenset(() if keep_exdates else series.exdates)
     previous = None
     for wall in heapq.merge(rule_walls(series, lo, hi, counter), rdates):

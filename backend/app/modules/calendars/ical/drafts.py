@@ -22,6 +22,7 @@ MAX_ATTENDEES = 100
 MAX_ALARMS = 3
 MAX_ALARM_MINUTES = 40_320  # four weeks
 MAX_OVERRIDES = 1000  # per series; reading counts the rest as `ical.over_limit`
+MAX_RDATES = 1000  # values written per series; reading counts the rest (once per event)
 
 
 class Status(StrEnum):

@@ -20,10 +20,13 @@ from app.modules.calendars.recurrence_rule import Freq, ParsedRule
 
 @dataclass(slots=True)
 class Counter:
-    """What an expansion cost: candidates the rule generated, and whether it jumped."""
+    """What an expansion cost: candidates the rule generated, whether it jumped, and
+    the wall time its scan reached (the last candidate, or the horizon where the rule
+    ran out: `recurrence_ids` charges the periods scanned past what it asked for)."""
 
     candidates: int = 0
     jumps: int = 0
+    reached: datetime | None = None
 
 
 def week_start(day: date, wkst: int) -> date:

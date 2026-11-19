@@ -6,11 +6,12 @@ faithful measure of the work. Each refusal is counted under an `ical.*` code."""
 import calendar
 import random
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
 from app.modules.calendars.ical import lines, reading, vtimezone, zones
+from app.modules.calendars.ical.drafts import MAX_RDATES
 from app.modules.calendars.ical.problems import Skip
 from app.modules.calendars.recurrence_rule import ParsedRule, RuleInvalid, parse_rule
 
@@ -191,3 +192,17 @@ def test_one_offset_costs_by_the_ruled_observances_and_their_lists_only() -> Non
     wall = datetime(2026, 7, 1, 12)
     assert _spent(longer, wall) > _spent(simple, wall)
     assert _spent(many, wall) == _spent(simple, wall)  # unruled observances: a bisection
+
+
+def test_a_series_takes_its_first_max_rdates_written_and_counts_the_rest() -> None:
+    first = datetime(2026, 1, 1, 10)
+    values = [(first + timedelta(hours=n + 1)).strftime("%Y%m%dT%H%M%SZ") for n in range(1010)]
+    body = (
+        f"DTSTART:{first:%Y%m%dT%H%M%S}Z\r\n"
+        f"RDATE:{','.join(values[:600])}\r\nRDATE:{','.join(reversed(values[600:]))}"
+    )
+    parsed = _parse(_calendar(_event("u", body)))
+    rdates = parsed.events[0].series.rdates
+    assert len(rdates) == MAX_RDATES
+    assert rdates[-1] == first + timedelta(hours=1010)  # the second RDATE's first value
+    assert parsed.problems == Counter({"ical.over_limit": 1})

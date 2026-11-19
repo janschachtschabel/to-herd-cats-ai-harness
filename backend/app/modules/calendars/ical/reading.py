@@ -18,6 +18,7 @@ from app.modules.calendars.ical import content, lines, problems, times
 from app.modules.calendars.ical.budget import Budget, OverBudget, check_cost
 from app.modules.calendars.ical.drafts import (
     MAX_OVERRIDES,
+    MAX_RDATES,
     MAX_UID,
     EventDraft,
     OverrideDraft,
@@ -176,7 +177,7 @@ def _series(
             tzid=begin.tzid,
             all_day=begin.all_day,
             rrule=rule,
-            rdates=tuple(sorted({w for prop in added for w in times.walls(prop, begin, frame)})),
+            rdates=_rdates(added, begin, frame, notes),
         )
     except SeriesInvalid as refused:
         raise Skip(problems.FROM_SERIES.get(refused.code, problems.TIME_INVALID)) from None
@@ -195,6 +196,24 @@ def _series(
         exdates = {found.get(value, value[0]) for value in values}
         series = replace(series, exdates=tuple(sorted(exdates)))
     return begin, series
+
+
+def _rdates(
+    props: list[lines.Prop], begin: times.Start, frame: times.Frame, notes: Counter[str]
+) -> tuple[datetime, ...]:
+    """The first `MAX_RDATES` values written in `props`, as the series' wall times,
+    sorted and once (re-check RC7a-4: a series' RDATEs are walked per pass)."""
+    found: set[datetime] = set()
+    left = MAX_RDATES
+    for prop in props:
+        values = lines.date_times(prop)
+        kept = values[: max(left, 0)]
+        if len(kept) < len(values):
+            notes[problems.OVER_LIMIT] = 1
+        tzid = prop.param("TZID")
+        found.update(times.to_wall(value, tzid, begin, frame) for value in kept)
+        left -= len(kept)
+    return tuple(sorted(found))
 
 
 def _recurrence_ids(
