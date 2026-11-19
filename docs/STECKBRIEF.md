@@ -1199,7 +1199,13 @@ zurück.
   ganzen Woche auf 2.305 statt rund 3.000 (vier Seiten zu je 755) und ihre Zeilen von
   1.621 auf 1.541. Die Arbeit der ganzen Woche sinkt von 83.673 auf 63.941 (−24 %), die
   des Monatsrasters mit allen Seiten von 633.290 auf 425.322; dessen Zeit von rund 1,9 s
-  auf rund 1,1 s.
+  auf rund 1,1 s. **Das ist der günstigste Fall für (b):** Jede Regel der Mischung
+  (`measure_calendar_events.RULES`) ist eine, mit der eine Serie mit `COUNT` vorspringt;
+  Regeln mit schwankender Zahl je Periode (etwa monatlich am 31.) enthält der Bestand
+  nicht. Sie laufen ab ihrem Beginn und kosten je Aufruf ihre Kandidaten seit dem Beginn
+  (monatlich am 31. über fünf Jahre rund 60, eine Zeile kostet 40); im Alltag sind sie
+  selten und dünn. Für die Messung in Task 23 ist eine solche Art in der Mischung
+  vorgemerkt.
 - **Wofür die Zeit jetzt geht:** vor allem die Zeilen. Jede noch laufende Serie wird auf
   jeder Seite geladen und angesetzt (vor den Abhilfen gemessen: Laden der rund 400
   Zeilen samt Ausnahmen 24 ms, Entfalten 38 ms, rund 95 µs je Zeile), denn (a) spart nur

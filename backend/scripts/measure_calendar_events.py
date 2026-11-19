@@ -20,7 +20,10 @@ from app.modules.calendars.models import Calendar
 ANCHOR = datetime(2026, 11, 23, tzinfo=UTC)  # a Monday
 ZONE = "Europe/Berlin"
 ZONES = (ZONE,) * 8 + ("America/New_York", "Asia/Tokyo")
-# (weight, rule, minutes): the mixture of series.
+# (weight, rule, minutes): the mixture of series. Every rule here lets a counted series
+# jump (`recurrence_count.per_block`), so the stock measures remedy (b) at its best
+# (review M10 task 3c, R3c-2); a rule whose count varies per period walks from its
+# start and is not in it.
 RULES: tuple[tuple[int, str, int], ...] = (
     (4, "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR", 15),
     (2, "FREQ=DAILY", 30),
