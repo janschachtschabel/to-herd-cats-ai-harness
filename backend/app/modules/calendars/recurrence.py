@@ -149,7 +149,7 @@ def _last_instant(series: Series, rule: ParsedRule) -> datetime | None:
     return None
 
 
-def _rule_walls(
+def rule_walls(
     series: Series, lo: datetime, stop: datetime, counter: Counter
 ) -> Iterator[datetime]:
     """DTSTART, then the rule's matches (`COUNT` and `UNTIL` applied), in order; from
@@ -179,7 +179,7 @@ def walls(
     rdates = sorted(wall for wall in set(series.rdates) if wall >= lo)
     exdates = frozenset(() if keep_exdates else series.exdates)
     previous = None
-    for wall in heapq.merge(_rule_walls(series, lo, hi, counter), rdates):
+    for wall in heapq.merge(rule_walls(series, lo, hi, counter), rdates):
         if wall > hi:
             return
         if wall != previous and wall >= lo and wall not in exdates:
@@ -279,7 +279,7 @@ def count_before(series: Series, recurrence_id: datetime) -> int:
     time): what splitting a counted series there leaves to its first part."""
     wall = as_wall(series, recurrence_id)
     count = 0
-    for found in _rule_walls(series, series.start, wall, Counter()):
+    for found in rule_walls(series, series.start, wall, Counter()):
         if found >= wall:
             break
         count += 1
