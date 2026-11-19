@@ -7,6 +7,7 @@ import { approvalKeys } from '@/features/approvals/queries'
 import { automationEventKeys, automationKeys } from '@/features/automations/queries'
 import { backupKeys } from '@/features/backup/queries'
 import { calendarKeys } from '@/features/calendars/keys'
+import { calendarEventKeys } from '@/features/calendars/live'
 import { noteRunProgress } from '@/features/agents/live'
 import { proposalEventKeys } from '@/features/proposals/live'
 import { proposalKeys } from '@/features/proposals/queries'
@@ -110,10 +111,12 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
     case 'backup.changed':
       return [backupKeys.all]
     case 'calendar.changed':
+      // Ids only: the calendar views refetch what they show (the server judges).
+      return calendarEventKeys(event.spaceId)
     case 'event.invited':
-      // Ids only: every calendar view refetches what it shows (the server judges). An
-      // invitation reaches someone outside the space too, who gets no `calendar.changed`;
-      // its activity entry comes as `notification.created`.
+      // An invitation reaches someone outside the space too, who gets no
+      // `calendar.changed`: every calendar view refetches; its activity entry comes as
+      // `notification.created`.
       return [calendarKeys.all]
     case 'card.changed':
       // A run's card was decided, answered or settled (ran or stale): the cards, the
