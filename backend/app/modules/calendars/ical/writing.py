@@ -34,7 +34,7 @@ from app.modules.calendars.ical.drafts import (
 from app.modules.calendars.recurrence import Series
 
 PRODID = "-//to-herd-cats-ai//calendar//EN"
-_UTC_ZONES = frozenset({"UTC", "Etc/UTC"})
+_UTC = "UTC"  # written as instants (`…Z`), the zone a series in UTC is read back in
 _VTIMEZONE_YEARS = (1970, 2038)  # widened to an event's year where it lies outside
 _PARTSTAT = {
     Response.NEEDS_ACTION: "NEEDS-ACTION",
@@ -68,11 +68,7 @@ def _stream(events: Iterable[ExportEvent], name: str | None) -> Iterator[bytes]:
     for event in events:
         chunk = b""
         for series in (event.series, *(o.series for o in event.overrides)):
-            if (
-                series.tzid is not None
-                and series.tzid not in _UTC_ZONES
-                and series.tzid not in written
-            ):
+            if series.tzid is not None and series.tzid != _UTC and series.tzid not in written:
                 written.add(series.tzid)
                 chunk += _vtimezone(series.tzid, *_years(series.start.year))
         yield chunk + b"".join(part.to_ical() for part in _vevents(event))
@@ -143,7 +139,7 @@ def _vevent(uid: str, stamp: datetime, series: Series, content: Content, redacte
 def _moment(key: str, series: Series, wall: datetime) -> tuple[str, object, dict[str, str]]:
     if series.all_day:
         return key, wall.date(), {}
-    if series.tzid in _UTC_ZONES:
+    if series.tzid == _UTC:
         return key, wall.replace(tzinfo=UTC), {}
     return key, wall, {"TZID": series.tzid or ""}
 

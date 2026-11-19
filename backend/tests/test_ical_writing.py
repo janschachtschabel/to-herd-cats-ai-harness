@@ -6,10 +6,11 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.modules.calendars import zones
 from app.modules.calendars.ical import reading, writing
 from app.modules.calendars.ical.drafts import AttendeeDraft, Content, EventDraft, ExportEvent
 from app.modules.calendars.recurrence import Series
-from tests.support.ical_occurrences import utc
+from tests.support.ical_occurrences import effective, utc
 
 SERIES = Series(datetime(2026, 7, 1, 9), timedelta(hours=1), "Europe/Berlin", False)
 
@@ -47,3 +48,34 @@ def test_a_stamp_without_a_zone_is_refused() -> None:
     draft = EventDraft(uid="u", series=SERIES, content=Content())
     with pytest.raises(ValueError, match="aware"):
         ExportEvent.of(draft, stamp=datetime(2026, 11, 19))
+
+
+ODD_ZONES = [
+    "Pacific/Apia",  # skipped 30 December 2011
+    "Australia/Lord_Howe",  # half an hour of summer time
+    "Antarctica/Troll",  # two hours of summer time
+    "Africa/Casablanca",  # summer time paused for Ramadan
+    "Asia/Kathmandu",  # +05:45
+    "Etc/UTC",
+    "UTC",
+]
+
+
+@pytest.mark.parametrize("year", [1905, 2026, 2390])
+def test_a_series_reads_back_alike_in_every_kind_of_zone(year: int) -> None:
+    sample = sorted(zones.names())[::25] + ODD_ZONES
+    for name in sample:
+        draft = EventDraft(
+            uid=name,
+            series=Series(
+                datetime(year, 3, 1, 9),
+                timedelta(hours=1),
+                name,
+                False,
+                rrule="FREQ=MONTHLY;COUNT=12",
+            ),
+            content=Content(),
+        )
+        data = writing.event_ics(ExportEvent.of(draft, stamp=utc(2026, 11, 19)))
+        (back,) = reading.parse(data, default_zone="Asia/Tokyo", limit=5).events
+        assert (back.series.tzid, effective(back)) == (name, effective(draft)), name
