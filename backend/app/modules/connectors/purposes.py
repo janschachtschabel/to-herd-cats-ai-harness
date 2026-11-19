@@ -40,6 +40,7 @@ from app.core.principal import PrincipalType
 from app.modules.ai.access import require_ai
 from app.modules.audit.recorder import record
 from app.modules.connectors.models import AuthKind, Connector, ConnectorScope, Purpose
+from app.modules.connectors.origins import InvalidOrigin, origin_of
 from app.modules.connectors.repository import ConnectorRepository, personal_of
 from app.modules.connectors.schemas import check_auth, check_header
 from app.modules.oauth.repository import ClientRepository
@@ -92,35 +93,33 @@ async def require_right(
 async def personal_repository(
     session: AsyncSession, actor: Actor, purpose: Purpose
 ) -> ConnectorRepository:
-    """The acting person's own connectors of `purpose`, after checking `rule.use`."""
+    """The acting person's own connectors of `purpose` (never `mcp`), after checking
+    `rule.use`."""
+    _calendar_only(purpose)
     if actor.principal.type != PrincipalType.USER:
-        if purpose == Purpose.MCP:
-            await require_ai(session, actor, Action.AI_USE)  # agents: 404, as in M8
         raise Forbidden(code="auth.permission_denied")
     await require_right(session, actor, purpose, rule_for(purpose).use)
     return personal_of(session, actor.org_id, actor.principal.id, purpose)
 
 
 def bare_origin(origin: str) -> str:
-    """`https://host[:port]`, lower case; 422 `connector.origin_invalid` for anything
-    else (another scheme, credentials, a path, a query or a fragment)."""
-    parts = urlsplit(origin)
+    """The origin as `origins.origin_of` spells it (the one `moving` compares); 422
+    `connector.origin_invalid` for anything else, a path, query or fragment included."""
     try:
-        port = parts.port
-    except ValueError:
-        port = -1
-    if (
-        parts.scheme != "https"
-        or not parts.hostname
-        or parts.username is not None
-        or parts.password is not None
-        or parts.path
-        or parts.query
-        or parts.fragment
-        or port == -1
-    ):
-        raise ValidationFailed(code="connector.origin_invalid")
-    return f"https://{parts.hostname.lower()}" + (f":{port}" if port else "")
+        parts = urlsplit(origin)
+        bare = not (parts.path or parts.query or parts.fragment or "?" in origin or "#" in origin)
+        if bare:
+            return origin_of(origin)
+    except (ValueError, InvalidOrigin):
+        pass
+    raise ValidationFailed(code="connector.origin_invalid")
+
+
+def _calendar_only(purpose: Purpose) -> None:
+    """An MCP connector is made and reached through `ConnectorService` (its names and
+    `ai.use`'s 404); asking this module for one is a programming error."""
+    if purpose == Purpose.MCP:
+        raise ValueError("purposes serves calendar connectors, not mcp ones")
 
 
 async def create_personal(
@@ -134,9 +133,11 @@ async def create_personal(
     header_name: str | None = None,
     oauth_client_id: uuid.UUID | None = None,
 ) -> Connector:
-    """The acting person's new connector of `purpose` (checks `rule.use`). `bearer` and
-    `header` take the secret (stored `enc:`); `oauth` names an app of the same purpose
-    and gets its tokens through the flow (`oauth/flow.py`)."""
+    """The acting person's new connector of `purpose` (never `mcp`; checks `rule.use`).
+    `bearer` and `header` take the secret (stored `enc:`; empty or blank: 422
+    `connector.secret_invalid`); `oauth` names an app of the same purpose and gets its
+    tokens through the flow (`oauth/flow.py`). `origin` is recorded as `bare_origin`
+    spells it."""
     repo = await personal_repository(session, actor, purpose)
     where = bare_origin(origin)
     try:
@@ -148,6 +149,8 @@ async def create_personal(
         (kind == AuthKind.OAUTH) == (secret is not None)
     ):
         raise ValidationFailed(code="connector.secret_invalid")
+    if secret is not None and not secret.get_secret_value().strip():
+        raise ValidationFailed(code="connector.secret_invalid")  # never the database's check
     if oauth_client_id is not None:
         clients = ClientRepository(session, actor.org_id, purpose)
         if await clients.get_shared_lock(oauth_client_id) is None:
@@ -159,7 +162,7 @@ async def create_personal(
         name=f"{purpose.value}:{connector_id}",
         auth_kind=kind,
         header_name=header_name,
-        secret_ref=secrets.encrypt(secret.get_secret_value()) if secret else None,
+        secret_ref=secrets.encrypt(secret.get_secret_value()) if secret is not None else None,
         oauth_client_id=oauth_client_id,
     )
     details = {
@@ -167,7 +170,7 @@ async def create_personal(
         "purpose": purpose.value,
         "auth_kind": kind.value,
         "origin": where,
-        "secret": "enc" if secret else None,
+        "secret": "enc" if secret is not None else None,
     }
     await record(session, actor, "connector.created", "connector", connector.id, details)
     return connector
