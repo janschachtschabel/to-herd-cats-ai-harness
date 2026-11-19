@@ -243,7 +243,7 @@ secrets:
 ## @section Database
 
 ## @param database.url Connection URL of an external PostgreSQL without the password, e.g. postgresql+asyncpg://herd@db.example:5432/herd; ignored when postgresql.enabled
-## @param database.existingSecret Name of an existing Secret with the database password under the key "password"; mounted as a file (HERD_DATABASE_PASSWORD_FILE). Also used by the bundled PostgreSQL; set it there when rendering with `helm template` (Argo CD, Flux): the generated password relies on `lookup`, which is empty then, so every render would make a new one
+## @param database.existingSecret Name of an existing Secret with the database password under the key "password"; mounted as a file (HERD_DATABASE_PASSWORD_FILE). Also used by the bundled PostgreSQL, then with two keys: "password" for its superuser herd (the StatefulSet and the migration job's db-owner step only) and "owner-password" for the app's role herd_owner (API, worker, migration, backups; no superuser, so an archive's dump never runs as one, docs/SICHERUNG.md); set it there when rendering with `helm template` (Argo CD, Flux): the generated password relies on `lookup`, which is empty then, so every render would make a new one
 ## @param database.sslMode TLS to the database, libpq's sslmode (HERD_DATABASE_SSLMODE; API, worker, migration and backup, asyncpg and pg_dump/pg_restore alike): verify-full is recommended for an external database; empty: the URL's own setting. With postgresql.enabled only "", disable, allow or prefer (the bundled PostgreSQL speaks no TLS); verify-ca needs database.caSecret
 ## @param database.caSecret Name of an existing Secret with the CA certificate to verify the database server against, under the key "ca.crt"; mounted as a file (HERD_DATABASE_SSLROOTCERT). Empty: the image's system CAs (verify-full only; verify-ca needs it)
 ## @param database.migrate.url Separate database roles (docs/SICHERUNG.md): the URL of the role that owns the schema, without the password; the migration job and the backup job connect with it (HERD_MIGRATE_DATABASE_URL), the API and worker pods with database.url, whose role then gets data rights only. Empty: one role (the default). External database only
@@ -261,7 +261,7 @@ database:
 
 ## @section Bundled PostgreSQL (for test and staging only)
 
-## @param postgresql.enabled Run a minimal single-pod pgvector StatefulSet; switch it off and set database.url for production
+## @param postgresql.enabled Run a minimal single-pod pgvector StatefulSet; switch it off and set database.url for production. The app connects as herd_owner, which the migration job's init container (`python -m app.stack db-owner`, as the superuser) makes and hands the database, schema public and every object in it on every revision
 ## @param postgresql.image PostgreSQL image (pgvector), pinned by digest
 ## @param postgresql.storage.size Size of the data volume
 ## @param postgresql.storage.storageClass Storage class of the data volume; empty: the cluster default

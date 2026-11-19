@@ -36,10 +36,12 @@ app.kubernetes.io/part-of: to-herd-cats-ai
 {{- end -}}
 {{- end -}}
 
-{{/* The database URL without password: the bundled PostgreSQL or database.url. */}}
+{{/* The database URL without password: the bundled PostgreSQL (as herd_owner, the
+role the migration job's db-owner step makes: owner of the database, no superuser)
+or database.url. */}}
 {{- define "herd.databaseUrl" -}}
 {{- if .Values.postgresql.enabled -}}
-{{- printf "postgresql+asyncpg://herd@%s-postgresql:5432/herd" (include "herd.fullname" .) -}}
+{{- printf "postgresql+asyncpg://herd_owner@%s-postgresql:5432/herd" (include "herd.fullname" .) -}}
 {{- else -}}
 {{- $url := required "database.url is required when postgresql.enabled is false" .Values.database.url -}}
 {{- if regexMatch "://[^/@]*:[^/@]*@" $url -}}
@@ -49,13 +51,20 @@ app.kubernetes.io/part-of: to-herd-cats-ai
 {{- end -}}
 {{- end -}}
 
-{{/* The Secret holding the database password (key "password"), or "" for none. */}}
+{{/* The Secret holding the app's database password (key: herd.databasePasswordKey),
+or "" for none. */}}
 {{- define "herd.databaseSecret" -}}
 {{- if .Values.database.existingSecret -}}
 {{- .Values.database.existingSecret -}}
 {{- else if .Values.postgresql.enabled -}}
 {{- printf "%s-postgresql" (include "herd.fullname" .) -}}
 {{- end -}}
+{{- end -}}
+
+{{/* The key of the app's password in herd.databaseSecret: "owner-password" (herd_owner)
+with the bundled PostgreSQL, whose "password" is its superuser's; else "password". */}}
+{{- define "herd.databasePasswordKey" -}}
+{{- if .Values.postgresql.enabled -}}owner-password{{- else -}}password{{- end -}}
 {{- end -}}
 
 {{/* Pod Security "restricted" for the app pods (image user 10001). */}}
@@ -157,7 +166,7 @@ entries would win): secrets come from Secrets, the chart's settings from its val
     secretName: {{ . }}
     defaultMode: 0440
     items:
-      - key: password
+      - key: {{ include "herd.databasePasswordKey" $.root }}
         path: password
 {{- end }}
 {{- with .root.Values.database.caSecret }}

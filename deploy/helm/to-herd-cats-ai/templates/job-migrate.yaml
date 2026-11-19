@@ -5,6 +5,12 @@ PostgreSQL does not exist yet when pre-install hooks run, so with it the job is 
 ordinary resource, one per revision; until it has run, the API pods restart (their
 bootstrap needs the schema) and stay not ready, and the job retries until the
 database answers. Fine for test and staging, which is all the bundled one is for.
+
+With the bundled PostgreSQL an init container runs `python -m app.stack db-owner` first,
+as its superuser herd (key "password"): it makes the role herd_owner (LOGIN only, no
+superuser) with the Secret's "owner-password" and hands it the database, schema public
+and every object in it, on every revision. The app, the migration and the backups
+connect as herd_owner: an archive's dump never runs as a superuser (review M9b F2-1).
 */ -}}
 {{- $hook := not .Values.postgresql.enabled -}}
 apiVersion: batch/v1
@@ -40,6 +46,38 @@ spec:
       {{- end }}
       securityContext:
         {{- include "herd.podSecurityContext" . | nindent 8 }}
+      {{- if not $hook }}
+      initContainers:
+        - name: db-owner
+          image: {{ include "herd.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /usr/bin/tini
+            - --
+            - python
+            - -m
+            - app.stack
+            - db-owner
+            - --host
+            - {{ printf "%s-postgresql" (include "herd.fullname" .) }}
+            - --superuser-password-file
+            - /var/run/secrets/herd/database-superuser/password
+            - --owner-password-file
+            - /var/run/secrets/herd/database/password
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          securityContext:
+            {{- include "herd.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: database-password
+              mountPath: /var/run/secrets/herd/database
+              readOnly: true
+            - name: database-superuser-password
+              mountPath: /var/run/secrets/herd/database-superuser
+              readOnly: true
+      {{- end }}
       containers:
         - name: migrate
           image: {{ include "herd.image" . | quote }}
@@ -61,3 +99,12 @@ spec:
       volumes:
         {{- include "herd.volumes" . | nindent 8 }}
         {{- with include "herd.migrateVolume" . }}{{ . | nindent 8 }}{{- end }}
+        {{- if not $hook }}
+        - name: database-superuser-password
+          secret:
+            secretName: {{ include "herd.databaseSecret" . }}
+            defaultMode: 0440
+            items:
+              - key: password
+                path: password
+        {{- end }}

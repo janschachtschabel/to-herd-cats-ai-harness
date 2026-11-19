@@ -363,7 +363,7 @@
       "additionalProperties": false,
       "properties": {
         "url": {"type": "string", "description": "External PostgreSQL URL without the password"},
-        "existingSecret": {"type": "string", "description": "Existing Secret with the database password under the key \"password\""},
+        "existingSecret": {"type": "string", "description": "Existing Secret with the database password under the key \"password\"; with the bundled PostgreSQL also \"owner-password\" (the app's role herd_owner; \"password\" is the superuser's)"},
         "sslMode": {"type": "string", "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"], "description": "HERD_DATABASE_SSLMODE (libpq's sslmode); empty: the URL's own"},
         "migrate": {
           "type": "object",
@@ -385,7 +385,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {"type": "boolean", "description": "Run the bundled single-pod PostgreSQL (test and staging only)"},
+        "enabled": {"type": "boolean", "description": "Run the bundled single-pod PostgreSQL (test and staging only); the app connects to it as herd_owner (owner of the database, no superuser), made by the migration job's db-owner step"},
         "image": {"type": "string", "description": "PostgreSQL (pgvector) image", "minLength": 1},
         "maxConnections": {"type": "integer", "minimum": 20, "maximum": 10000, "description": "max_connections of the bundled PostgreSQL; must cover 16 per API and worker pod plus 10"},
         "storage": {

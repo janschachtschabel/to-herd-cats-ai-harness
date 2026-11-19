@@ -143,3 +143,46 @@ fi
 if render "${roles[@]}" --set 'database.migrate.runtimeRole=Herd App' >/dev/null 2>&1; then
   fail "database.migrate.runtimeRole took a name that needs quoting"
 fi
+
+# Review M9b F2-1: with the bundled PostgreSQL nothing of the app connects as its
+# superuser herd. The migration job's init container db-owner (as herd, key "password")
+# makes herd_owner with the generated "owner-password"; the app, the migration and the
+# backups connect as herd_owner with that key; the superuser's key stays with the
+# StatefulSet and db-owner. An external database keeps database.url and "password".
+out=$(render --set backup.enabled=true)
+secret=$(doc Secret t-to-herd-cats-ai-postgresql "$out")
+grep -q "^  password: " <<<"$secret" || fail "the generated Secret has no superuser password"
+grep -q "^  owner-password: " <<<"$secret" || fail "the generated Secret has no owner-password"
+migrate=$(doc Job t-to-herd-cats-ai-migrate-1 "$out")
+for pod in "Deployment t-to-herd-cats-ai-api" "Deployment t-to-herd-cats-ai-worker" \
+  "Job t-to-herd-cats-ai-migrate-1" "CronJob t-to-herd-cats-ai-backup"; do
+  # shellcheck disable=SC2086
+  manifest=$(doc $pod "$out")
+  grep -A1 -- "- name: HERD_DATABASE_URL" <<<"$manifest" \
+    | grep -q 'value: "postgresql+asyncpg://herd_owner@t-to-herd-cats-ai-postgresql:5432/herd"' \
+    || fail "$pod does not connect as herd_owner"
+  grep -A6 -- "- name: database-password$" <<<"$manifest" | grep -q "key: owner-password" \
+    || fail "$pod does not mount the owner's password"
+done
+for pod in "Deployment t-to-herd-cats-ai-api" "Deployment t-to-herd-cats-ai-worker" \
+  "CronJob t-to-herd-cats-ai-backup"; do
+  # shellcheck disable=SC2086
+  grep -q "database-superuser\|initContainers" <<<"$(doc $pod "$out")" \
+    && fail "$pod gets the superuser's password"
+done
+grep -A3 "initContainers:" <<<"$migrate" | grep -q "name: db-owner" \
+  || fail "the migration job does not run db-owner first"
+grep -A2 -- "- app.stack" <<<"$migrate" | grep -q -- "- db-owner" || fail "db-owner runs something else"
+grep -A1 -- "- --superuser-password-file" <<<"$migrate" \
+  | grep -q "/var/run/secrets/herd/database-superuser/password" || fail "db-owner lacks the superuser's file"
+grep -A1 -- "- --owner-password-file" <<<"$migrate" \
+  | grep -q "/var/run/secrets/herd/database/password" || fail "db-owner lacks the owner's file"
+grep -A6 -- "- name: database-superuser-password$" <<<"$migrate" | grep -q "key: password" \
+  || fail "db-owner's superuser file is not the key password"
+grep -A6 -- "- name: password$" <<<"$(doc StatefulSet t-to-herd-cats-ai-postgresql "$out")" \
+  | grep -q "key: password" || fail "the bundled PostgreSQL lost its superuser's password"
+out=$(render "${ext[@]}")
+grep -q "herd_owner\|owner-password\|db-owner\|database-superuser" <<<"$out" \
+  && fail "an external database gets the bundled PostgreSQL's owner role"
+grep -A6 -- "- name: database-password$" <<<"$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  | grep -q "key: password" || fail "an external database's password is not the key password"
