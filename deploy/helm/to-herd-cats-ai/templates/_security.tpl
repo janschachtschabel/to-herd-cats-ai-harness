@@ -28,6 +28,9 @@ backup). The bundled PostgreSQL speaks no TLS, so it refuses the modes that need
 {{- if and .Values.postgresql.enabled (has $mode (list "require" "verify-ca" "verify-full")) -}}
 {{- fail (printf "database.sslMode %s needs a database that speaks TLS; the bundled PostgreSQL does not (postgresql.enabled)" $mode) -}}
 {{- end -}}
+{{- if and (eq $mode "verify-ca") (not .Values.database.caSecret) -}}
+{{- fail "database.sslMode verify-ca needs database.caSecret (pg_dump and pg_restore take the system's CAs only with verify-full)" -}}
+{{- end -}}
 {{- if $mode }}
 - name: HERD_DATABASE_SSLMODE
   value: {{ $mode | quote }}

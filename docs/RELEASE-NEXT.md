@@ -86,7 +86,7 @@ anders gesagt):
 | `HERD_UPLOAD_RATE_PER_MINUTE` | `30` | Uploads (Anhänge, Importe) je Person und Minute | `writeLimit.uploadsPerMinute` |
 | `HERD_CLAMAV_ADDRESS` | leer (aus) | `host:port` eines clamd; dann werden Anhänge und Importe vorher gescannt (fail closed) | `virusScan.clamavAddress`, `virusScan.egress` |
 | `HERD_DATABASE_SSLMODE` | leer | `disable` … `verify-full`, gewinnt über `sslmode` in der URL; gilt für die App, LISTEN und die pg-Werkzeuge | `database.sslMode` |
-| `HERD_DATABASE_SSLROOTCERT` | leer | CA-Datei für `verify-ca`/`verify-full` (ohne: die CAs des Systems) | `database.caSecret` |
+| `HERD_DATABASE_SSLROOTCERT` | leer | CA-Datei für `verify-ca`/`verify-full` (ohne: bei `verify-full` die CAs des Systems; `verify-ca` ohne sie ist ein Startfehler) | `database.caSecret` |
 | `HERD_INTERNAL_TOKEN_PREVIOUS` (`_FILE`) | leer | das alte interne Token während eines Wechsels (nur die API) | Schlüssel `previous` im Token-Secret |
 | `HERD_MIGRATE_DATABASE_URL`, `HERD_MIGRATE_DATABASE_PASSWORD` (`_FILE`) | leer | Migrationsrolle (besitzt das Schema; Migration, `python -m app.ops`) | `database.migrate.url`, `database.migrate.existingSecret` |
 | `HERD_DATABASE_RUNTIME_ROLE` | leer | Laufzeitrolle, bekommt nach jeder Migration die Datenrechte; Pflicht zusammen mit `HERD_MIGRATE_DATABASE_URL` | `database.migrate.runtimeRole` |

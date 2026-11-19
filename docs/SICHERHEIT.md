@@ -139,8 +139,10 @@ V13.2.1). (a) und (c) gebaut, M9b Task 18; (b) Abweichung.** *Entscheidung:* (a)
 Datenbank: `HERD_DATABASE_SSLMODE` (libpq-Modi, gewinnt über die URL) und
 `HERD_DATABASE_SSLROOTCERT` (CA-Datei) erreichen jede Verbindung der App (asyncpg über
 die Engine und die LISTEN-Verbindung, `core/db_tls.py`) und `pg_dump`/`pg_restore`
-(`PGSSLMODE`/`PGSSLROOTCERT`, `ops/pgtools.child_env`; ohne CA-Datei prüfen beide gegen
-die CAs des Systems, die Werkzeuge mit `PGSSLROOTCERT=system`); im Chart `database.sslMode` und
+(`PGSSLMODE`/`PGSSLROOTCERT`, `ops/pgtools.child_env`; mit `verify-full` ohne CA-Datei
+prüfen beide gegen die CAs des Systems, die Werkzeuge mit `PGSSLROOTCERT=system`;
+`verify-ca` ohne CA-Datei lehnen Start und Chart ab, weil libpq `system` nur mit
+`verify-full` nimmt); im Chart `database.sslMode` und
 `database.caSecret` (CA aus einem Secret, in API, Worker, Migration und Sicherung
 eingehängt). Empfohlen ist `verify-full`; das mitgelieferte PostgreSQL (Test und Staging)
 spricht kein TLS, das Chart lehnt mit ihm die Modi ab, die TLS verlangen (V12.3.1).

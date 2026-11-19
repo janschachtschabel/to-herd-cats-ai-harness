@@ -88,6 +88,12 @@ fi
 if render "${ext[@]}" --set database.sslMode=sometimes >/dev/null 2>&1; then
   fail "database.sslMode took an unknown mode"
 fi
+# libpq's tools take the system's CAs with verify-full only (review M9b final, F2-3).
+if render "${ext[@]}" --set database.sslMode=verify-ca >/dev/null 2>&1; then
+  fail "database.sslMode verify-ca took no database.caSecret"
+fi
+render "${ext[@]}" --set database.sslMode=verify-ca --set database.caSecret=db-ca >/dev/null \
+  || fail "database.sslMode verify-ca with database.caSecret was refused"
 
 # J12 c: the API takes the previous internal token from the Secret's optional key
 # "previous"; the collab process sends only the current one.

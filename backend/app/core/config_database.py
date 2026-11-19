@@ -9,9 +9,10 @@ that migrations give data rights only.
 
 HERD_DATABASE_SSLMODE takes libpq's modes and wins over an `ssl`/`sslmode` in the URL;
 empty keeps the URL's (and asyncpg's default, `prefer`). HERD_DATABASE_SSLROOTCERT is
-the CA file to verify the server against (`verify-ca`, `verify-full`); without it the
-system's CAs. Both reach asyncpg (`core/db_tls.py`) and pg_dump/pg_restore
-(`ops/pgtools.child_env`)."""
+the CA file to verify the server against (`verify-ca`, `verify-full`); `verify-full`
+without it checks the system's CAs, `verify-ca` without it is refused (libpq's tools
+take the system's CAs only with `verify-full`). Both reach asyncpg (`core/db_tls.py`)
+and pg_dump/pg_restore (`ops/pgtools.child_env`)."""
 
 import re
 from pathlib import Path
@@ -45,6 +46,13 @@ class DatabaseSettings(BaseSettings):
         cert = self.database_sslrootcert
         if cert is not None and not cert.is_file():
             raise ValueError("HERD_DATABASE_SSLROOTCERT cannot be read: no such file")
+        # libpq's tools take the system's CAs (`sslrootcert=system`) only with
+        # verify-full; with verify-ca every backup and restore would fail (F2-3).
+        if self.database_sslmode == "verify-ca" and cert is None:
+            raise ValueError(
+                "HERD_DATABASE_SSLMODE=verify-ca needs HERD_DATABASE_SSLROOTCERT (the CA "
+                "file); without one use verify-full, which checks the system's CAs"
+            )
         return self
 
     @model_validator(mode="after")

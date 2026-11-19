@@ -1,4 +1,4 @@
-"""Review of M9b Task 18 (R18-2): `HERD_DATABASE_SSLMODE=verify-full` (or `verify-ca`)
+"""Review of M9b Task 18 (R18-2): `HERD_DATABASE_SSLMODE=verify-full`
 without `HERD_DATABASE_SSLROOTCERT` must mean the same for the app and for the
 PostgreSQL tools: the system's CAs, as the README, `config_database.py` and the chart's
 `database.caSecret` ("Empty: the image's system CAs") say.
@@ -20,10 +20,11 @@ def _settings(mode: str) -> Settings:
 
 
 def test_the_tools_verify_against_the_systems_cas_like_the_app() -> None:
-    for mode in ("verify-full", "verify-ca"):
-        env = child_env(_settings(mode))
-        assert env["PGSSLMODE"] == mode
-        assert env.get("PGSSLROOTCERT") == "system", mode
+    """Only for verify-full: libpq refuses `sslrootcert=system` with verify-ca, which
+    therefore needs HERD_DATABASE_SSLROOTCERT (review M9b final, F2-3)."""
+    env = child_env(_settings("verify-full"))
+    assert env["PGSSLMODE"] == "verify-full"
+    assert env.get("PGSSLROOTCERT") == "system"
 
 
 def test_pg_dump_does_not_ask_for_a_root_crt_in_the_home_directory() -> None:

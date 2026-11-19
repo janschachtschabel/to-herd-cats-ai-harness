@@ -26,7 +26,6 @@ from app.ops import tool_errors
 _VERSION = re.compile(r"\(PostgreSQL\)\s+(\d+)(?:\.(\d+))?")
 # The asyncpg URL's TLS option, as libpq names it.
 _SSL_QUERY = ("sslmode", "ssl")
-_VERIFYING = frozenset({"verify-ca", "verify-full"})
 
 
 class ToolFailed(Exception):
@@ -61,9 +60,12 @@ def child_env(settings: Settings) -> dict[str, str]:
         env["PGSSLMODE"] = settings.database_sslmode
     if settings.database_sslrootcert is not None:
         env["PGSSLROOTCERT"] = str(settings.database_sslrootcert)
-    elif env.get("PGSSLMODE") in _VERIFYING:
+    elif settings.database_sslmode == "verify-full":
         # Without a file asyncpg verifies against the system's CAs; libpq does so only
         # when told (PostgreSQL 16+), else it looks for ~/.postgresql/root.crt (R18-2).
+        # libpq takes `system` with verify-full only; verify-ca needs a file, which
+        # the settings demand (F2-3). A mode from the URL keeps libpq's own default,
+        # as asyncpg does for it.
         env["PGSSLROOTCERT"] = "system"
     return env
 
