@@ -150,7 +150,7 @@ async def test_more_than_a_hundred_attendees_are_refused(
     event = await new_event(t.organiser_client, t.calendar["id"])
     many = [{"type": "email", "email": f"p{i}@example.org"} for i in range(101)]
     r = await put_attendees(t.organiser_client, event, many, event["version"])
-    assert r.status_code == 422
+    assert _code(r) == (422, "validation_failed")  # the schema's bound (max_length)
     ok = await put_attendees(t.organiser_client, event, many[:100], event["version"])
     assert ok.status_code == 200, ok.text
     twice = [person(t.reader), person(t.reader)]

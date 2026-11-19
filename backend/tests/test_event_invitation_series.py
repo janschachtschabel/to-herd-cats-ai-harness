@@ -19,6 +19,7 @@ from tests.factories_invitations import (
     attendees,
     invite,
     person,
+    put_attendees,
     responses,
     team,
 )
@@ -130,3 +131,22 @@ async def test_answering_a_series_reaches_the_overrides_that_followed_it(
     ):
         got = responses(await attendees(t.organiser_client, event_id))
         assert got == {str(t.outsider.id): expected}
+
+
+async def test_a_series_change_that_would_fill_an_override_past_a_hundred_is_refused(
+    make_client: Any, make_user: MakeUser, make_space: MakeSpace
+) -> None:
+    """The schema bounds one list at 100; a series' newcomer reaches each override, so
+    an override with one of its own on top of the series' 99 would hold 101: 422
+    `event.too_many_attendees`, and nothing is written."""
+    t = await team(make_client, make_user, make_space)
+    many = [{"type": "email", "email": f"p{i}@example.org"} for i in range(99)]
+    series = await _series(t, *many)
+    override = await _change(t.organiser_client, series, "this", SECOND, title="Anders")
+    await invite(t.organiser_client, override, *many, person(t.outsider))
+    current = (await t.organiser_client.get(f"/api/events/{series['id']}")).json()
+    r = await put_attendees(
+        t.organiser_client, series, [*many, person(t.reader)], current["version"]
+    )
+    assert (r.status_code, r.json()["error"]["code"]) == (422, "event.too_many_attendees")
+    assert len(await attendees(t.organiser_client, series["id"])) == 99
