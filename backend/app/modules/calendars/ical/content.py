@@ -88,9 +88,10 @@ def _minutes_before(trigger: lines.Prop | None, duration: timedelta) -> int | No
     if trigger is None or (trigger.param("VALUE") or "").upper() == "DATE-TIME":
         return None
     try:
-        offset = lines.duration(trigger.raw)
+        days, exact = lines.duration(trigger.raw)
     except Skip:
         return None
+    offset = timedelta(days=days) + exact
     if (trigger.param("RELATED") or "").upper() == "END":
         offset += duration
     before = -offset
@@ -141,7 +142,7 @@ def _attendees(props: list[lines.Prop], notes: Counter[str]) -> tuple[AttendeeDr
         if email.lower() in seen:
             continue
         seen.add(email.lower())
-        name = lines.clean(prop.param("CN") or "").strip()[:MAX_TITLE] or None
+        name = lines.one_line(prop.param("CN") or "")[:MAX_TITLE] or None
         role = (prop.param("ROLE") or "").upper()
         found.append(
             AttendeeDraft(

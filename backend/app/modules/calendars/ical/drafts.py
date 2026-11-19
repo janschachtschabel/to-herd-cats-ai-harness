@@ -104,6 +104,10 @@ class ExportEvent:
     alarms: tuple[int, ...] = ()
     redacted: bool = False
 
+    def __post_init__(self) -> None:
+        if self.stamp.tzinfo is None:
+            raise ValueError("the stamp must be aware: it is never read in the process's zone")
+
     @classmethod
     def of(cls, draft: EventDraft, *, stamp: datetime, redacted: bool = False) -> Self:
         shared = {field.name: getattr(draft, field.name) for field in fields(EventDraft)}

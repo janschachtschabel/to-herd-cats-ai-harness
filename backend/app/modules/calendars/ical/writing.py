@@ -22,6 +22,7 @@ from icalendar import Alarm, Calendar, Event, Timezone, vCalAddress, vDuration, 
 from icalendar.prop import vInline
 
 from app.modules.calendars import recurrence, zones
+from app.modules.calendars.ical import lines
 from app.modules.calendars.ical.drafts import (
     AttendeeDraft,
     Content,
@@ -60,8 +61,8 @@ def _stream(events: Iterable[ExportEvent], name: str | None) -> Iterator[bytes]:
     head.add("PRODID", PRODID)
     head.add("CALSCALE", "GREGORIAN")
     if name is not None:
-        head.add("NAME", vText(name))
-        head.add("X-WR-CALNAME", vText(name))
+        head.add("NAME", vText(_text(name)))
+        head.add("X-WR-CALNAME", vText(_text(name)))
     yield head.to_ical().removesuffix(_END)
     written: set[str] = set()
     for event in events:
@@ -95,8 +96,9 @@ def _vevents(event: ExportEvent) -> Iterator[Event]:
     uid = _opaque(event.uid) if event.redacted else event.uid
     master = _vevent(uid, event.stamp, event.series, event.content, event.redacted)
     if not event.redacted:
-        if event.organiser:
-            master.add("ORGANIZER", vCalAddress(f"mailto:{event.organiser}"))
+        organiser = lines.valid_address(event.organiser or "")
+        if organiser is not None:
+            master.add("ORGANIZER", vCalAddress(f"mailto:{organiser}"))
         for minutes in event.alarms:
             master.add_component(_alarm(minutes, event.content.title))
     yield master
@@ -108,7 +110,7 @@ def _vevents(event: ExportEvent) -> Iterator[Event]:
 
 def _vevent(uid: str, stamp: datetime, series: Series, content: Content, redacted: bool) -> Event:
     part = Event()
-    part.add("UID", uid)
+    part.add("UID", _text(uid))
     part.add("DTSTAMP", stamp.astimezone(UTC))
     part.add(*_moment("DTSTART", series, series.start))
     _end(part, series)
@@ -131,9 +133,10 @@ def _vevent(uid: str, stamp: datetime, series: Series, content: Content, redacte
         ("DESCRIPTION", content.description),
     ):
         if text:
-            part.add(key, text)
+            part.add(key, _text(text))
     for attendee in content.attendees:
-        part.add("ATTENDEE", _attendee(attendee))
+        if (written := _attendee(attendee)) is not None:
+            part.add("ATTENDEE", written)
     return part
 
 
@@ -178,20 +181,28 @@ def _exact(duration: timedelta) -> str:
 def _alarm(minutes: int, title: str) -> Alarm:
     alarm = Alarm()
     alarm.add("ACTION", "DISPLAY")
-    alarm.add("DESCRIPTION", title or "Reminder")
+    alarm.add("DESCRIPTION", _text(title) or "Reminder")
     alarm.add("TRIGGER", vDuration(-timedelta(minutes=minutes)))
     return alarm
 
 
-def _attendee(attendee: AttendeeDraft) -> vCalAddress:
-    address = vCalAddress(f"mailto:{attendee.email}")
-    if attendee.name:
-        address.params["CN"] = attendee.name
-    address.params["ROLE"] = (
-        "OPT-PARTICIPANT" if attendee.role is Role.OPTIONAL else "REQ-PARTICIPANT"
-    )
+def _attendee(attendee: AttendeeDraft) -> vCalAddress | None:
+    email = lines.valid_address(attendee.email)
+    if email is None:
+        return None  # nothing that is no address goes out
+    address = vCalAddress(f"mailto:{email}")
+    if name := lines.one_line(attendee.name or ""):
+        address.params["CN"] = name
+    optional = attendee.role is Role.OPTIONAL
+    address.params["ROLE"] = "OPT-PARTICIPANT" if optional else "REQ-PARTICIPANT"
     address.params["PARTSTAT"] = _PARTSTAT[attendee.response]
     return address
+
+
+def _text(text: str) -> str:
+    """A text as TEXT can carry it: line breaks as `\\n` (escaped by `vText`), no
+    other control character, never a bare carriage return."""
+    return lines.clean(text.replace("\r\n", "\n").replace("\r", "\n"))
 
 
 def _opaque(uid: str) -> str:

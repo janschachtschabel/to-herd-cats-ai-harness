@@ -28,6 +28,7 @@ from app.modules.calendars.recurrence_rule import FIRST_YEAR, LAST_YEAR
 
 DAY = timedelta(days=1)
 _UNTIL = re.compile(r"(?i)^(\s*UNTIL\s*=\s*)([0-9]{8}(?:T[0-9]{6}Z?)?)\s*$")
+_EARLIEST = datetime(FIRST_YEAR, 1, 1, tzinfo=UTC)
 _WALL_PROPS = ("DTSTART", "DTEND", "RDATE", "EXDATE", "RECURRENCE-ID")
 
 
@@ -96,18 +97,14 @@ def length(part: lines.Component, begin: Start, frame: Frame) -> timedelta:
             return DAY * max(days, 1)
         found = _instant(value, end.param("TZID"), begin.tzid or "UTC", frame) - begin.instant
     elif (written := part.first("DURATION")) is not None:
-        found = lines.duration(written.raw)
-        if found < timedelta():
+        days, exact = lines.duration(written.raw)
+        if days < 0 or exact < timedelta():
             raise Skip(problems.TIME_INVALID)
         if begin.all_day:
-            return DAY * max(-(-found // DAY), 1)
+            return DAY * max(days + -(-exact // DAY), 1)
         # whole days are nominal (RFC 5545 3.3.6): the same wall time days later
-        nominal = begin.wall + timedelta(days=found.days)
-        found = (
-            _localise(nominal, begin.tzid or "UTC")
-            + timedelta(seconds=found.seconds)
-            - begin.instant
-        )
+        nominal = _localise(begin.wall + timedelta(days=days), begin.tzid or "UTC")
+        found = nominal + exact - begin.instant
     else:
         return DAY if begin.all_day else timedelta()
     if found < timedelta():
@@ -140,6 +137,11 @@ def until(rule: str, begin: Start, frame: Frame) -> str:
         if match is None:
             continue
         written = lines.date_time(match.group(2))
+        if written.year > LAST_YEAR:
+            del parts[index]
+            return ";".join(parts)
+        if written.year < FIRST_YEAR:  # ends the series at its start
+            written = date(FIRST_YEAR, 1, 1) if begin.all_day else _EARLIEST
         if begin.all_day:
             day = _day_of(written, None, frame)
             moment = datetime.combine(day, time(), tzinfo=UTC)
@@ -150,7 +152,7 @@ def until(rule: str, begin: Start, frame: Frame) -> str:
         if moment.year > LAST_YEAR:
             del parts[index]
             return ";".join(parts)
-        moment = max(moment, datetime(FIRST_YEAR, 1, 1, tzinfo=UTC))
+        moment = max(moment, _EARLIEST)
         text = moment.strftime("%Y%m%d") if begin.all_day else moment.strftime("%Y%m%dT%H%M%SZ")
         parts[index] = f"UNTIL={text}"
         return ";".join(parts)

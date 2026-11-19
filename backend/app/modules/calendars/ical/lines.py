@@ -11,14 +11,18 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 
-from icalendar import vDuration
 from icalendar.parser import Contentline, Contentlines
+from icalendar.parser.property import unescape_backslash
 
 from app.modules.calendars.ical import problems
 from app.modules.calendars.ical.problems import Skip
 
 # ASCII digits only; seconds up to 60 (a leap second, read as 59).
 _DATE_TIME = re.compile(r"([0-9]{4})([0-9]{2})([0-9]{2})(?:T([0-9]{2})([0-9]{2})([0-9]{2})(Z)?)?")
+# RFC 5545 3.3.6: weeks or days (nominal) and a time part (exact).
+_DURATION = re.compile(
+    r"([+-])?P(?:([0-9]{1,6})W)?(?:([0-9]{1,6})D)?(?:T(?:([0-9]{1,6})H)?(?:([0-9]{1,6})M)?(?:([0-9]{1,6})S)?)?"
+)
 _OFFSET = re.compile(r"([+-])([0-9]{2})([0-9]{2})([0-9]{2})?")
 # C0 controls but tab and line feed, and DEL: never in a text (Postgres takes no NUL).
 _CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
@@ -78,7 +82,7 @@ def _prop(line: Contentline) -> Prop:
         str(key).upper(): str(value[0] if isinstance(value, list) and value else value)
         for key, value in params.items()
     }
-    return Prop(str(name).upper(), flat, str(raw), line.parts()[2])
+    return Prop(str(name).upper(), flat, str(raw), unescape_backslash(str(raw)))
 
 
 def read(data: bytes) -> tuple[list[Component], Counter[str]]:
@@ -146,14 +150,20 @@ def date_times(prop: Prop) -> list[date | datetime]:
     return values
 
 
-def duration(value: str) -> timedelta:
-    try:
-        found = vDuration.from_ical(value.strip())  # type: ignore[no-untyped-call]
-    except (ValueError, TypeError):
-        raise Skip(problems.TIME_INVALID) from None
-    if not isinstance(found, timedelta):
+def duration(value: str) -> tuple[int, timedelta]:
+    """A DURATION as its nominal days (weeks count seven) and its exact time, both with
+    the duration's sign: `PT36H` is 36 hours, `P1DT12H` a day and 12 hours."""
+    match = _DURATION.fullmatch(value.strip().upper())
+    if (
+        match is None
+        or match.group(0).rstrip("T") in ("P", "+P", "-P")
+        or value.strip().endswith("T")
+    ):
         raise Skip(problems.TIME_INVALID)
-    return found
+    sign, weeks, days, hours, minutes, seconds = match.groups()
+    whole = int(weeks or 0) * 7 + int(days or 0)
+    exact = timedelta(hours=int(hours or 0), minutes=int(minutes or 0), seconds=int(seconds or 0))
+    return (-whole, -exact) if sign == "-" else (whole, exact)
 
 
 def offset(value: str) -> timedelta:
@@ -169,8 +179,21 @@ def address(prop: Prop | None) -> str | None:
     """The address of a `mailto:` value (ORGANIZER, ATTENDEE), as written."""
     if prop is None or prop.raw[:7].lower() != "mailto:":
         return None
-    found = prop.raw[7:].strip()
-    local, at, domain = found.partition("@")
-    if not (local and at and domain) or any(c.isspace() for c in found) or len(found) > 320:
+    return valid_address(prop.raw[7:].strip())
+
+
+def valid_address(text: str) -> str | None:
+    """`text` if it is one address (`local@domain`, no space or control character, at
+    most 320 characters), else None."""
+    local, at, domain = text.partition("@")
+    if not (local and at and domain) or len(text) > 320:
         return None
-    return clean(found)
+    if any(c.isspace() or c < " " or c == "\x7f" for c in text):
+        return None
+    return text
+
+
+def one_line(text: str) -> str:
+    """`text` without control characters and with its white space runs as one space
+    (a name)."""
+    return " ".join(clean(text).split())

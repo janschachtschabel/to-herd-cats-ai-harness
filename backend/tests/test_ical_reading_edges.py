@@ -100,11 +100,22 @@ def test_years_outside_the_calendar_are_refused_or_cut() -> None:
         _calendar(
             _event("old", "RRULE:FREQ=YEARLY", start="DTSTART;VALUE=DATE:18500101"),
             _event("far-until", "RRULE:FREQ=YEARLY;UNTIL=99991231T235959Z"),
+            _event(
+                "far-until-date",
+                "RRULE:FREQ=YEARLY;UNTIL=99991231",  # its end of day lies past datetime's
+                start="DTSTART;TZID=America/New_York:20260710T090000",
+            ),
+            _event("early-until", "RRULE:FREQ=YEARLY;UNTIL=18000101T000000Z"),
         )
     )
     assert parsed.problems == Counter({"ical.time_out_of_range": 1})
-    (far,) = parsed.events
-    assert far.series.rrule == "FREQ=YEARLY"  # an UNTIL beyond 2399 ends nothing earlier
+    rules = {d.uid: d.series.rrule for d in parsed.events}
+    # an UNTIL beyond 2399 ends nothing earlier; one before 1900 ends at the start
+    assert rules == {
+        "far-until": "FREQ=YEARLY",
+        "far-until-date": "FREQ=YEARLY",
+        "early-until": "FREQ=YEARLY;UNTIL=19000101T000000Z",
+    }
 
 
 def test_a_rule_that_never_matches_is_read_as_its_start_alone() -> None:
@@ -263,3 +274,20 @@ def test_every_code_is_listed() -> None:
         "ical.over_limit",
     }
     assert all(code.startswith("ical.") for code in problems.CODES)
+
+
+@pytest.mark.parametrize(
+    ("written", "hours"),
+    [
+        ("PT36H", 36),  # exact hours, also across the end of summer time
+        ("P1DT12H", 37),  # a day is nominal: the same wall time a day later, then 12 h
+        ("P1W", 7 * 24 + 1),
+    ],
+)
+def test_a_duration_counts_days_by_the_wall_clock_and_hours_exactly(
+    written: str, hours: int
+) -> None:
+    start = "DTSTART;TZID=Europe/Berlin:20261024T120000"
+    parsed = _parse(_calendar(_event("d", f"DURATION:{written}", start=start)))
+    (event,) = parsed.events
+    assert event.series.duration == timedelta(hours=hours)
